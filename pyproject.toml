@@ -1,0 +1,30 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "xiang-shuiyin-qt"
+version = "0.1.0"
+description = "「镶·水印」 水印处理工具（Qt6 桌面版）"
+readme = "README.md"
+requires-python = ">=3.10"
+license = "MIT"
+dependencies = [
+    "Pillow>=10.0",
+    "exifread>=3.0",
+    # 运行时只用 QtWidgets/QtGui/QtCore, 都在 Essentials 里;
+    # 用 PySide6 元包是为了开发方便, 打包时应换成 PySide6-Essentials 以省掉约 77MB 的 Addons
+    "PySide6>=6.11",
+]
+
+[project.optional-dependencies]
+build = [
+    "pyinstaller>=6.0",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/xiangshuiyin", "src/xsy_qt"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"

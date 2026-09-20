@@ -1,0 +1,53 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+.pyi-build*/
+.pyi-dist/
+*.egg
+
+# Virtual environments
+venv/
+.venv/
+env/
+
+# IDE
+.vscode/
+.idea/
+.zcode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Logs
+*.log
+
+# history
+history/
+
+# 本地调试
+*.bat
+
+# 本地配置 / 凭据 / 运行时数据
+.env
+.env.*
+*.db
+*.sqlite*
+settings.json
+presets.json
+
+# 测试与覆盖率
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+tools/
+shots/
+/README.md
+/docs/images/

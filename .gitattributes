@@ -1,0 +1,37 @@
+* text=auto
+
+# 跨平台一致: 所有文本/脚本/配置/文档统一 LF
+*.py           text eol=lf
+*.md           text eol=lf
+*.yml          text eol=lf
+*.yaml         text eol=lf
+*.html         text eol=lf
+*.css          text eol=lf
+*.js           text eol=lf
+*.json         text eol=lf
+*.toml         text eol=lf
+*.spec         text eol=lf
+*.txt          text eol=lf
+*.cfg          text eol=lf
+*.ini          text eol=lf
+*.svg          text eol=lf
+.gitignore     text eol=lf
+LICENSE        text eol=lf
+.gitattributes text eol=lf
+
+# 二进制素材(git 的自动探测本来就认得, 这里显式声明防呆):
+# 不做行尾转换、也不参与 diff
+*.ttf  binary
+*.otf  binary
+*.ttc  binary
+*.ico  binary
+*.png  binary
+*.jpg  binary
+*.jpeg binary
+*.webp binary
+*.gif  binary
+
+# export-ignore — git archive 打包时排除以下路径，不随 release 分发
+.github/       export-ignore
+.gitignore     export-ignore
+.gitattributes export-ignore
