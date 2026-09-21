@@ -8,6 +8,7 @@
 这里是**本程序自己的固定位置**(Windows: %LOCALAPPDATA%\\XiangShuiyin-QT6 + 临时预览目录),
 与任何其它程序无关; 用 setdefault 是为了让工具脚本能注入自己的临时目录(见 tools/)。
 """
+import logging
 import os
 import sys
 import tempfile
@@ -31,9 +32,10 @@ os.environ.setdefault("XSY_BASE_DIR", os.path.join(_data_root(), "XiangShuiyin-Q
 os.environ.setdefault("XSY_PREVIEW_DIR",
                       os.path.join(tempfile.gettempdir(), "XiangShuiyin_preview_qt"))
 
+from xiangshuiyin import __version__ as app_version   # noqa: E402
 from xiangshuiyin import app as core          # noqa: E402 - 必须晚于上面的环境变量
 from xsy_qt import theme                      # noqa: E402
-from xsy_qt.window import MainWindow          # noqa: E402
+from xsy_qt.window import MainWindow, _PREVIEW_SHARPEN, _SLOW_RENDER_MS   # noqa: E402
 
 
 def main():
@@ -57,7 +59,35 @@ def main():
     print(f"[启动] 日志:     {os.path.join(core.LOG_DIR, 'log-' + core.LOG_TIMESTAMP + '.log')}")
     if not os.path.exists(core.SETTINGS_FILE):
         print("[启动] 未找到设置文件, 使用出厂默认参数")
+    _log_environment(win)
     return app.exec()
+
+
+def _log_environment(win):
+    """把"这次跑在什么环境"一次写进日志。
+
+    以前这些数字每次排查都要现写探针去量(DPI/可用区/窗口尺寸/档位), 现在启动即可见 ——
+    "发虚/顶出屏幕/预览慢"这类问题第一眼就能排除环境因素。
+    """
+    import platform
+
+    from PySide6 import __version__ as pyside_version
+
+    logging.info(f"[环境] 版本 {app_version} | Python {platform.python_version()} | "
+                 f"PySide6 {pyside_version} | {platform.system()}-{platform.release()}-{platform.version()}")
+    scr = win.screen()
+    if scr is not None:
+        geo, avail = scr.geometry(), scr.availableGeometry()
+        sizes = win._split.sizes() if getattr(win, "_split", None) else []
+        logging.info(f"[环境] 屏幕 {scr.name()} {int(geo.width() * scr.devicePixelRatio())}x"
+                     f"{int(geo.height() * scr.devicePixelRatio())}@{scr.devicePixelRatio():g}x "
+                     f"(逻辑 {geo.width()}x{geo.height()}, 可用 {avail.width()}x{avail.height()})")
+        logging.info(f"[环境] 窗口 {win.width()}x{win.height()} 分栏 {sizes} "
+                     f"预览区 {win._preview.width()}x{win._preview.height()}")
+    logging.info(f"[环境] 数据目录 {core.BASE_DIR} | 预览目录 {core.PREVIEW_DIR} | 日志 {core.LOG_FILE}")
+    logging.info(f"[环境] 档位 PREVIEW_MAX_SIDE={core.PREVIEW_MAX_SIDE} 上屏锐化={_PREVIEW_SHARPEN} "
+                 f"层缓存预算={core._LAYER_CACHE_BUDGET >> 20}MB 单层上限={core._LAYER_CACHE_MAX_PX // 1_000_000}MP "
+                 f"慢调用阈值={_SLOW_RENDER_MS}ms")
 
 
 if __name__ == "__main__":

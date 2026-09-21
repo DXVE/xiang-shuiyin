@@ -35,6 +35,10 @@ class PreviewWorker(QThread):
 
     request() 只覆盖待渲染槽并唤醒, 不排队 —— 所以渲染耗时 500ms 时, 用户连拖 3 秒滑块
     最多同时存在"1 个在渲染 + 1 个待渲染", 不会积压出一串过期预览。
+
+    但**在跑的那一轮不会被中断**: 它照常渲完、照常上屏(此时参数可能已经又改过)。于是
+    "请求→上屏"会等于"等上一轮跑完 + 自己这一轮", 前一段常被误读成渲染变慢 ——
+    所以这里统计 _arrived_during(渲染期间又到达了几次请求), 由界面写进日志。
     """
 
     rendered = Signal(dict)
@@ -45,9 +49,13 @@ class PreviewWorker(QThread):
         self._cv = threading.Condition()
         self._pending = None          # (req, 发起时刻)
         self._stopping = False
+        self._inflight = False        # 是否正在渲染(用于统计"渲染期间又来了几次请求")
+        self._arrived_during = 0
 
     def request(self, req):
         with self._cv:
+            if self._inflight:
+                self._arrived_during += 1
             self._pending = (req, time.perf_counter())
             self._cv.notify()
 
@@ -57,6 +65,8 @@ class PreviewWorker(QThread):
             self._cv.notify()
 
     def run(self):
+        # 线程名进日志(%(threadName)s): QThread 的 Python 线程名默认是 Dummy-N, 一点信息都没有
+        threading.current_thread().name = "预览线程"
         while True:
             with self._cv:
                 while self._pending is None and not self._stopping:
@@ -65,22 +75,32 @@ class PreviewWorker(QThread):
                     return
                 req, t0 = self._pending
                 self._pending = None
-            resp = self._render(req)
+                self._inflight = True
+                arrived = self._arrived_during
+                self._arrived_during = 0
+            # 排队 = 从"用户发起"到"真正开渲"的等待(只可能是等上一轮跑完), 与渲染耗时分开记
+            resp = self._render(req, queue_ms=(time.perf_counter() - t0) * 1000)
             resp["_req_t"] = t0
+            resp["arrived_during"] = arrived
+            self._inflight = False
             self.rendered.emit(resp)
 
-    def _render(self, req):
+    def _render(self, req, queue_ms=0.0):
         t0 = time.perf_counter()
         try:
             resp = self._state.make_preview(req)
         except Exception as e:                     # noqa: BLE001 - 任何异常都要回给界面
             traceback.print_exc()
-            return {"ok": False, "error": f"预览失败: {e}", "ms": 0}
+            return {"ok": False, "error": f"预览失败: {e}", "ms": 0, "queue_ms": queue_ms}
         resp = dict(resp or {})
         resp["ms"] = (time.perf_counter() - t0) * 1000
+        resp["queue_ms"] = queue_ms
         pil = resp.get("image")
         if resp.get("ok") and pil is not None:
+            t_conv = time.perf_counter()
             resp["image"] = _pil_to_qimage(pil)
+            # PIL->QImage 的内存拷贝: 预览档一张约 10~25ms。与渲染耗时分开记, 免得混成一个数
+            resp["qimg_ms"] = (time.perf_counter() - t_conv) * 1000
         return resp
 
 
@@ -102,6 +122,7 @@ class EventWatcher(QThread):
         self._stopping = True
 
     def run(self):
+        threading.current_thread().name = "事件线程"
         while not self._stopping:
             q = self._state.events
             try:

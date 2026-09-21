@@ -22,6 +22,11 @@ TEXT = "#0f172a"
 MUTED = "#7A756C"
 EMPTY_SLOT = "#C6BEB0"   # 空位虚线框: 比边框色(LINE)深一档, 否则在卡片上看不出有多少个空位
 WARN_BG = "#FDF6E3"
+# 滚动条 handle 的静默色: 比背景(BG)与边框(LINE)都深一档, 保证鼠标一扫就能定位。
+# 第一版用了很淡的 #DDD6C8 + 4px 细 handle, 结论是"太细太淡、难以定位", 所以回到这个深度、
+# 并把 handle 放回 6px(见 QSS)。它只在**真的可以滚动**时出现(见 window._wire_scrollbar 的
+# emptyRange), 所以不必再考虑"平时也在"的那种克制。
+SCROLL_HANDLE = "#C6BEB0"
 
 _ASSETS = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets")
 
@@ -64,7 +69,7 @@ QSS = f"""
 QWidget {{
     color: {TEXT};
     font-family: "Microsoft YaHei UI", "Segoe UI", sans-serif;
-    font-size: 13px;
+    font-size: 12px;
 }}
 QMainWindow, QDialog {{ background: {BG}; }}
 /* 滚动区与其 viewport 透明, 露出页签的卡片底色 */
@@ -110,12 +115,12 @@ QFrame#card {{
     border-radius: {RADIUS_CARD}px;
 }}
 QLabel#cardTitle {{
-    font-size: 14px;
+    font-size: 13px;
     font-weight: bold;
     color: #334155;
     background: transparent;
 }}
-QLabel#hint {{ color: {MUTED}; font-size: 12px; background: transparent; }}
+QLabel#hint {{ color: {MUTED}; font-size: 11px; background: transparent; }}
 QLabel#fieldLabel {{ background: transparent; }}
 QLabel#muted {{ color: {MUTED}; background: transparent; }}
 
@@ -147,7 +152,7 @@ QPushButton#primary {{
 }}
 QPushButton#primary:hover {{ background: {ACCENT2}; }}
 QPushButton#primary:disabled {{ background: #b8c9bd; border-color: #a8b9ad; color: #f0f0f0; }}
-QPushButton#mini {{ padding: 0 8px; font-size: 12px; border-radius: {RADIUS_SMALL}px; color: {MUTED}; }}
+QPushButton#mini {{ padding: 0 8px; font-size: 11px; border-radius: {RADIUS_SMALL}px; color: {MUTED}; }}
 
 /* ---------- 输入控件 ---------- */
 QLineEdit, QSpinBox, QDoubleSpinBox, QComboBox {{
@@ -213,14 +218,36 @@ QCheckBox::indicator:unchecked:hover {{ image: url({CHECK_OFF_HOVER}); }}
 QCheckBox::indicator:checked {{ image: url({CHECK_ON}); }}
 QCheckBox::indicator:checked:hover {{ image: url({CHECK_ON_HOVER}); }}
 
-/* ---------- 滚动条 ---------- */
+/* ---------- 滚动条 ----------
+   左列的滚动条**常驻**(见 window._build_tab: 常驻才能让卡片宽度不跳), 但"常驻"不等于"平时要看得见":
+   内容不满一屏时滚动范围为 0, Qt 会把 handle 拉满整条轨道 —— 那是一条从顶到底的实心长条, 难看。
+   所以按滚动范围切两态(window._wire_scrollbar 设动态属性 emptyRange 并重新 polish):
+     范围 0  -> handle 画成透明, 平时就是"看不见的一条"
+     可滚动  -> 14px 轨道 / 手柄两侧各留 2px => 10px 宽的圆头手柄 + SCROLL_HANDLE(深), 好定位;
+                悬停/按下上主色。
+   手柄尺寸靠两个数控制: QScrollBar 的 width = **占位总宽**(改它必须同步 window._SB_W, 页签行按
+   它留右侧占位); QScrollBar::handle 的 margin: 0 Npx = 两侧缝隙, 手柄宽 = width - 2N。
+   缝隙要"两边都有"就得给 handle 加 margin —— 只给 QScrollBar 加 margin 的话手柄会贴着一边。
+   占位宽度始终保留(不是 AsNeeded), 所以卡片宽度不会跳。 */
 QScrollArea {{ border: none; background: transparent; }}
-QScrollBar:vertical {{ background: transparent; width: 10px; margin: 2px; }}
-QScrollBar::handle:vertical {{ background: #d6cfc2; border-radius: 5px; min-height: 30px; }}
-QScrollBar::handle:vertical:hover {{ background: {ACCENT}; }}
-QScrollBar::add-line, QScrollBar::sub-line {{ height: 0; }}
-QScrollBar:horizontal {{ background: transparent; height: 10px; margin: 2px; }}
-QScrollBar::handle:horizontal {{ background: #d6cfc2; border-radius: 5px; min-width: 30px; }}
+QScrollBar:vertical {{ background: transparent; width: 14px; }}
+QScrollBar::handle:vertical {{ background: {SCROLL_HANDLE}; border-radius: 5px; min-height: 30px;
+                               margin: 0 2px; }}
+QScrollBar::handle:vertical:hover, QScrollBar::handle:vertical:pressed {{ background: {ACCENT}; }}
+QScrollBar::handle:vertical[emptyRange="true"] {{ background: transparent; }}
+/* 手柄上下那两段轨道(add-page/sub-page)必须显式写成透明: 不写的话它们仍由 Fusion 默认样式绘制,
+   会画出一条 1px 的槽边框, 在 125% 缩放下被抗锯齿成一条"毛边/残影"纵贯整条(实测就是这样)。 */
+QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {{ background: transparent; }}
+QScrollBar::add-line, QScrollBar::sub-line {{ height: 0; width: 0; }}
+QScrollBar::up-arrow:vertical, QScrollBar::down-arrow:vertical,
+QScrollBar::left-arrow:horizontal, QScrollBar::right-arrow:horizontal {{
+    background: none; border: none; width: 0; height: 0; }}
+QScrollBar:horizontal {{ background: transparent; height: 14px; }}
+QScrollBar::handle:horizontal {{ background: {SCROLL_HANDLE}; border-radius: 5px; min-width: 30px;
+                                 margin: 2px 0; }}
+QScrollBar::handle:horizontal:hover, QScrollBar::handle:horizontal:pressed {{ background: {ACCENT}; }}
+QScrollBar::handle:horizontal[emptyRange="true"] {{ background: transparent; }}
+QScrollBar::add-page:horizontal, QScrollBar::sub-page:horizontal {{ background: transparent; }}
 
 /* ---------- 进度条 ---------- */
 QProgressBar {{

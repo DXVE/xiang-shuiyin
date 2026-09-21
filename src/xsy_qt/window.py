@@ -10,6 +10,7 @@
               放大镜 · 间距几何标注 · 启动页/状态吐司
 """
 import inspect
+import logging
 import math
 import os
 import time
@@ -31,6 +32,7 @@ from xiangshuiyin import app as core
 from . import theme
 from .dialog import MessageDialog, csdify, go_frameless
 from .render import EventWatcher, PreviewWorker, _pil_to_qimage
+from .stats import SessionStats
 
 # process_single 实际接受的形参名 —— backend_params() 据此过滤 UI 侧参数
 _BACKEND_KEYS = set(inspect.signature(core.process_single).parameters)
@@ -190,8 +192,9 @@ _NOT_PERSISTED = {"logo_dir", "input_path", "output_path", "batch_dir", "output_
 # 放大镜尺寸/倍数/圆角, (240×160, 3 倍, 12px 圆角)
 MAG_W, MAG_H, MAG_ZOOM, MAG_RADIUS = 240, 160, 3, 12
 MAG_MARGIN = 12      # 离预览框右上角的距离; 留出投影的余量
-# 竖向滚动条宽度, 与 theme.QSS 里 `QScrollBar:vertical { width: 10px }` 一致
-_SB_W = 10
+# 竖向滚动条占位宽度, 必须与 theme.QSS 里 `QScrollBar:vertical { width }` 一致(现在 14px):
+# _segbar_row 按这个值给页签行留右侧占位, 两边不同步的话页签卡片会比参数卡片宽出那条差
+_SB_W = 14
 
 # 预览显示缩放: 用 PIL 的 LANCZOS 而不是 QPixmap.scaled(Smooth) —— 见 PreviewBox._scale_for_display
 # 后面的 UnsharpMask 是"轻锐化"(半径1/阈值3), 数值按"过冲(白边)幅度"定, 实测(856px 宽的
@@ -207,9 +210,13 @@ _PREVIEW_SHARPEN = 60
 # 初始尺寸按**屏幕可用区**(已扣任务栏)的百分比算, 不写死像素: 1080p@125% 的逻辑可用区只有
 # 1536x816, 写死 860 高会把底栏与状态栏顶到屏幕外(实测就是这个问题)。留边 _WIN_EDGE px
 # 保证四边不贴边、还能拖动。数值可直接调。
-_WIN_W_RATIO, _WIN_H_RATIO, _WIN_EDGE = 0.6, 0.8, 100
+_WIN_W_RATIO, _WIN_H_RATIO, _WIN_EDGE = 0.8, 0.9, 100
 # 左列占比(左 4 : 右 6)。窗口缩放时按此比例重排; 用户手动拖过分隔条后不再自动分配。
 _SPLIT_LEFT = 0.4
+
+# 慢调用阈值(ms): 取 800, 超过就把请求日志降级成 WARNING 并标"偏慢"。
+# 渲染 + 排队一起算 —— 用户感受到的卡顿是这两者之和(排队来自"在跑的那一轮不可中断")。
+_SLOW_RENDER_MS = 800
 
 FONT_STYLE_COLS = ("显示", "粗体", "斜体")
 FONT_STYLE_GROUPS = [
@@ -483,6 +490,7 @@ class PreviewBox(QWidget):
         super().__init__(parent)
         self.setMinimumSize(360, 300)
         self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        self.stats = None        # 由 MainWindow 注入的 SessionStats(记录上屏缩放耗时); None 时只记日志
         self._pix = None
         self._pil = None
         self._scaled = None
@@ -528,12 +536,21 @@ class PreviewBox(QWidget):
                                   Qt.TransformationMode.SmoothTransformation)
             pm.setDevicePixelRatio(dpr)
             return pm
+        t0 = time.perf_counter()
         im = self._pil.resize((dev.width(), dev.height()), Image.LANCZOS)
         if _PREVIEW_SHARPEN > 0:
             im = im.filter(ImageFilter.UnsharpMask(radius=1.0, percent=_PREVIEW_SHARPEN,
                                                    threshold=3))
         pm = QPixmap.fromImage(_pil_to_qimage(im))
         pm.setDevicePixelRatio(dpr)      # 位图是"1.25 倍的像素", 按逻辑坐标画才是 1:1
+        # 上屏缩放跑在 GUI 线程上(实测慢的时候几十毫秒), 值得单独记一条。这里只在
+        # "新画面/新尺寸"时执行(结果缓存在 _scaled), 所以每次预览最多一行 —— 绝不进逐帧重绘路径。
+        scale_ms = (time.perf_counter() - t0) * 1000
+        src = self._pil.size
+        logging.info(f"[上屏] 缩放 {src[0]}x{src[1]}→{dev.width()}x{dev.height()} "
+                     f"dpr={dpr:g} 耗时 {scale_ms:.0f}ms (PIL LANCZOS+锐化{_PREVIEW_SHARPEN})")
+        if self.stats is not None:
+            self.stats.add_display_scale(scale_ms)
         return pm
 
     def set_geo(self, geom):
@@ -1317,8 +1334,10 @@ class MainWindow(QMainWindow):
         self.setAcceptDrops(True)
         self._split_user_set = False     # 用户是否手动拖过分隔条(拖过就不再自动分配比例)
         self._fitted = False             # 是否已按屏幕可用区定过尺寸(见 _fit_to_screen)
+        self._stats = SessionStats(core)  # 会话统计: 界面右侧显示 + 退出时落一条汇总
         self._fit_to_screen()
         self._build_ui()
+        self._preview.stats = self._stats     # 上屏缩放的耗时也进统计(见 PreviewBox._scale_for_display)
         self._sync_visibility()
         self._mode_btns["single"].setChecked(True)
         self._sync_files_ui()
@@ -1342,6 +1361,7 @@ class MainWindow(QMainWindow):
         self._event_watcher = EventWatcher(state, self)
         self._event_watcher.event.connect(self._on_event)
         self._event_watcher.start()
+        self._refresh_stats()            # 状态栏右侧先显示"尚无预览", 避免那块空白看着像坏了
         self._status("拖入图片即可开始（放大镜/间距标注/取色板见后续步骤）")
 
     # ---------- 参数 ----------
@@ -1535,10 +1555,30 @@ class MainWindow(QMainWindow):
         self._status_label = QLabel("")
         self._status_label.setObjectName("statusText")
         self._status_bar.addWidget(self._status_label, 1)
+        # 状态栏右侧两组数字(等宽小字, 各自带 tooltip):
+        #   1) 每次渲染的耗时 —— 原来在预览框下方, 会让预览底边比左列高 21~22px("一高一低"),
+        #      搬到这儿后右列只剩预览一个孩子, 两侧底边自然齐平, 预览还多出那 21px 高度;
+        #   2) 本次会话的累计统计(悬停看完整分位与缓存命中率)。
+        self._perf = QLabel("")
+        self._perf.setStyleSheet("color:%s; font-family:Consolas,monospace; background:transparent;"
+                                 % theme.MUTED)
+        self._status_bar.addPermanentWidget(self._perf)
+        self._stats_label = QLabel("")
+        self._stats_label.setStyleSheet(
+            "color:%s; font-family:Consolas,monospace; background:transparent;" % theme.MUTED)
+        self._status_bar.addPermanentWidget(self._stats_label)
         self._status_bar.setContentsMargins(theme.INSET_STATUS, 0, 0, 0)
         # QStatusBar 的盒布局还会再加一点内部边距(由样式决定, 实测 2px), 首次布局后量一次补掉,
         # 否则状态文本会比顶栏/底栏多缩进那一点
         QTimer.singleShot(0, self._fix_status_inset)
+
+    def _refresh_stats(self):
+        """刷新状态栏右侧的会话统计(每次预览/生成结束时调用一次, 只做加法与一次排序)。"""
+        try:
+            self._stats_label.setText(self._stats.summary(compact=True))
+            self._stats_label.setToolTip(self._stats.summary())
+        except Exception as e:                      # 统计出问题绝不能影响主流程
+            logging.warning(f"[统计] 刷新失败: {e}")
 
     def _build_topbar(self):
         top = QFrame()
@@ -1567,15 +1607,20 @@ class MainWindow(QMainWindow):
         return top
 
     def _build_preview_pane(self):
+        """右侧预览面板: 只有预览框一个孩子。
+
+        **不要在这里加任何底部控件**(以前这里是预览下方一行耗时 `_perf`): 那一行会让预览
+        底边比左列(含滚动条)高 21~22px, 看上去"一高一低"。耗时数字现在住状态栏右侧
+        (见状态栏构造处), 右列于是填满整个面板, 两侧底边对齐。
+
+        左留白用 INSET_COL: 滚动条手柄两侧的"空气"要相等, 左边是"卡片宿主右留白(INSET_COL)
+        + 手柄自己的 margin 2px", 右边就得是"手柄 margin 2px + 这里的 INSET_COL"; 不加这段
+        预览会紧贴分隔条, 手柄看着贴向预览一侧(实测 12.4px vs 6.0px, 加上后两侧都是 12px)。
+        """
         right = QWidget()
         rl = QVBoxLayout(right)
-        rl.setContentsMargins(0, 0, 0, 0)
-        rl.setSpacing(6)
+        rl.setContentsMargins(theme.INSET_COL, 0, 0, 0)
         rl.addWidget(self._preview, 1)
-        self._perf = QLabel("")
-        self._perf.setStyleSheet("color:%s; font-family:Consolas,monospace; background:transparent;"
-                                 % theme.MUTED)
-        rl.addWidget(self._perf)
         return right
 
     def _build_bottombar(self):
@@ -1605,8 +1650,12 @@ class MainWindow(QMainWindow):
         specs = [s for s in PARAM_SPECS if s["tab"] == tab_id]
         area = QScrollArea()
         area.setWidgetResizable(True)
-        # 滚动条常驻: 内容不满一屏时也保留占位, 卡片宽度不会跳(_segbar_row 按同一宽度对齐)
+        # 滚动条常驻: 内容不满一屏时也保留占位, 卡片宽度不会跳(_segbar_row 按同一宽度对齐)。
+        # "常驻"只保占位, 不保可见 —— 不可滚动时由 _wire_scrollbar 把 handle 画成透明,
+        # 否则范围 0 会把 handle 拉满整条轨道, 变成一条从顶到底的实心长条。
         area.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOn)
+        self._wire_scrollbar(area.verticalScrollBar())
+        self._wire_scrollbar(area.horizontalScrollBar())
         host = QWidget()
         v = QVBoxLayout(host)
         # 左右留白在视口之内 —— 同时充当卡片投影的外扩余量(贴边界会被裁成直角)
@@ -1650,6 +1699,25 @@ class MainWindow(QMainWindow):
         v.addStretch(1)
         area.setWidget(host)
         return area
+
+    def _wire_scrollbar(self, sb):
+        """让滚动条"不可滚动时把手柄画成透明"。
+
+        滚动条是常驻的(占位不变 -> 卡片宽度不跳), 但范围为 0 时 Qt 会把 handle 拉满整条轨道,
+        看起来就是一条从顶到底的实心长条。这里按范围切一个动态属性, QSS 用
+        `::handle[emptyRange="true"] { background: transparent; }` 把它画成透明 —— 平时看不见,
+        一旦内容真的溢出就恢复成深色 6px 手柄(好定位)。**占位宽度始终保留**, 不是 AsNeeded,
+        所以不会出现"滚动条一出现卡片就窄 10px"的跳动。
+        """
+        def _on_range(lo, hi, bar=sb):
+            empty = hi <= lo
+            if bar.property("emptyRange") == empty:
+                return
+            bar.setProperty("emptyRange", empty)
+            bar.style().unpolish(bar)      # 改动态属性后必须重新 polish, 否则 QSS 不重算
+            bar.style().polish(bar)
+        sb.rangeChanged.connect(_on_range)
+        _on_range(sb.minimum(), sb.maximum())   # 初始态: 首次布局前范围是 0, 先按"空"起
 
     def _segbar_row(self):
         """页签行: 右侧留出竖向滚动条的宽度, 让页签卡片与下方卡片左右都对齐。
@@ -2148,13 +2216,47 @@ class MainWindow(QMainWindow):
 
     def _on_rendered(self, resp):
         if not resp.get("ok"):
-            self._status("预览失败：" + str(resp.get("error") or ""))
+            err = str(resp.get("error") or "")
+            self._status("预览失败：" + err)
+            logging.warning(f"[预览] 渲染失败: {err}")   # 失败也要留痕(以前只在状态栏闪一下)
             return
-        if resp.get("image") is not None:
-            self._preview.set_image(resp["image"])
+        img = resp.get("image")
+        if img is not None:
+            self._preview.set_image(img)
         self._preview.set_geo(resp.get("geom"))
         e2e = (time.perf_counter() - resp.get("_req_t", time.perf_counter())) * 1000
         self._perf.setText(f"渲染 {resp.get('ms', 0):.0f} ms · 请求→显示 {e2e:.0f} ms")
+
+        ms = resp.get("ms", 0.0)
+        queue_ms = resp.get("queue_ms", 0.0)
+        qimg_ms = resp.get("qimg_ms", 0.0)
+        arrived = resp.get("arrived_during", 0)
+        size = f"{img.width()}x{img.height()}" if img is not None else "-"
+        parts = [f"[预览] 渲染 {ms:.0f}ms (排队 {queue_ms:.0f}ms, 转图 {qimg_ms:.0f}ms)",
+                 f"画布 {size}",
+                 f"档 {resp.get('max_side', '-')}",
+                 f"请求→就绪 {e2e:.0f}ms"]
+        if arrived:
+            # 排队时间往往就是它造成的: 在跑的那一轮不会被中断, 新请求要等它跑完
+            parts.append(f"渲染期间又到达 {arrived} 次请求(上一轮不可中断, 排队主要来自这里)")
+        line = " | ".join(parts)
+        if ms + queue_ms >= _SLOW_RENDER_MS:
+            logging.warning(line + f" [偏慢: 渲染 {ms:.0f}ms]")
+        else:
+            logging.info(line)
+
+        # 会话统计: 与界面上的 _stats 标签同一份数据源
+        self._stats.add_preview(ms=ms, queue_ms=queue_ms, qimg_ms=qimg_ms, e2e_ms=e2e,
+                                arrived=arrived)
+        self._refresh_stats()
+        # 上一次渲染的分段耗时挂到 tooltip: 参数改完不用去翻日志就知道时间花在哪一段
+        st = resp.get("stage") or {}
+        if st.get("stages"):
+            self._perf.setToolTip(f"渲染分段({st.get('tag', '')}) 合计 {st.get('total_ms', 0):.0f}ms\n"
+                                  + "\n".join("· " + s for s in st["stages"])
+                                  + "\n\n参数指纹:\n" + str(st.get("sig", "")))
+        else:
+            self._perf.setToolTip("")
 
     # ---------- 自定义水印信息(手动 EXIF) ----------
     def _on_manual_toggle(self, on):
@@ -2316,6 +2418,9 @@ class MainWindow(QMainWindow):
             self._gen_btn.setEnabled(True)
             self._progress.setVisible(False)
             msg = str(ev.get("message") or "")
+            # 生成耗时由核心在 finished 事件里带回来(单张=这一张, 批量=整批), 进会话统计
+            self._stats.add_generated(ev.get("ms") or 0.0, ev.get("count") or 1)
+            self._refresh_stats()
             if ev.get("success"):
                 out_dir = ev.get("out_dir") or self._output_dir
                 self._status(f"已完成：{msg}")
@@ -2345,6 +2450,11 @@ class MainWindow(QMainWindow):
         if self._save_timer.isActive():     # 防抖还没到点就关窗: 立刻落盘, 否则最后一次改动会丢
             self._save_timer.stop()
             self._save_settings_now()
+        # 退出时落一条会话汇总: 单条日志答不了"这次整体有没有退化/缓存有没有用"
+        try:
+            logging.info("[统计] " + self._stats.summary_oneline())
+        except Exception as ex:             # noqa: BLE001 - 汇总失败不能挡住关窗
+            logging.warning(f"[统计] 汇总失败: {ex}")
         self._preview_worker.stop()
         self._preview_worker.wait(2000)
         self._event_watcher.stop()

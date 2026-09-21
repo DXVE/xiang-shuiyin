@@ -323,7 +323,8 @@ def _read_exif_exifread(image_path, result, debug=False):
         # L2: 不提前 return, 始终执行下方 Pillow 回退补漏,
         # 避免 exifread 部分成功(缺光圈/ISO等)时字段丢失
     except Exception as e:
-        print(f"exifread 错误: {e}")
+        # 落日志而不是 print: 之前这两个错在日志文件里完全看不到(EXIF 读失败会静默变成 unknown)
+        logging.warning(f"EXIF: exifread 读取失败({type(e).__name__}: {e}), 走 Pillow 回退")
 
 # 用 Pillow 补漏 exifread 缺失的字段(仅填 None 处, 不覆盖已有值)
 def _read_exif_pillow(image_path, result):
@@ -347,7 +348,7 @@ def _read_exif_pillow(image_path, result):
                     result['fnumber'] = fnum or result['fnumber']
                     result['iso'] = iso or result['iso']
     except Exception as e:
-        print(f"Pillow 回退失败: {e}")
+        logging.warning(f"EXIF: Pillow 回退补漏失败({type(e).__name__}: {e})")
 
 # 从图片文件路径读取 EXIF 信息(品牌、型号、快门、光圈、ISO)
 def get_exif_data_from_path(image_path, debug=False):
@@ -616,13 +617,17 @@ _MASK_CACHE_LOCK = threading.Lock()
 _MASK_CACHE_MAX = 3          # 只留最近几项
 _MASK_CACHE_MAX_PX = 16_000_000   # 超过约 16MP 的 mask 不缓存: 成品渲染是一次性的,
                                   # 缓存它只会白占内存(24MP 成品的 mask 就是 24MB)
+# 命中/未命中计数: 只在落"渲染分段"日志时读一次(见 _cache_stats_line), 不在查找路径上做别的事
+_MASK_STATS = {"hit": 0, "miss": 0}
 
 def _cached_mask(key, build):
     with _MASK_CACHE_LOCK:
         m = _MASK_CACHE.get(key)
     if m is not None:
+        _MASK_STATS["hit"] += 1
         return m
     m = build()
+    _MASK_STATS["miss"] += 1
     if key[1] * key[2] <= _MASK_CACHE_MAX_PX:
         with _MASK_CACHE_LOCK:
             if len(_MASK_CACHE) >= _MASK_CACHE_MAX:
@@ -659,6 +664,28 @@ _LAYER_CACHE_STATS = {"hit": 0, "miss": 0, "skip": 0}   # 观测用: 命中/未�
 # 按线程关闭分层缓存: 批量里每张图只渲染一次, 缓存纯空转, 还会把交互预览的层挤出去。
 # 必须用 thread-local —— 批量进行时用户仍可能拖图调参, 全局开关会误伤预览线程。
 _LAYER_CACHE_TLS = threading.local()
+# 预览源缩略图缓存(psrc)的命中计数: 它决定"这张图第一次预览的额外开销"有没有被摊掉
+_THUMB_STATS = {"hit": 0, "miss": 0}
+
+
+def _cache_stats_line():
+    """本次渲染期间的缓存使用情况: 增量(相对上一次落日志) + 累计 + 占用。
+
+    只在落"渲染分段"日志时调用一次(每次渲染一行), 不在任何查找热路径上。
+    计数是各线程无锁自增的, 这里读到的是近似值; 日志用途足够。
+    """
+    with _LAYER_CACHE_LOCK:
+        cur = dict(_LAYER_CACHE_STATS)
+        used_mb = _LAYER_CACHE_BYTES[0] / 1e6
+    prev = _CACHE_STATS_SNAPSHOT
+    dh, dm = cur["hit"] - prev[0], cur["miss"] - prev[1]
+    _CACHE_STATS_SNAPSHOT[0], _CACHE_STATS_SNAPSHOT[1] = cur["hit"], cur["miss"]
+    return (f" | 层缓存 +{dh}命中/+{dm}未命中 (累计 {cur['hit']}/{cur['miss']}, 占用 {used_mb:.0f}MB)"
+            f" 蒙版 {_MASK_STATS['hit']}/{_MASK_STATS['miss']}"
+            f" 缩略图 {_THUMB_STATS['hit']}/{_THUMB_STATS['miss']}")
+
+
+_CACHE_STATS_SNAPSHOT = [0, 0]      # [层缓存累计命中, 累计未命中] 上一次落日志时的值(算增量用)
 
 
 def _layer_bytes(im):
@@ -879,7 +906,45 @@ def process_single(input_path, output_path, logo_dir,
                    manual_exif=None,
                    layout_mode="unified",   # 水印布局模式
                    geom_out=None,    # 可选: 传入 dict, 填充间距段几何坐标(画布像素), 供预览叠加标注
-                   image_out=None):  # 可选: 传入 list, 直接拿到画布 PIL 图而不落盘(调用方要内存图像时用)
+                   image_out=None,   # 可选: 传入 list, 直接拿到画布 PIL 图而不落盘(调用方要内存图像时用)
+                   stage_out=None,   # 可选: 传入 list, 回传本次的"渲染分段"结果(供界面显示/复用, 省得读日志)
+                   stage_log=True):  # 内部参数: 是否落"渲染分段"日志(先导帧那类成对刷屏的场景可关)
+    # ---- 分段计时: 渲染链路各阶段耗时, 函数结束时一次性落一条日志(排查瓶颈就靠这条) ----
+    # 每次渲染只多 1 行日志、10 次 time.monotonic()(约 1µs), 不在任何热路径上逐层/逐行记。
+    _t0 = time.monotonic()
+    t_prev = _t0
+    stages = []   # ["预处理 12ms", ...] 按序累积
+    def _stage(name):
+        nonlocal t_prev
+        now = time.monotonic()
+        stages.append(f"{name} {(now - t_prev) * 1000:.0f}ms")
+        t_prev = now
+
+    def _flush_stage_log(tag):
+        """把分段结果落成一条日志(渲染末尾调用一次)。
+
+        尾部带**参数指纹**: 排查"两次渲染为什么不一样"时, 直接对比两行末尾那段就够了。
+        画布尺寸记的是 render_scale 缩回**之前**的逻辑画布;
+        低清增强时最终回传的图会小 render_scale 倍, 那个尺寸在调用方的请求级日志里。
+        """
+        if not stage_log:
+            return
+        sig = (f"画布{canvas_w}x{canvas_h} {layout_mode} 比例{canvas_ratio:.4g}" if canvas_ratio > 0
+               else f"画布{canvas_w}x{canvas_h} {layout_mode} 比例原图") + (
+               f" bg={bg_mode}/r{blur_radius}/d{bg_darken_strength} 圆角{corner_radius}{'圆' if corner_circle else ''}"
+               f" 边距{image_margin} 间距{gap_image_top}/{gap_image_bottom}/{gap_top}/{gap_bottom}/{line_gap}"
+               f" 字{min_font_size_in} 缩{scale_logo}/{scale_model}/{scale_params}"
+               f" 描边{int(enable_image_stroke)} 影{int(enable_image_shadow)}o{image_shadow_offset}"
+               f"b{image_shadow_blur}a{image_shadow_alpha} 字描{int(enable_text_stroke)} 字影{int(enable_text_shadow)}")
+        total_ms = (time.monotonic() - _t0) * 1000
+        logging.info(f"[{tag}] 渲染分段: " + ", ".join(stages)
+                     + f" | 合计 {total_ms:.0f}ms | {sig}{_cache_stats_line()}")
+        if stage_out is not None:
+            # 回给调用方: 界面把它放进"上一次渲染"的 tooltip, 不必去读日志文件
+            stage_out.append({"tag": tag, "stages": list(stages), "total_ms": total_ms, "sig": sig})
+
+    # 低清增强会放大该值, 参数指纹要记用户输入的原值
+    min_font_size_in = min_font_size
     # 显式关闭原图文件句柄, 避免批量处理时句柄/内存堆积;
     # convert()/resize() 会生成新图像对象, 不受 _original.close() 影响.
     # src_key: 本次输入图的内容标识, 分层缓存的键都以它开头(换图/改文件即失效)。
@@ -914,9 +979,11 @@ def process_single(input_path, output_path, logo_dir,
             original_large = original
     finally:
         _original.close()
+    _stage("预处理(解码/转正/增强)")
 
     # 获取 EXIF
     exif = get_exif_data_from_path(input_path)
+    _stage("EXIF读取")
 
     # 防御性钳制: 界面仅标准比例档(均在此区间), 防脚本直调/未来回归自由输入产生极端画布
     if canvas_ratio > 0:
@@ -1150,6 +1217,7 @@ def process_single(input_path, output_path, logo_dir,
             water_area_h = 2 * side_h
         elif lines and layout_mode != "split_top_bottom":
             total_text_h = _sec_height(lines, line_spacing)
+    _stage("字体/几何")
 
     # 生成背景(支持暗化)
     def _build_background():
@@ -1205,6 +1273,7 @@ def process_single(input_path, output_path, logo_dir,
         canvas = Image.blend(bg, Image.new("RGB", bg.size, (0, 0, 0)), bg_darken_strength)
     else:
         canvas = bg
+    _stage("背景层")
 
     paste_x = (canvas_w - img_w) // 2
     paste_y = top_margin
@@ -1230,6 +1299,7 @@ def process_single(input_path, output_path, logo_dir,
     elif corner_radius > 0:
         display_img = _layer_cached(("img_round", src_key, img_w, img_h, "round", corner_radius),
                                     lambda: round_corners(original_large, corner_radius))
+    _stage("图片外观(圆角/正圆)")
     # 图片投影(水墨晕开): 图片形状模糊后作为 alpha, 阴影从内容边缘向外渐变晕开,
     # 而非实心偏移的硬投影; 阴影层需带 padding 外扩区, 否则 Pillow 模糊不超出图像
     # 边界, 无法形成向外晕开渐变(blur 只影响圆角边缘, 调不出效果)
@@ -1264,6 +1334,7 @@ def process_single(input_path, output_path, logo_dir,
              image_shadow_color, image_shadow_alpha, circle_mode, corner_radius),
             _build_shadow)
         canvas.paste(sh, (paste_x + ox - pad, paste_y + oy - pad), sh)
+    _stage("图片阴影层")
     canvas.paste(display_img, (paste_x, paste_y), display_img if (circle_mode or corner_radius > 0) else None)
 
     # 图片内描边
@@ -1322,6 +1393,7 @@ def process_single(input_path, output_path, logo_dir,
             # 直角图: ImageDraw 直绘(无抗锯齿但有硬边, 与直角图片一致), 开销可忽略
             draw = ImageDraw.Draw(canvas)
             draw.rectangle(rect, outline=image_stroke_color, width=image_stroke_width)
+    _stage("图片描边层")
 
     _geom = {"gaps": {"image_margin": [], "gap_top": [], "gap_image_top": [],
                       "gap_image_bottom": [], "gap_bottom": [], "line_gap": []}}
@@ -1454,11 +1526,13 @@ def process_single(input_path, output_path, logo_dir,
                     _geom["gaps"]["gap_bottom"].append((all_ys[-1][1], all_ys[-1][1] + bottom_gap_px))
                     for (y0, _), (y1, _) in zip(all_ys, all_ys[1:]):
                         _geom["gaps"]["line_gap"].append((y0, y1))
+    _stage("水印文字绘制")
 
     if render_scale > 1:
         canvas = canvas.resize((round(canvas_w / render_scale),
                                 round(canvas_h / render_scale)),
                                Image.Resampling.LANCZOS)
+        _stage("低清缩回")
 
     # 收集几何坐标(供预览叠加间距标注): _geom 记录的是 render_scale 放大前坐标,
     # 需按最终画布尺寸归一化(canvas 可能被 MAX_DIM 或 render_scale 缩放)
@@ -1476,8 +1550,12 @@ def process_single(input_path, output_path, logo_dir,
     if image_out is not None:
         # 调用方直接要内存图像: 跳过编码、写盘与读回解码
         image_out.append(canvas)
+        _flush_stage_log("预览")
         return True, None
-    return _save_output(canvas, output_path, original_exif)
+    ret = _save_output(canvas, output_path, original_exif)
+    _stage("编码保存")
+    _flush_stage_log("成品")
+    return ret
 
 
 # ---------- 日志文件配置(按时间戳命名，保留最近 3 份)----------
@@ -1519,8 +1597,11 @@ _cleanup_tmp_files()
 LOG_TIMESTAMP = datetime.now().strftime("%Y%m%d_%H%M%S")
 LOG_FILE = os.path.join(LOG_DIR, f"log-{LOG_TIMESTAMP}.log")
 
-# 时间戳带毫秒: 拖放/预览这类时序问题必须能对齐前后端到毫秒
-logging.basicConfig(level=logging.INFO, format='%(asctime)s.%(msecs)03d [%(levelname)s] %(message)s',
+# 时间戳带毫秒: 拖放/预览这类时序问题必须能对齐到毫秒
+# 线程名也在格式里: 同时有 界面/预览线程/事件线程/生成线程 四个来源在写同一份日志,
+# 出问题时先看是谁写的(线程名由各线程自己设, 见 RenderWorker 与 xsy_qt/render.py)
+logging.basicConfig(level=logging.INFO,
+                    format='%(asctime)s.%(msecs)03d [%(levelname)s] [%(threadName)s] %(message)s',
                     datefmt='%Y-%m-%d %H:%M:%S',
                     filename=LOG_FILE, filemode='w', encoding='utf-8')
 
@@ -1620,6 +1701,7 @@ class RenderWorker(threading.Thread):
                  file_paths=None, raw_model=None, custom_model=None,
                  save_map_flag=False, manual_exif=None, batch_out_dir=None):
         super().__init__(daemon=True)
+        self.name = "生成线程"        # 进日志的 %(threadName)s: 与预览/界面线程区分开(日志格式里带线程名)
         self.mode = mode
         self.params = params
         self.events = events
@@ -1659,6 +1741,7 @@ class RenderWorker(threading.Thread):
 
         logging.info(f"单张处理: {self.input_path}")
         self.events.put({"type": "log", "msg": "处理中...", "level": "INFO"})
+        t0 = time.monotonic()
         try:
             success, final_path = process_single(self.input_path, self.output_path,
                                                  manual_exif=self.manual_exif, **self.params)
@@ -1668,10 +1751,11 @@ class RenderWorker(threading.Thread):
             self.events.put({"type": "finished", "message": str(e), "success": False})
             return
         if success:
-            logging.info(f"单张完成: {final_path}")
+            one_ms = (time.monotonic() - t0) * 1000
+            logging.info(f"单张完成: {final_path} (耗时 {one_ms:.0f}ms)")
             self.events.put({"type": "log", "msg": f"已完成: {self.original_name}", "level": "INFO"})
             self.events.put({"type": "finished", "message": f"已完成: {os.path.basename(final_path)}",
-                             "success": True, "download_path": final_path,
+                             "success": True, "download_path": final_path, "ms": one_ms, "count": 1,
                              "download_name": os.path.basename(final_path),   # PNG 回退时与真实扩展名一致
                              "out_dir": os.path.dirname(os.path.abspath(final_path))})
         else:
@@ -1692,6 +1776,7 @@ class RenderWorker(threading.Thread):
         success = 0
         errors = []
         used_names = set()   # 输出名去重: 不同子目录同名图片不互相覆盖
+        t_batch = time.monotonic()
         logging.info(f"批量处理: 共 {total} 个文件 -> {out_dir}")
         for idx, item in enumerate(files, 1):
             if self.stop_event.is_set():
@@ -1712,15 +1797,21 @@ class RenderWorker(threading.Thread):
             out_path = os.path.join(out_dir, out_name)
             logging.info(f"[{idx}/{total}] 处理: {fname} -> {out_name}")
             self.events.put({"type": "progress", "done": idx, "total": total, "name": fname})
+            t_one = time.monotonic()
             try:
                 process_single(fpath, out_path, **self.params)
                 success += 1
+                # 每张的耗时: 批量慢时一眼看出是某张特别大还是整体退化
+                logging.info(f"[{idx}/{total}] 完成: {fname} (耗时 {(time.monotonic() - t_one) * 1000:.0f}ms)")
             except Exception as e:
                 err_msg = f"{fname} -> {e}"
                 logging.warning(f"处理失败 {fpath}: {e}")
                 errors.append(err_msg)
         # 构建结果消息
+        batch_ms = (time.monotonic() - t_batch) * 1000
+        avg = f", 平均 {batch_ms / success:.0f}ms" if success else ""
         result_msg = f"批量处理完成：{success}/{total} -> {out_dir}"
+        logging.info(f"批量总耗时 {batch_ms:.0f}ms (成功 {success}/{total}{avg})")
         if errors:
             fail_detail = "\n失败详情："
             for err in errors[:5]:
@@ -1731,7 +1822,7 @@ class RenderWorker(threading.Thread):
         logging.info(result_msg)
         self.events.put({"type": "log", "msg": result_msg, "level": "INFO" if success == total else "WARNING"})
         self.events.put({"type": "finished", "message": result_msg, "success": success == total,
-                         "out_dir": out_dir})
+                         "out_dir": out_dir, "ms": batch_ms, "count": success})
 
 
 # ===== 应用状态 =====
@@ -2008,6 +2099,7 @@ class AppState:
             with self._thumb_lock:
                 ent = self._thumb_cache.get(key)
             if ent and os.path.isfile(ent[0]):
+                _THUMB_STATS["hit"] += 1
                 logging.info(f"预览: 命中缩略图缓存 {os.path.basename(ent[0])}")
                 return ent
         with self._thumb_gen_lock:
@@ -2015,6 +2107,7 @@ class AppState:
                 with self._thumb_lock:
                     ent = self._thumb_cache.get(key)
                 if ent and os.path.isfile(ent[0]):
+                    _THUMB_STATS["hit"] += 1
                     logging.info(f"预览: 命中缩略图缓存(等锁后) {os.path.basename(ent[0])}")
                     return ent
             if src_image is not None:
@@ -2022,6 +2115,7 @@ class AppState:
             else:
                 with Image.open(input_path) as im:
                     src, src_h = self._write_preview_src(im, tag, max_side)
+            _THUMB_STATS["miss"] += 1
             if key is not None:
                 with self._thumb_lock:
                     if len(self._thumb_cache) > 8:   # 预览源通常就一张, 留少量最近项即可
@@ -2033,10 +2127,11 @@ class AppState:
 
     def _render_preview(self, input_path, params, manual_exif, raw_model, custom_model,
                         out_path, preview_scale=None, pv="", geom_out=None, src_image=None,
-                        image_out=None, max_side=PREVIEW_MAX_SIDE):
+                        image_out=None, stage_out=None, max_side=PREVIEW_MAX_SIDE):
         """统一渲染入口: preview_scale 给定时先缩略输入图(实时预览), 否则原图全量(目前无调用方,
         为预览/其它入口保留); geom_out 给定时收集间距段几何(供界面预览图叠加标注);
-        src_image 给定时复用它(调用方已打开的句柄); 缩略图本身有 (mtime,size) 缓存, 命中不读原图"""
+        src_image 给定时复用它(调用方已打开的句柄); 缩略图本身有 (mtime,size) 缓存, 命中不读原图;
+        stage_out 给定时回传"渲染分段"结果(见 process_single 的 _flush_stage_log)"""
         if preview_scale:
             src, src_h = self._preview_src_for(input_path, src_image, max_side)
             input_path = src
@@ -2062,7 +2157,8 @@ class AppState:
         params = _inject_model_map(params, raw_model, custom_model, copy_on_inject=True)
         return process_single(input_path, out_path,
                               manual_exif=_format_manual_exif(manual_exif),
-                              geom_out=geom_out, image_out=image_out, **params)
+                              geom_out=geom_out, image_out=image_out, stage_out=stage_out,
+                              **params)
 
 
 
@@ -2079,6 +2175,7 @@ class AppState:
         params = req.get("params") or {}
         geom_out = {}
         image_out = []
+        stage_out = []          # 渲染分段结果: 随 resp 回给调用方(界面 tooltip 用), 成本可忽略
         with self._render_lock:
             self._rendering_count += 1
         try:
@@ -2104,7 +2201,8 @@ class AppState:
                     input_path, params, req.get("manual_exif"),
                     req.get("raw_model"), req.get("custom_model"),
                     None, preview_scale=preview_scale,
-                    geom_out=geom_out, src_image=im, image_out=image_out, max_side=max_side)
+                    geom_out=geom_out, src_image=im, image_out=image_out,
+                    stage_out=stage_out, max_side=max_side)
         except Exception as e:
             logging.error(f"预览生成失败: {e}")
             return {"ok": False, "error": f"预览生成失败: {e}"}
@@ -2118,6 +2216,8 @@ class AppState:
                 "max_side": max_side or max(image_out[0].size)}
         if geom_out:
             resp["geom"] = geom_out   # 间距段坐标, 预览图叠加标注用
+        if stage_out:
+            resp["stage"] = stage_out[0]   # 渲染分段: 界面显示 + 请求级日志复用, 不必读日志文件
         return resp
 
     # ---------- 清理临时文件(程序退出时) ----------
