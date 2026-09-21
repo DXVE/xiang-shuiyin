@@ -7,9 +7,16 @@
 所以全部走一把锁。**不在任何热路径上**做统计(逐帧绘制、逐层缓存查找都不进这里)。
 """
 import threading
+
+from PySide6.QtCore import QCoreApplication, QT_TRANSLATE_NOOP
 from collections import deque
 
 _SAMPLES = 200      # 每类耗时最多留最近 200 个样本: 算 p50/p95 足够, 内存固定在几 KB
+
+
+def _t(text):
+    """取译文(中文是源语言)。用的时候才调 —— import 期翻译器还没装(见 xsy_qt/i18n.py)。"""
+    return QCoreApplication.translate("stats", text)
 
 
 def _pct(vals, q):
@@ -107,26 +114,35 @@ class SessionStats:
 
         if compact:
             if not n:
-                return "本次会话: 尚无预览"
-            gen_part = f" · 生成 {gen}" if gen else ""
-            return (f"预览 {n} · 渲染 p50 {r50:.0f}/p95 {r95:.0f}ms"
-                    f" · 层缓存 {layer_pct:.0f}% · 队列 {arrived}{gen_part}")
+                return _t(QT_TRANSLATE_NOOP("stats", "本次会话: 尚无预览"))
+            gen_part = _t(QT_TRANSLATE_NOOP("stats", " · 生成 {gen}")).format(gen=gen) if gen else ""
+            return (_t(QT_TRANSLATE_NOOP("stats", "预览 {n} · 渲染 p50 {r50:.0f}/p95 {r95:.0f}ms")).format(
+                        n=n, r50=r50, r95=r95)
+                    + _t(QT_TRANSLATE_NOOP("stats", " · 层缓存 {pct:.0f}% · 队列 {arrived}{gen_part}")).format(
+                        pct=layer_pct, arrived=arrived, gen_part=gen_part))
 
-        lines = [f"本次会话: 预览 {n} 次" + (f", 失败 {failed} 次" if failed else "")]
+        lines = [_t(QT_TRANSLATE_NOOP("stats", "本次会话: 预览 {n} 次")).format(n=n)
+                 + (_t(QT_TRANSLATE_NOOP("stats", ", 失败 {failed} 次")).format(failed=failed) if failed else "")]
         if n:
-            lines.append(f"  渲染      p50 {r50:.0f}ms / p95 {r95:.0f}ms / max {rmax:.0f}ms")
-            lines.append(f"  排队      p50 {q50:.0f}ms / p95 {q95:.0f}ms / max {qmax:.0f}ms"
-                         f"   (渲染期间又到达 {arrived} 次请求)")
-            lines.append(f"  转图      p50 {c50:.0f}ms")
-            lines.append(f"  上屏缩放  p50 {s50:.0f}ms")
-            lines.append(f"  请求→就绪  p50 {e50:.0f}ms / p95 {e95:.0f}ms / max {emax:.0f}ms")
-        lines.append(f"  层缓存    命中 {layer_hit} / 未命中 {layer_miss} ({layer_pct:.0f}%)"
-                     f"  占用 {rates['占用MB']:.0f}MB")
+            lines.append(_t(QT_TRANSLATE_NOOP("stats", "  渲染      p50 {r50:.0f}ms / p95 {r95:.0f}ms / max {rmax:.0f}ms"))
+                         .format(r50=r50, r95=r95, rmax=rmax))
+            lines.append(_t(QT_TRANSLATE_NOOP("stats", "  排队      p50 {q50:.0f}ms / p95 {q95:.0f}ms / max {qmax:.0f}ms"))
+                         .format(q50=q50, q95=q95, qmax=qmax)
+                         + _t(QT_TRANSLATE_NOOP("stats", "   (渲染期间又到达 {n} 次请求)")).format(n=arrived))
+            lines.append(_t(QT_TRANSLATE_NOOP("stats", "  转图      p50 {c50:.0f}ms")).format(c50=c50))
+            lines.append(_t(QT_TRANSLATE_NOOP("stats", "  上屏缩放  p50 {s50:.0f}ms")).format(s50=s50))
+            lines.append(_t(QT_TRANSLATE_NOOP("stats", "  请求→就绪  p50 {e50:.0f}ms / p95 {e95:.0f}ms / max {emax:.0f}ms"))
+                         .format(e50=e50, e95=e95, emax=emax))
+        lines.append(_t(QT_TRANSLATE_NOOP("stats", "  层缓存    命中 {hit} / 未命中 {miss} ({pct:.0f}%)")).format(
+                         hit=layer_hit, miss=layer_miss, pct=layer_pct)
+                     + _t(QT_TRANSLATE_NOOP("stats", "  占用 {mb:.0f}MB")).format(mb=rates["占用MB"]))
         mh, mm, mp = rates["蒙版"]
         th, tm, tp = rates["缩略图"]
-        lines.append(f"  蒙版缓存  {mh}/{mm} ({mp:.0f}%)    缩略图缓存 {th}/{tm} ({tp:.0f}%)")
+        lines.append(_t(QT_TRANSLATE_NOOP("stats", "  蒙版缓存  {mh}/{mm} ({mp:.0f}%)    缩略图缓存 {th}/{tm} ({tp:.0f}%)"))
+                     .format(mh=mh, mm=mm, mp=mp, th=th, tm=tm, tp=tp))
         if gen:
-            lines.append(f"  生成      {gen} 张, 累计 {gen_ms / 1000:.1f}s, 平均 {gen_ms / gen:.0f}ms")
+            lines.append(_t(QT_TRANSLATE_NOOP("stats", "  生成      {n} 张, 累计 {s:.1f}s, 平均 {avg:.0f}ms"))
+                         .format(n=gen, s=gen_ms / 1000, avg=gen_ms / gen))
         return "\n".join(lines)
 
     def summary_oneline(self):

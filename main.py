@@ -39,10 +39,11 @@ from xsy_qt.window import MainWindow, _PREVIEW_SHARPEN, _SLOW_RENDER_MS   # noqa
 
 
 def main():
+    from PySide6.QtCore import QCoreApplication
     from PySide6.QtGui import QIcon
     from PySide6.QtWidgets import QApplication
 
-    from xsy_qt import single
+    from xsy_qt import i18n, single
 
     app = QApplication(sys.argv)
     # 单实例闸门**必须早于 AppState**: AppState 一构造就读设置、清预览残留, 而"两个进程各写一份
@@ -53,7 +54,7 @@ def main():
         print("[启动] 程序已在运行，已激活已有窗口；本次启动退出")
         return 0
 
-    app.setApplicationName("镶·水印 (Qt 版)")
+    app.setApplicationName(QCoreApplication.translate("main", "镶·水印 (Qt 版)"))
     theme.apply_font(app)
     theme.apply_palette(app)          # 应用主题配色与字体
     icon = os.path.join(core.ASSETS_DIR, "exif-watermark-icon.ico")
@@ -61,6 +62,8 @@ def main():
         app.setWindowIcon(QIcon(icon))
 
     state = core.AppState()
+    # 界面语言: **必须在建窗口之前装翻译器** —— 窗口里的文案是构造时 tr() 的
+    i18n.install(app, state.settings.get("lang") or i18n.DEFAULT_LANG)
     win = MainWindow(state)
     win.show()
     single.wire(srv, win)             # 此后再有实例启动, 就把这个窗口提到前台

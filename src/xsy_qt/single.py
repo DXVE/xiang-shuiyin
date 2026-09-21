@@ -32,6 +32,9 @@ _REPLY_MS = 400
 # 一起带走; 而这里的对象数 = 用户重复启动的次数, 量级可忽略(应用退出时一并释放)。
 _RETIRED = set()
 
+# 本进程占着的 server(重启自己之前要先放掉, 见 release())
+_SERVER = None
+
 
 def _user():
     """管道名里的用户名片段: 同一台机器多用户登录时, 各自的实例互不干扰。"""
@@ -84,9 +87,23 @@ def claim(name):
 
 def wire(server, win):
     """把 server 接上主窗口: 之后再有实例启动, 就把这个窗口提到前台。窗口建好后调。"""
+    global _SERVER
+    _SERVER = server
     if server is None:
         return
     server.newConnection.connect(lambda: _accept(server, win))
+
+
+def release():
+    """放掉单实例管道。
+
+    **重启自己之前必须调**: 管道还在我们手里时起新进程, 新进程连得上, 就会被这道闸门当成
+    "已有实例在运行"而直接退出 —— 结果是重启后什么都没起来。
+    """
+    global _SERVER
+    if _SERVER is not None:
+        _SERVER.close()
+        _SERVER = None
 
 
 def _accept(server, win):

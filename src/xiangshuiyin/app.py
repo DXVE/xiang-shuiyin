@@ -1965,9 +1965,11 @@ class AppState:
 
     # ---------- 预设 ----------
     def load_presets(self):
+        """读预设文件。字体路径失效时**只在内存里回退**到本机默认, 不回写文件。
+
+        在对方机器上一加载就被改写, 双方手里的文件不再一致。这是本程序的有意取舍,
+        """
         presets = _load_json(PRESETS_FILE)
-        # 迁移旧预设中指向 _MEI 临时目录的失效字体路径到持久目录
-        changed = False
         for key, p in presets.items():
             if not isinstance(p, dict):
                 continue
@@ -1975,12 +1977,8 @@ class AppState:
                 cur = p.get(fkey)
                 if not cur or not os.path.isfile(cur):
                     newp = _default_font_path(fname)
-                    if newp and p.get(fkey) != newp:
+                    if newp:
                         p[fkey] = newp
-                        changed = True
-        if changed:
-            self.save_presets(presets)
-            logging.info("presets 字体路径已迁移到持久目录")
         return presets
 
     def save_presets(self, presets):

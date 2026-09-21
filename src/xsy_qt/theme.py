@@ -272,6 +272,24 @@ QLabel#statusText {{ color: {MUTED}; background: transparent; }}
 /* ---------- 分隔条 ---------- */
 QSplitter::handle {{ background: transparent; width: 8px; }}
 
+/* ---------- 菜单(顶栏 ☰) ----------
+   不设 QMenu 的话在 Windows 上是原生白底菜单, 与这套暖色调不同源。
+   item 的 padding 必须写死(不写会用默认的图标宽度, 左侧空一大块)。 */
+QMenu {{
+    background: {CARD};
+    border: 1px solid {LINE};
+    border-radius: {RADIUS_CTRL}px;
+    padding: 6px;
+}}
+QMenu::item {{
+    padding: 6px 26px 6px 12px;      /* 右侧留给子菜单箭头 */
+    border-radius: {RADIUS_SMALL}px;
+    color: {TEXT};
+}}
+QMenu::item:selected {{ background: #EFF3EF; color: {TEXT}; }}   /* 与页签悬停同一档 */
+QMenu::item:disabled {{ color: #b9b3a8; }}
+QMenu::separator {{ height: 1px; background: {LINE}; margin: 6px 8px; }}
+
 /* ---------- 提示框 ---------- */
 QToolTip {{
     background: #334155;

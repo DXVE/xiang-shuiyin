@@ -21,7 +21,7 @@
     QLayoutItem 所有权陷阱 —— `takeAt` 拿到的 item 归 Python, GC 时把布局仍在用的
     QSpacerItem 一起删掉, 之后随便一次 GC 就 abort(实测 exit 127)。
 """
-from PySide6.QtCore import QEvent, QObject, Qt
+from PySide6.QtCore import QCoreApplication, QEvent, QObject, Qt
 from PySide6.QtWidgets import (
     QDialog, QFrame, QHBoxLayout, QLabel, QMessageBox, QPushButton, QVBoxLayout, QWidget,
 )
@@ -125,8 +125,8 @@ def csdify(dlg, title, recenter):
     close.setObjectName("mini")
     close.setFixedSize(TITLE_H, TITLE_H)
     close.setCursor(Qt.CursorShape.PointingHandCursor)
-    close.setToolTip("关闭")
-    close.setAccessibleName("关闭")
+    close.setToolTip(QCoreApplication.translate("dialog", "关闭"))
+    close.setAccessibleName(QCoreApplication.translate("dialog", "关闭"))
     close.clicked.connect(dlg.reject)
     lay.addWidget(close)
 
@@ -142,11 +142,16 @@ def csdify(dlg, title, recenter):
     return panel
 
 
+# 标准按钮的文案: **用的时候才取**, 不能在 import 期建表 —— 那时翻译器还没装(见 i18n.install)
 _BTN_TEXT = {
     QMessageBox.StandardButton.Ok: "确定",
     QMessageBox.StandardButton.Yes: "是",
     QMessageBox.StandardButton.No: "否",
 }
+
+
+def _btn_text(btn):
+    return QCoreApplication.translate("dialog", _BTN_TEXT[btn])
 
 
 class MessageDialog(QDialog):
@@ -175,7 +180,7 @@ class MessageDialog(QDialog):
                   QMessageBox.StandardButton.No):
             if not (buttons & b):
                 continue
-            btn = QPushButton(_BTN_TEXT[b])
+            btn = QPushButton(_btn_text(b))
             btn.setFixedHeight(theme.CTRL_H)
             if b == self.result_button:
                 btn.setObjectName("primary")
@@ -183,7 +188,7 @@ class MessageDialog(QDialog):
             row.addWidget(btn)
         root.addLayout(row)
         if recenter is not None:
-            csdify(self, title or "提示", recenter)
+            csdify(self, title or QCoreApplication.translate("dialog", "提示"), recenter)
 
     def _pick(self, b):
         self.result_button = b
