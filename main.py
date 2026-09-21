@@ -42,9 +42,17 @@ def main():
     from PySide6.QtGui import QIcon
     from PySide6.QtWidgets import QApplication
 
-    state = core.AppState()
+    from xsy_qt import single
 
     app = QApplication(sys.argv)
+    # 单实例闸门**必须早于 AppState**: AppState 一构造就读设置、清预览残留, 而"两个进程各写一份
+    # settings.json、后写的那份盖掉先写的"正是单实例要防的事(见 xsy_qt/single.py)。
+    # 已有实例时: 通知它激活窗口(由本进程去抢前台 —— 它持有前台权限), 然后本进程退出。
+    keep, srv = single.claim(single.server_name())
+    if not keep:
+        print("[启动] 程序已在运行，已激活已有窗口；本次启动退出")
+        return 0
+
     app.setApplicationName("镶·水印 (Qt 版)")
     theme.apply_font(app)
     theme.apply_palette(app)          # 应用主题配色与字体
@@ -52,8 +60,10 @@ def main():
     if os.path.isfile(icon):
         app.setWindowIcon(QIcon(icon))
 
+    state = core.AppState()
     win = MainWindow(state)
     win.show()
+    single.wire(srv, win)             # 此后再有实例启动, 就把这个窗口提到前台
     print(f"[启动] 数据目录: {core.BASE_DIR}")
     print(f"[启动] 预览目录: {core.PREVIEW_DIR}")
     print(f"[启动] 日志:     {os.path.join(core.LOG_DIR, 'log-' + core.LOG_TIMESTAMP + '.log')}")

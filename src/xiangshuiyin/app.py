@@ -1778,6 +1778,10 @@ class RenderWorker(threading.Thread):
         used_names = set()   # 输出名去重: 不同子目录同名图片不互相覆盖
         t_batch = time.monotonic()
         logging.info(f"批量处理: 共 {total} 个文件 -> {out_dir}")
+        if self.manual_exif:
+            # 批量用了"与照片本身无关"的参数, 日志里要留痕 —— 否则以后看到成品型号不对,
+            # 排查时根本想不到是勾了「自定义水印信息」(它一次作用到整批)
+            logging.info("批量: 使用自定义水印信息(忽略每张照片的 EXIF)")
         for idx, item in enumerate(files, 1):
             if self.stop_event.is_set():
                 logging.info(f"用户取消: 已完成 {success}/{total}")
@@ -1799,7 +1803,9 @@ class RenderWorker(threading.Thread):
             self.events.put({"type": "progress", "done": idx, "total": total, "name": fname})
             t_one = time.monotonic()
             try:
-                process_single(fpath, out_path, **self.params)
+                # manual_exif 与单张同一条口径(见 _process_single): 勾了「自定义水印信息」时,
+                # 这里也没往下传), 于是批量静默忽略该功能 —— 而预览一直按它渲染, 表现就是
+                process_single(fpath, out_path, manual_exif=self.manual_exif, **self.params)
                 success += 1
                 # 每张的耗时: 批量慢时一眼看出是某张特别大还是整体退化
                 logging.info(f"[{idx}/{total}] 完成: {fname} (耗时 {(time.monotonic() - t_one) * 1000:.0f}ms)")
@@ -2051,7 +2057,8 @@ class AppState:
                 except Exception as e:
                     return {"ok": False, "error": f"无法创建导出子目录: {e}"}
                 self.worker = RenderWorker("batch", params, self.events, self.stop_event,
-                                              file_paths=file_paths, batch_out_dir=batch_out)
+                                              file_paths=file_paths, batch_out_dir=batch_out,
+                                              manual_exif=manual_exif)
             self.worker.start()
             return {"ok": True}
         finally:

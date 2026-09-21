@@ -15,8 +15,9 @@ import math
 import os
 import time
 
-from PySide6.QtCore import QPointF, QRectF, QSize, Qt, QTimer, Signal
-from PySide6.QtGui import QColor, QImage, QPainter, QPainterPath, QPen, QPixmap
+from PySide6.QtCore import QPointF, QRectF, QSize, Qt, QTimer, QUrl, Signal
+from PySide6.QtGui import (QColor, QDesktopServices, QImage, QPainter, QPainterPath, QPen,
+                           QPixmap)
 from PySide6.QtWidgets import (
     QAbstractSpinBox, QApplication, QCheckBox, QColorDialog, QComboBox, QDialog,
     QFileDialog, QFrame, QGridLayout, QHBoxLayout, QLabel,
@@ -1329,6 +1330,7 @@ class MainWindow(QMainWindow):
         self._batch_recursive = True
         self._manual_on = False
         self._manual = {"make": "", "model": "", "exposure": "", "fnumber": "", "iso": ""}
+        self._manual_preview = False     # 是否是「刷新预览效果」点出来的那一轮(只它才动状态栏)
 
         self.setWindowTitle("镶 · 水印 (Qt 版)")
         self.setAcceptDrops(True)
@@ -1341,6 +1343,7 @@ class MainWindow(QMainWindow):
         self._sync_visibility()
         self._mode_btns["single"].setChecked(True)
         self._sync_files_ui()
+        self._sync_refresh_btn()         # 启动时还没选图: 「刷新预览效果」先按灰
         self._unify_spins()
         self._unify_buttons()
         # 型号美化卡里两个按钮取同宽, 否则右边缘一宽一窄参差
@@ -1607,11 +1610,15 @@ class MainWindow(QMainWindow):
         return top
 
     def _build_preview_pane(self):
-        """右侧预览面板: 只有预览框一个孩子。
+        """右侧预览面板: 标题条 + 预览框。
 
-        **不要在这里加任何底部控件**(以前这里是预览下方一行耗时 `_perf`): 那一行会让预览
+        **不要在预览框下面加任何控件**(以前这里是预览下方一行耗时 `_perf`): 那一行会让预览
         底边比左列(含滚动条)高 21~22px, 看上去"一高一低"。耗时数字现在住状态栏右侧
         (见状态栏构造处), 右列于是填满整个面板, 两侧底边对齐。
+
+        标题条与左列页签块**等高**(都是 42px, 算法见 _build_preview_header), 间隔也用
+        GAP_CARD —— 于是两块上下沿齐平, 预览框顶边也与左列第一张卡片齐平。代价是这
+        42 + 10 = 52px 从预览高度里出, 是"两列顶部协调"换来的。
 
         左留白用 INSET_COL: 滚动条手柄两侧的"空气"要相等, 左边是"卡片宿主右留白(INSET_COL)
         + 手柄自己的 margin 2px", 右边就得是"手柄 margin 2px + 这里的 INSET_COL"; 不加这段
@@ -1620,8 +1627,39 @@ class MainWindow(QMainWindow):
         right = QWidget()
         rl = QVBoxLayout(right)
         rl.setContentsMargins(theme.INSET_COL, 0, 0, 0)
+        rl.setSpacing(theme.GAP_CARD)       # 与左列"块与块之间"同一节奏
+        rl.addWidget(self._build_preview_header())
         rl.addWidget(self._preview, 1)
         return right
+
+    def _build_preview_header(self):
+        """预览标题条: 一张圆角小块(与左列卡片同一套底/边/圆角), 里面左「效果预览」右「↺ 刷新预览效果」。
+
+        为什么是"块"而不是一行普通文字: 左列顶部本来就是一张圆角卡片(页签行), 右列顶端裸着
+        放一行字会显得两块不同源。
+
+        **高度与左列页签块严格相等(42px)** —— 左边是 6px 内边距 + 28px 按钮 + 6px 内边距
+        + 1px 边框 ×2, 这里用同一套算法(竖向 6px 内边距 + 同一个 28px 高的迷你按钮), 于是
+        两块的上沿、下沿在同一条线上。这是拿预览高度换来的(42px + GAP_CARD = 52px), 是
+        "两列顶部协调"的代价; 想省下来就得让标题条浮在预览之上(不占布局高度), 见 README。
+        按钮与卡片里的「↺ 重置本组」同款(#mini: 11px、MUTED 色、可见边框)。
+        **不挂投影**(其它卡片都有): 右列顶端没有留白余量, 投影会被裁掉。
+        """
+        self._preview_header = QFrame()
+        self._preview_header.setObjectName("card")
+        h = QHBoxLayout(self._preview_header)
+        h.setContentsMargins(10, 6, 10, 6)
+        h.setSpacing(theme.GAP_CTRL)
+        title = QLabel("效果预览")
+        title.setObjectName("cardTitle")
+        h.addWidget(title)
+        h.addStretch(1)
+        self._refresh_btn = QPushButton("↺ 刷新预览效果")
+        self._refresh_btn.setObjectName("mini")     # 与卡片里的「↺ 重置本组」同一款
+        self._refresh_btn.setCursor(Qt.PointingHandCursor)
+        self._refresh_btn.clicked.connect(self._refresh_preview_clicked)
+        h.addWidget(self._refresh_btn)
+        return self._preview_header
 
     def _build_bottombar(self):
         bottom = QFrame()
@@ -1975,8 +2013,13 @@ class MainWindow(QMainWindow):
         return card
 
     def _build_preset_card(self):
-        card = Card("预设方案")
+        # 免得为一行 Logo 目录再占一张卡片的高度
+        card = Card("预设方案与 Logo")
         card.reset_btn.setVisible(False)
+        self._logo_label = self._path_label()
+        card.body.addWidget(self._row("Logo 目录", [
+            self._logo_label,
+            self._btn("打开目录", self._open_logo_dir)]))
         self._preset_combo = NoWheelComboBox()
         self._preset_name = QLineEdit()
         self._preset_name.setPlaceholderText("方案名（保存时必填）")
@@ -1986,8 +2029,35 @@ class MainWindow(QMainWindow):
             self._btn("加载", self._preset_load),
             self._btn("保存", self._preset_save),
             self._btn("删除", self._preset_delete)]))
+        self._sync_logo_dir_label()
         self._reload_presets()
         return card
+
+    def _sync_logo_dir_label(self):
+        """
+
+        进 tooltip 的是完整路径 —— 标签会被中间省略, 悬停才看得到全的。
+        """
+        if not hasattr(self, "_logo_label"):
+            return
+        self._logo_label.setText(self._params.get("logo_dir") or core.DEFAULT_LOGO_DIR)
+
+    def _open_logo_dir(self):
+        """
+
+        这个目录**不会被自动创建**(ensure_dir 只管日志/字体/预览三个), 所以第一次点它时先
+        """
+        path = self._params.get("logo_dir") or core.DEFAULT_LOGO_DIR
+        try:
+            os.makedirs(path, exist_ok=True)        # 已存在时不报错
+        except Exception as e:                      # noqa: BLE001 - 建不出来就退化成"报一句"
+            self._status(f"Logo 目录不可用：{e}")
+            logging.warning(f"[目录] 创建 Logo 目录失败: {path} ({e})")
+            return
+        if QDesktopServices.openUrl(QUrl.fromLocalFile(path)):
+            self._status(f"已打开 Logo 目录：{path}")
+        else:
+            self._status(f"打不开，Logo 目录是：{path}")
 
     def _reload_presets(self):
         try:
@@ -2012,9 +2082,16 @@ class MainWindow(QMainWindow):
         if not isinstance(p, dict):
             self._status("该槽位为空，无法加载")
             return
+        name = p.get("_preset_name") or key
+        # 里没有 confirm), 这里先问一句, 与「恢复默认设置」「删除预设」同一个形态。
+        if _message(self, QMessageBox.Icon.Question, "加载预设",
+                    f"将把当前所有参数覆盖为预设「{name}」的值。继续？",
+                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                    QMessageBox.StandardButton.No) != QMessageBox.StandardButton.Yes:
+            return
         self._apply_params(p)
         self._preset_name.setText(p.get("_preset_name") or "")
-        self._status(f"已加载预设：{p.get('_preset_name') or key}")
+        self._status(f"已加载预设：{name}")
 
     def _preset_save(self):
         key = self._preset_combo.currentData()
@@ -2035,6 +2112,11 @@ class MainWindow(QMainWindow):
             self._status("该槽位为空，无需删除")
             return
         name = self._preset_data[key].get("_preset_name") or key
+        if _message(self, QMessageBox.Icon.Question, "删除预设",
+                    f"确定删除「{name}」？",
+                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                    QMessageBox.StandardButton.No) != QMessageBox.StandardButton.Yes:
+            return
         self.state.preset_delete(key)
         self._reload_presets()
         self._preset_name.clear()
@@ -2057,6 +2139,7 @@ class MainWindow(QMainWindow):
                 row.set_value(val)
         self._sync_mirror_rows(changed)
         self._sync_visibility()
+        self._sync_logo_dir_label()        # logo_dir 也在参数表里(加载预设/恢复默认都可能动它)
         self._touch()
 
     # ---------- 参数持久化 ----------
@@ -2147,6 +2230,7 @@ class MainWindow(QMainWindow):
         if want == getattr(self, "_preview_src", ""):
             return False
         self._preview_src = want
+        self._sync_refresh_btn()        # 「刷新预览效果」只在有图可预览时可点
         if not want:
             self._preview.clear()
             self._preview.set_hint("拖入图片，或点「打开图片」")
@@ -2193,6 +2277,44 @@ class MainWindow(QMainWindow):
     def _manual_exif(self):
         return dict(self._manual) if self._manual_on else None
 
+    def _refresh_preview_clicked(self):
+        """
+
+        自动预览之外的单入口: 渲染失败、或想对同一组参数再跑一次时用。点下去先按灰、等响应
+        """
+        if not getattr(self, "_preview_src", ""):
+            self._status("请先选择一张图片（也可直接拖入图片或文件夹）")
+            return
+        self._manual_preview = True
+        self._refresh_btn.setEnabled(False)
+        self._status("正在生成预览…")
+        self.request_preview()
+
+    def _finish_manual_preview(self, ok):
+        """手动刷新的收尾: 复位按钮 + 给一句结果。
+
+        **只有手动点过才碰状态栏** —— 自动预览每次改参数都触发, 若也写一行"预览已生成",
+        状态栏就会随滑块的拖动不停闪。
+        """
+        if not getattr(self, "_manual_preview", False):
+            return
+        self._manual_preview = False
+        self._sync_refresh_btn()
+        if ok:
+            self._status("预览已生成")
+
+    def _sync_refresh_btn(self):
+        """没有可预览的图时把「刷新预览效果」按灰。
+
+        常驻一句"请先选择图片"看着像出错了, 所以改成按钮自身置灰 + tooltip 说明。
+        """
+        if not hasattr(self, "_refresh_btn"):
+            return
+        has = bool(getattr(self, "_preview_src", ""))
+        self._refresh_btn.setEnabled(has)
+        self._refresh_btn.setToolTip("立即按当前参数重渲一次预览" if has
+                                     else "先选择一张图片（或拖入图片）再刷新预览")
+
     def request_preview(self):
         """请求一次预览。
 
@@ -2217,6 +2339,7 @@ class MainWindow(QMainWindow):
     def _on_rendered(self, resp):
         if not resp.get("ok"):
             err = str(resp.get("error") or "")
+            self._finish_manual_preview(False)          # 手动刷新失败也要把按钮放回可点(重试入口)
             self._status("预览失败：" + err)
             logging.warning(f"[预览] 渲染失败: {err}")   # 失败也要留痕(以前只在状态栏闪一下)
             return
@@ -2226,6 +2349,7 @@ class MainWindow(QMainWindow):
         self._preview.set_geo(resp.get("geom"))
         e2e = (time.perf_counter() - resp.get("_req_t", time.perf_counter())) * 1000
         self._perf.setText(f"渲染 {resp.get('ms', 0):.0f} ms · 请求→显示 {e2e:.0f} ms")
+        self._finish_manual_preview(True)
 
         ms = resp.get("ms", 0.0)
         queue_ms = resp.get("queue_ms", 0.0)
