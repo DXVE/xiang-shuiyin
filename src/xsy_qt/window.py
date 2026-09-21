@@ -49,13 +49,16 @@ _RATIOS = {'1:1': 1, '3:2': 3 / 2, '2:3': 2 / 3, '4:3': 4 / 3, '3:4': 3 / 4,
 _RATIO_MODES = {v: k for k, v in _RATIOS.items()}
 
 # ---------- 预设 ----------
-_PRESET_SLOTS = 10
-# 预设里"跟着机器走"的键: 都是绝对路径, 换台机器就是死链。**存槽位时保留**(同机存取要能还原
-# 字体), 只在导出成文件时剥掉 —— 分享出去的那份必须是机器无关的。
+# 免得为非法字符/保留名/重名操心(见核心 preset_path)。
+_PRESET_SLOTS = core.MAX_PRESET_SLOTS
+# 预设里"跟着机器走"的键: 都是绝对路径, 换台机器就是死链。**本机存的预设里保留**(同机存取要能
+# 还原字体), 只在导出给别人时剥掉 —— 分享出去的那份必须是机器无关的。
 _PRESET_MACHINE_KEYS = ("logo_dir", "font_path", "font_bold_path",
                         "font_italic_path", "font_bold_italic_path")
 # 导出文件里的格式标记: _apply_params 会忽略未知键, 所以它不影响加载, 只用来让将来能识别。
 _PRESET_FORMAT = "xiangshuiyin.preset/1"
+# **只用于给出"导出时的默认文件名"**(用户可以改), 程序不靠它认任何东西 —— 槽位文件名是固定的
+ILLEGAL_FN_CHARS = set(chr(92) + '/:*?"<>|')
 
 # 撤销/重做: 只留最近 N 步; 同一控件的连续改动在停手 _UNDO_COALESCE_MS 之后算一步
 # (滑块是逐像素发信号的, 不合并的话拖一次要按两百下)
@@ -78,11 +81,6 @@ def migrate_preset(p):
         out["canvas_ratio_mode"] = "original" if num <= 0 else _RATIO_MODES.get(num, "original")
     return out
 
-
-def _safe_filename(name):
-    """把方案名变成能当文件名的字符串(Windows 上 \\ / : * ? " < > | 都不合法)。"""
-    s = "".join("_" if c in '\\/:*?"<>|' else c for c in str(name or "")).strip(" .")
-    return s or "preset"
 
 _FONT_FILTER = "字体 (*.ttf *.otf *.ttc);;所有文件 (*)"
 
@@ -850,45 +848,6 @@ def _save_file_dialog(parent, caption, directory="", default_name="", name_filte
     return files[0] if files else ""
 
 
-def ask_slot(parent, presets, name, slots=_PRESET_SLOTS):
-    """「导入到哪个槽位」—— 列出全部槽位与各自当前方案名, 由用户自己选。取消返回 ""。
-
-    **不做成"默认第一个空槽"式的无人值守**: 第一个槽很可能已经存着东西, 默认它等于鼓励
-    误覆盖。列表里把已占用的槽位连方案名一起列出来, 一眼就能挑到空的; 预选值是"第一个空槽"
-    (都占满了才预选当前槽位), 兼顾顺手与安全。
-    """
-    dlg = QDialog(parent)
-    go_frameless(dlg)
-    dlg.setWindowTitle(QCoreApplication.translate("window", "导入预设"))
-    v = QVBoxLayout(dlg)
-    lab = QLabel(QCoreApplication.translate("window", "把方案「{name}」导入到哪个槽位？").format(name=name))
-    lab.setWordWrap(True)
-    v.addWidget(lab)
-    combo = NoWheelComboBox()
-    first_empty = -1
-    for i in range(1, slots + 1):
-        key = str(i)
-        p = presets.get(key) or {}
-        cur_name = p.get("_preset_name") if isinstance(p, dict) else None
-        combo.addItem(QCoreApplication.translate("window", "槽位 {slot}：{name}").format(
-            slot=i, name=cur_name or QCoreApplication.translate("window", "— 空 —")), key)
-        if not cur_name and first_empty < 0:
-            first_empty = combo.count() - 1
-    if first_empty >= 0:
-        combo.setCurrentIndex(first_empty)
-    v.addWidget(combo)
-    hint = QLabel(QCoreApplication.translate("window", "目标槽位已有方案时会被覆盖。"))
-    hint.setObjectName("hint")
-    v.addWidget(hint)
-    v.addLayout(dlg_button_row(
-        dlg_button(QCoreApplication.translate("window", "取消"), dlg.reject),
-        dlg_button(QCoreApplication.translate("window", "导入"), dlg.accept, primary=True)))
-    csdify(dlg, QCoreApplication.translate("window", "导入预设"), _prep_dialog)
-    if dlg.exec() != QDialog.DialogCode.Accepted:
-        return ""
-    return combo.currentData() or ""
-
-
 def _hamburger_icon(color, size=15, dpr=1.0):
     """画"三横线"菜单图标。
 
@@ -1066,6 +1025,87 @@ class ImageInfoDialog(QDialog):
             "iso": core.iso_to_str(ex.get("iso")),
         }
         return out
+
+
+class PresetDialog(QDialog):
+    """预设方案弹窗: 槽位 / 名称 / 加载·保存·删除, 外加 导入·导出 与 目录入口。
+
+    里面就是 Logo 目录 + 预设槽 + 名称 + 加载/保存/删除), 卡片才是当初的偏离; ② 同一件事的
+    入口被拆成了两处 —— 槽位/名称/加载/保存/删除在卡片里、导入/导出在 ☰ 菜单里, 收进一个
+    弹窗后菜单里只剩「预设方案…」一项; ③ tab1 是全窗最长的一页, 省下这一块滚动短一截。
+
+    **每次打开都重新读盘**: 手工往 presets 目录里丢一个 presets5.json, 不用重启就能看到。
+
+    交互与「型号映射」那个弹窗一致: 每个动作**即时生效**(没有 OK/取消), 关闭就是关闭。
+    控件住这里、逻辑在 MainWindow(它手里有 _params/_apply_params/_undo_step), 所以下面每个
+    按钮都是"把我的控件交给窗口的那个方法"。
+    """
+
+    def __init__(self, win):
+        super().__init__(win)
+        self.win = win
+        go_frameless(self)
+        self.setWindowTitle(self.tr("预设方案"))
+        self.resize(560, 250)
+
+        def row(label, widgets):
+            w = QWidget()
+            h = QHBoxLayout(w)
+            h.setContentsMargins(0, 2, 0, 2)
+            h.setSpacing(theme.GAP_CTRL)
+            lab = QLabel(self.tr(label))
+            lab.setObjectName("fieldLabel")
+            lab.setFixedWidth(_LABEL_W)
+            lab.setWordWrap(True)
+            h.addWidget(lab)
+            for i, sub in enumerate(widgets):
+                h.addWidget(sub, 1 if i == 0 else 0)
+            return w
+
+        v = QVBoxLayout(self)
+        tip = QLabel(self.tr("一个槽位一个文件（presets1..10.json）；导入是按当前选中的槽位落地的。"))
+        tip.setObjectName("hint")
+        tip.setWordWrap(True)
+        v.addWidget(tip)
+
+        self.combo = NoWheelComboBox()
+        v.addWidget(row("槽位", [self.combo]))
+
+        self.name_edit = QLineEdit()
+        self.name_edit.setPlaceholderText(self.tr("方案名（保存时必填）"))
+        v.addWidget(row("名称", [
+            self.name_edit,
+            dlg_button(self.tr("加载"), lambda: win._preset_load(self)),
+            dlg_button(self.tr("保存"), lambda: win._preset_save(self)),
+            dlg_button(self.tr("删除"), lambda: win._preset_delete(self))]))
+
+        self.dir_label = ElidedLabel(core.PRESETS_DIR)
+        self.dir_label.setObjectName("muted")
+        self.dir_label.setToolTip(core.PRESETS_DIR)
+        v.addWidget(row("目录", [
+            self.dir_label,
+            dlg_button(self.tr("打开目录"),
+                       lambda: _open_and_report(win, core.PRESETS_DIR, self.tr("预设目录")))]))
+        v.addStretch(1)
+        v.addLayout(dlg_button_row(
+            dlg_button(self.tr("导入…"), lambda: win._import_preset(self)),
+            dlg_button(self.tr("导出…"), lambda: win._export_preset(self)),
+            dlg_button(self.tr("关闭"), self.reject, primary=True)))
+        csdify(self, self.tr("预设方案"), _prep_dialog)
+        self.reload()
+
+    # ---- 给 MainWindow 的那几个方法用的小接口 ----
+    def current_slot(self):
+        return self.combo.currentData() or ""
+
+    def name_text(self):
+        return self.name_edit.text().strip()
+
+    def set_name(self, text):
+        self.name_edit.setText(text)
+
+    def reload(self):
+        self.win._reload_presets(self)
 
 
 def _open_file_dialog(parent, caption, directory="", name_filter=""):
@@ -2040,8 +2080,7 @@ class MainWindow(QMainWindow):
         m = QMenu(self)
         m.addAction(self.tr("关于"), self._show_about)
         m.addSeparator()
-        m.addAction(self.tr("导入预设…"), self._import_preset)
-        m.addAction(self.tr("导出预设…"), self._export_preset)
+        m.addAction(self.tr("预设方案…"), self._open_preset_dialog)
         m.addSeparator()
         m.setToolTipsVisible(True)       # 菜单项也带 tooltip —— 每个入口指向哪个目录一目了然
         a = m.addAction(self.tr("打开日志目录"), self._open_log_dir)
@@ -2208,8 +2247,9 @@ class MainWindow(QMainWindow):
         v.setSpacing(theme.GAP_CARD)
 
         if tab_id == "files":
+            # 预设不在这里了: 它搬进了 ☰ 菜单的「预设方案…」弹窗(见 PresetDialog)
             for builder in (self._build_mode_card, self._build_model_card,
-                            self._build_manual_card, self._build_preset_card):
+                            self._build_manual_card):
                 v.addWidget(builder())
 
         card_order = []
@@ -2561,23 +2601,10 @@ class MainWindow(QMainWindow):
             card.body.addWidget(self._row(label, e))
         return card
 
-    def _build_preset_card(self):
-        # 免得为一行 Logo 目录再占一张卡片的高度
-        # Logo 目录那一行收进了 ☰ 菜单(用户: "logo目录及打开按钮, 收纳进菜单中") ——
-        # 卡片名字也回到「预设方案」: 它现在只装预设了
-        card = Card(QT_TRANSLATE_NOOP("Card", "预设方案"))
-        card.reset_btn.setVisible(False)
-        self._preset_combo = NoWheelComboBox()
-        self._preset_name = QLineEdit()
-        self._preset_name.setPlaceholderText(self.tr("方案名（保存时必填）"))
-        card.body.addWidget(self._row(QT_TRANSLATE_NOOP("MainWindow", "槽位"), self._preset_combo))
-        card.body.addWidget(self._row(QT_TRANSLATE_NOOP("MainWindow", "名称"), [
-            self._preset_name,
-            self._btn(self.tr("加载"), self._preset_load),
-            self._btn(self.tr("保存"), self._preset_save),
-            self._btn(self.tr("删除"), self._preset_delete)]))
-        self._reload_presets()
-        return card
+    def _open_preset_dialog(self):
+        """打开「预设方案」弹窗(构造即读盘, 见 PresetDialog)。"""
+        dlg = PresetDialog(self)
+        dlg.exec()
 
     def _open_logo_dir(self):
         """
@@ -2596,26 +2623,32 @@ class MainWindow(QMainWindow):
         else:
             self._status(self.tr("打不开，Logo 目录是：{path}").format(path=path))
 
-    def _reload_presets(self):
+    def _reload_presets(self, view):
+        """把 10 个槽位列进 view 的下拉(显示各自存着的方案名, 空槽显示「— 空 —」)。
+
+        `view` 就是 PresetDialog(控件在它那儿); 预设数据仍缓存在窗口的 self._preset_data。
+        键是槽位号(字符串), 与 `core.preset_path(slot)` 的槽位一致。
+        """
         try:
             self._preset_data = self.state.load_presets() or {}
-        except Exception:
+        except Exception as e:                      # noqa: BLE001
+            logging.warning(f"[预设] 读取失败: {e}")
             self._preset_data = {}
-        cur = self._preset_combo.currentData()
-        self._preset_combo.clear()
+        cur = view.current_slot()
+        view.combo.clear()
         for i in range(1, _PRESET_SLOTS + 1):
             key = str(i)
-            p = self._preset_data.get(key) or {}
-            name = p.get("_preset_name") if isinstance(p, dict) else None
-            self._preset_combo.addItem(self.tr("槽位 {slot}：{name}").format(
+            rec = self._preset_data.get(key) or {}
+            name = rec.get("_preset_name") if isinstance(rec, dict) else None
+            view.combo.addItem(self.tr("槽位 {slot}：{name}").format(
                 slot=i, name=name or self.tr("— 空 —")), key)
         if cur:
-            j = self._preset_combo.findData(cur)
+            j = view.combo.findData(cur)
             if j >= 0:
-                self._preset_combo.setCurrentIndex(j)
+                view.combo.setCurrentIndex(j)
 
-    def _preset_load(self):
-        key = self._preset_combo.currentData()
+    def _preset_load(self, view):
+        key = view.current_slot()
         p = self._preset_data.get(key) if key else None
         if not isinstance(p, dict):
             self._status(self.tr("该槽位为空，无法加载"))
@@ -2629,7 +2662,7 @@ class MainWindow(QMainWindow):
             return
         self._undo_step("__preset_load__", f"加载预设「{name}」",
                         lambda: self._apply_params(migrate_preset(p)))
-        self._preset_name.setText(p.get("_preset_name") or "")
+        view.set_name(name)
         self._status(self.tr("已加载预设：{name}").format(name=name))
 
     def _preset_payload(self):
@@ -2646,32 +2679,53 @@ class MainWindow(QMainWindow):
         p["canvas_ratio_mode"] = self._params.get("canvas_ratio_mode", "original")
         return p
 
-    def _preset_save(self):
-        key = self._preset_combo.currentData()
+    def _preset_save(self, view):
+        """把当前调参存进**当前选中的槽位**(方案名只是存在文件里的一个名字)。
+
+        槽位里已有方案而名字又变了(等于覆盖另一个方案)时先问一句; 名字没变就是"存回它", 不问。
+        """
+        key = view.current_slot()
         if not key:
             return
-        name = self._preset_name.text().strip()
+        name = view.name_text()
         if not name:
             self._status(self.tr("请先输入方案名再保存"))
             return
-        self.state.preset_save(key, self._preset_payload(), name)
-        self._reload_presets()
-        self._preset_combo.setCurrentIndex(self._preset_combo.findData(key))
+        cur = self._preset_data.get(key) or {}
+        cur_name = cur.get("_preset_name") if isinstance(cur, dict) else None
+        if cur_name and cur_name != name:
+            if _message(self, QMessageBox.Icon.Question, self.tr("保存预设"),
+                        self.tr("槽位 {slot} 已有方案「{name}」，保存会覆盖它。继续？")
+                        .format(slot=key, name=cur_name),
+                        QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                        QMessageBox.StandardButton.No) != QMessageBox.StandardButton.Yes:
+                return
+        d = self.state.preset_save(key, self._preset_payload(), name)
+        if not d.get("ok"):
+            _message(self, QMessageBox.Icon.Warning, self.tr("保存预设"),
+                     str(d.get("error") or ""))
+            return
+        view.reload()
+        view.combo.setCurrentIndex(view.combo.findData(key))
+        logging.info(f"[预设] 已保存: 槽位 {key}「{name}」-> {core.preset_path(key)}")
         self._status(self.tr("已保存到槽位 {slot}：{name}").format(slot=key, name=name))
 
-    def _export_preset(self):
-        """把当前槽位的方案导出成一个 .json(给别人用)。
+    def _export_preset(self, view):
+        """把当前选中的预设导出成一个 .json(给别人用)。
 
         导出的是**剥掉机器路径**的那份: logo_dir 与 4 个字体路径换台机器就是死链, 带出去只会
         让对方拿到一个静默降级的方案(品牌 logo 变文字、字体变内置 Roboto)。
         """
-        key = self._preset_combo.currentData()
+        key = view.current_slot()
         rec = self._preset_data.get(key) if key else None
         if not isinstance(rec, dict):
             self._status(self.tr("该槽位为空，没有可导出的方案"))
             return
         name = rec.get("_preset_name") or f"方案 {key}"
-        path = _save_file_dialog(self, self.tr("导出预设"), "", f"{_safe_filename(name)}.json",
+        # 默认文件名只是给对话框提个建议(用户可改), 所以顺手把 Windows 不认的字符换掉;
+        # 程序自己不靠这个名字认任何东西(槽位文件名固定是 presets1..10)
+        suggest = "".join("_" if c in ILLEGAL_FN_CHARS else c for c in name).strip() or f"preset{key}"
+        path = _save_file_dialog(self, self.tr("导出预设"), "", f"{suggest}.json",
                                  self.tr("预设 (*.json)"))
         if not path:
             return
@@ -2684,16 +2738,15 @@ class MainWindow(QMainWindow):
             self._status(self.tr("导出失败：{err}").format(err=e))
             logging.warning(f"[预设] 导出失败 {path}: {e}")
             return
-        logging.info(f"[预设] 已导出槽位 {key} -> {path} (剔除机器路径)"
-                     f" 共 {len(data)} 键")
+        logging.info(f"[预设] 已导出槽位 {key}「{name}」-> {path} (剔除机器路径) 共 {len(data)} 键")
         self._status(self.tr("已导出方案「{name}」").format(name=name))
 
-    def _import_preset(self):
-        """从一个 .json 导入方案到**你指定的槽位**。
+    def _import_preset(self, view):
+        """把一个 .json 导入成预设。
 
-        两条刻意的取舍:
-          - 目标槽位由你在弹窗里选(不默认第一个): 第一个槽往往已经存着东西;
-          - 文件里的机器路径键一律忽略(不吃别人的绝对路径): 导入只吃"方案参数"。
+        预设名取自文件里的 `_preset_name`, 没有再退回文件名 —— 而**文件里的机器路径键一律忽略**
+        (不吃别人的绝对路径): 导入进来的东西只该包含"方案参数"。
+        同名会覆盖, 覆盖前问一句。
         """
         path = _open_file_dialog(self, self.tr("导入预设"), "",
                                  self.tr("预设 (*.json);;所有文件 (*)"))
@@ -2709,36 +2762,40 @@ class MainWindow(QMainWindow):
         if not isinstance(data, dict) or not data:
             _message(self, QMessageBox.Icon.Warning, self.tr("导入预设"), self.tr("这个文件里没有方案数据。"))
             return
-        # 只吃"单条记录"。presets.json 那种 slot-keyed 的多方案文件要求先选一条, 这一版不做 ——
-        # 与其猜, 不如明确拒绝(判据是"有没有方案参数键")
+        # 只吃"单个方案"。老版 presets.json(槽位版)是"槽位 -> 方案"的字典, 判据是"有没有方案参数键"
         if not any(k in data for k in ("bg_color", "canvas_ratio_mode", "canvas_ratio",
                                       "font_path", "layout_mode")):
             _message(self, QMessageBox.Icon.Warning, self.tr("导入预设"),
-                     self.tr("这个文件里不像是单个方案（可能是整份 presets.json）。"
+                     self.tr("这个文件里不像是单个方案（可能是老版的 presets.json）。"
                              "请用「导出预设」得到单个方案文件后再导入。"))
             return
         name = str(data.get("_preset_name") or os.path.splitext(os.path.basename(path))[0])
         payload = {k: v for k, v in data.items()
                    if k not in _PRESET_MACHINE_KEYS and k != "_format"}
-        slot = ask_slot(self, self._preset_data, name)
-        if not slot:
+        # 导入目标是**当前选中的槽位**(不再弹"导入到哪个槽位"): 想换目标先在下拉里选好槽位再来
+        key = view.current_slot()
+        if not key:
             return
-        cur = self._preset_data.get(slot) or {}
+        cur = self._preset_data.get(key) or {}
         cur_name = cur.get("_preset_name") if isinstance(cur, dict) else None
         if cur_name and _message(self, QMessageBox.Icon.Question, self.tr("导入预设"),
                                  self.tr("槽位 {slot} 已有方案「{name}」，导入会覆盖它。继续？")
-                                 .format(slot=slot, name=cur_name),
+                                 .format(slot=key, name=cur_name),
                                  QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
                                  QMessageBox.StandardButton.No) != QMessageBox.StandardButton.Yes:
             return
-        self.state.preset_save(slot, migrate_preset(payload), name)
-        self._reload_presets()
-        self._preset_combo.setCurrentIndex(self._preset_combo.findData(slot))
-        logging.info(f"[预设] 已导入 {path} -> 槽位 {slot}（{'覆盖' if cur_name else '空槽'}）")
-        self._status(self.tr("已导入方案「{name}」到槽位 {slot}").format(name=name, slot=slot))
+        d = self.state.preset_save(key, migrate_preset(payload), name)
+        if not d.get("ok"):
+            _message(self, QMessageBox.Icon.Warning, self.tr("导入预设"),
+                     str(d.get("error") or ""))
+            return
+        view.reload()
+        view.combo.setCurrentIndex(view.combo.findData(key))
+        logging.info(f"[预设] 已导入 {path} -> 槽位 {key}「{name}」（{'覆盖' if cur_name else '空槽'}）")
+        self._status(self.tr("已导入方案「{name}」到槽位 {slot}").format(name=name, slot=key))
 
-    def _preset_delete(self):
-        key = self._preset_combo.currentData()
+    def _preset_delete(self, view):
+        key = view.current_slot()
         if not key or not isinstance(self._preset_data.get(key), dict):
             self._status(self.tr("该槽位为空，无需删除"))
             return
@@ -2748,9 +2805,12 @@ class MainWindow(QMainWindow):
                     QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
                     QMessageBox.StandardButton.No) != QMessageBox.StandardButton.Yes:
             return
-        self.state.preset_delete(key)
-        self._reload_presets()
-        self._preset_name.clear()
+        d = self.state.preset_delete(key)
+        if not d.get("ok"):
+            _message(self, QMessageBox.Icon.Warning, self.tr("删除预设"), str(d.get("error") or ""))
+            return
+        view.reload()
+        view.set_name("")
         self._status(self.tr("已删除槽位 {slot}：{name}").format(slot=key, name=name))
 
     def _apply_params(self, src):
@@ -2831,7 +2891,6 @@ class MainWindow(QMainWindow):
             self._apply_params(d)
             self._params["logo_dir"] = d.get("logo_dir") or self._params.get("logo_dir")
             self._reload_model_map()
-            self._preset_name.clear()
 
         # 整批算一步撤销(快照里连 logo_dir / model_map 一起存, 所以撤得回来)
         self._undo_step("__reset_settings__", "恢复默认设置", _do)

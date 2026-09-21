@@ -79,9 +79,25 @@ else:
 BASE_DIR = os.environ.get("XSY_BASE_DIR") or os.path.join(_data_root, "XiangShuiyin-QT6")
 DATA_DIR = os.path.join(BASE_DIR, "watermark_data")
 SETTINGS_FILE = os.path.join(DATA_DIR, "settings.json")
-PRESETS_FILE = os.path.join(DATA_DIR, "presets.json")
+# 预设: 10 个固定槽位, 一个槽一个文件(presets1.json .. presets10.json, 见 preset_path)。
+# 导出/导入就是"单个文件进、单个文件出", 又不必拿预设名去当文件名。
+PRESETS_DIR = os.path.join(DATA_DIR, "presets")
+PRESETS_FILE = os.path.join(DATA_DIR, "presets.json")   # 老文件(旧的整份格式): 只用于一次性迁移
 DEFAULT_LOGO_DIR = os.path.join(DATA_DIR, "logos")
 DEFAULT_SPECIAL_DIR = os.path.join(DEFAULT_LOGO_DIR, "special")
+
+# ---------- 预设文件名规则 ----------
+# ---------- 预设落盘 ----------
+# **槽位 -> 固定文件名**: presets1.json .. presets10.json。文件名**不承载预设名** ——
+# 一旦"预设名 = 文件名", 就得处理非法字符、保留设备名(CON/NUL)、尾点、重名、超长……
+# 全是自找的薄弱点(用户的原话: "少一道程序薄弱点"); 预设名只存在文件内容里。
+MAX_PRESET_SLOTS = 10
+
+
+def preset_path(slot):
+    """槽位(1..10) -> 预设文件路径。"""
+    return os.path.join(PRESETS_DIR, f"presets{int(slot)}.json")
+
 
 # ---------- 默认字体路径 ----------
 # 脚本同目录: 内置资源目录 assets/fonts(Roboto 四变体, 随程序分发, SIL OFL 协议)
@@ -1559,7 +1575,8 @@ def process_single(input_path, output_path, logo_dir,
 
 
 # ---------- 日志文件配置(按时间戳命名，保留最近 3 份)----------
-LOG_DIR = BASE_DIR
+# 设置、tmp 残留, 看着乱)。目录在 import 阶段就建出来 —— 下面的 filemode='w' 会往里写。
+LOG_DIR = os.path.join(BASE_DIR, "logs")
 ensure_dir(LOG_DIR)
 
 # 清理旧日志：只保留最近 3 份 log-*.log
@@ -1981,22 +1998,108 @@ class AppState:
                         p[fkey] = newp
         return presets
 
-    def save_presets(self, presets):
-        _save_json(PRESETS_FILE, presets, ensure_path=DATA_DIR)
+    # ---------- 预设(10 个固定槽位, 一槽一个文件) ----------
+    def load_presets(self):
+        """读 10 个槽位, 返回 {槽位字符串: 记录}(只带有内容的槽)。
 
-    def preset_save(self, key, params, name):
-        presets = self.load_presets()
-        params = dict(params)
-        params["_preset_name"] = name.strip() or f"方案 {key}"
-        presets[str(key)] = params
-        self.save_presets(presets)
+        "程序悄悄改你的预设文件", 分发出去的那份在对方机器上一加载就走样了(见 README)。
+        """
+        self._migrate_presets()
+        out = {}
+        for slot in range(1, MAX_PRESET_SLOTS + 1):
+            fpath = preset_path(slot)
+            if not os.path.isfile(fpath):
+                continue
+            rec = _load_json(fpath, check_file=True)
+            if not isinstance(rec, dict):
+                continue
+            rec.setdefault("_preset_name", f"方案 {slot}")
+            for fkey, fname in FONT_SETTING_MAP:        # 字体路径失效 -> 只在内存里回落
+                cur = rec.get(fkey)
+                if not cur or not os.path.isfile(cur):
+                    newp = _default_font_path(fname)
+                    if newp:
+                        rec[fkey] = newp
+            out[str(slot)] = rec
+        return out
+
+    def preset_save(self, slot, params, name):
+        """把一份参数存进槽位。同名/同槽覆盖由界面先确认。"""
+        try:
+            n = int(slot)
+        except (TypeError, ValueError):
+            return {"ok": False, "error": "槽位无效"}
+        if not 1 <= n <= MAX_PRESET_SLOTS:
+            return {"ok": False, "error": f"槽位超出 1~{MAX_PRESET_SLOTS}"}
+        rec = dict(params or {})
+        rec["_preset_name"] = (name or "").strip() or f"方案 {n}"
+        _save_json(preset_path(n), rec, ensure_path=PRESETS_DIR)
         return {"ok": True}
 
-    def preset_delete(self, key):
-        presets = self.load_presets()
-        presets.pop(str(key), None)
-        self.save_presets(presets)
+    def preset_delete(self, slot):
+        fpath = preset_path(slot)
+        try:
+            if os.path.isfile(fpath):
+                os.remove(fpath)
+        except (OSError, TypeError, ValueError) as e:
+            return {"ok": False, "error": str(e)}
         return {"ok": True}
+
+    def _migrate_presets(self):
+        """把两种历史格式一次性迁进槽位文件, 然后把老文件挪走(不删数据, 也不留原名 —— 否则
+        每次启动都会把用户已经删掉的预设"复活")。
+
+        两种历史:
+          a) 最早那种: 整份 `presets.json`(键就是槽位 "1".."10");
+          b) 中间那版: `presets/*.json` 一个预设一个文件、文件名即预设名(现已废弃)。
+        """
+        if os.path.isfile(PRESETS_FILE):
+            old = _load_json(PRESETS_FILE)
+            moved = 0
+            if isinstance(old, dict):
+                for key in sorted(old, key=lambda k: str(k)):
+                    rec = old[key]
+                    if not isinstance(rec, dict):
+                        continue
+                    try:
+                        self.preset_save(str(key), rec, rec.get("_preset_name") or f"方案 {key}")
+                        moved += 1
+                    except Exception as e:              # noqa: BLE001 - 单个迁不动不挡其它
+                        logging.warning(f"预设迁移失败(槽位 {key}): {e}")
+            try:
+                os.replace(PRESETS_FILE, PRESETS_FILE + ".migrated")
+                logging.info(f"预设已迁入槽位文件: {moved} 个; 老文件改名 "
+                             f"{os.path.basename(PRESETS_FILE)}.migrated")
+            except OSError as e:
+                logging.warning(f"老预设文件改名失败(下次启动会再迁一次): {e}")
+        # b) 中间那版留下的"按名字命名"的文件: 按名字排序塞进**空槽**, 然后把它们挪进子目录
+        #    (只填空槽 —— 这些是较新的数据, 但也别把槽位里原有的东西盖掉; 放不下的留在
+        #     _migrated/ 里, 只是不参与列表, 不删)
+        try:
+            stray = [f for f in sorted(os.listdir(PRESETS_DIR))
+                     if f.lower().endswith(".json") and not f.lower().startswith("presets")]
+        except OSError:
+            return
+        if not stray:
+            return
+        free = [i for i in range(1, MAX_PRESET_SLOTS + 1) if not os.path.isfile(preset_path(i))]
+        park = os.path.join(PRESETS_DIR, "_migrated")
+        for i, fname in zip(free, stray):
+            src = os.path.join(PRESETS_DIR, fname)
+            rec = _load_json(src, check_file=True)
+            if not isinstance(rec, dict):
+                continue
+            try:
+                self.preset_save(str(i), rec,
+                                 rec.get("_preset_name") or os.path.splitext(fname)[0])
+                os.makedirs(park, exist_ok=True)
+                os.replace(src, os.path.join(park, fname))
+                logging.info(f"预设已迁入空槽位 {i}: {fname}")
+            except Exception as e:                      # noqa: BLE001
+                logging.warning(f"预设迁移失败({fname}): {e}")
+        left = [f for f in stray if os.path.isfile(os.path.join(PRESETS_DIR, f))]
+        if left:
+            logging.warning(f"槽位已满, {len(left)} 个旧预设留在 {park} 里未参与列表: {left[:5]}")
 
     # ---------- 处理 ----------
     def start_generate(self, req):
