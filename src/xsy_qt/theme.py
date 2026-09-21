@@ -153,6 +153,9 @@ QPushButton#primary {{
 QPushButton#primary:hover {{ background: {ACCENT2}; }}
 QPushButton#primary:disabled {{ background: #b8c9bd; border-color: #a8b9ad; color: #f0f0f0; }}
 QPushButton#mini {{ padding: 0 8px; font-size: 11px; border-radius: {RADIUS_SMALL}px; color: {MUTED}; }}
+/* 带菜单的按钮(QPushButton.setMenu)右下角会被 Qt 画一个下拉三角, 小图标按钮上看着就是多出
+   一个小 "v"(顶栏 ☰ 上被用户报过) —— 这个按钮的语义是"点开菜单", 不需要那个三角, 关掉它 */
+QPushButton#mini::menu-indicator {{ image: none; width: 0px; height: 0px; }}
 
 /* ---------- 输入控件 ---------- */
 QLineEdit, QSpinBox, QDoubleSpinBox, QComboBox {{

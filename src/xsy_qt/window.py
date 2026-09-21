@@ -14,11 +14,10 @@ import json
 import logging
 import math
 import os
-import sys
 import time
 from datetime import datetime
 
-from PySide6.QtCore import (QCoreApplication, QPointF, QProcess, QRectF, QSize, Qt,
+from PySide6.QtCore import (QCoreApplication, QPointF, QRectF, QSize, Qt,
                             QT_TRANSLATE_NOOP, QTimer, QUrl, Signal)
 from PySide6.QtGui import (QColor, QDesktopServices, QImage, QKeySequence, QPainter,
                            QPainterPath, QPen, QPixmap, QShortcut)
@@ -35,7 +34,7 @@ from PIL import Image, ImageFilter
 from xiangshuiyin import app as core
 
 from . import i18n, single, theme
-from .dialog import MessageDialog, csdify, go_frameless
+from .dialog import MessageDialog, csdify, dlg_button, dlg_button_row, go_frameless
 from .render import EventWatcher, PreviewWorker, _pil_to_qimage
 from .stats import SessionStats
 
@@ -881,20 +880,45 @@ def ask_slot(parent, presets, name, slots=_PRESET_SLOTS):
     hint = QLabel(QCoreApplication.translate("window", "目标槽位已有方案时会被覆盖。"))
     hint.setObjectName("hint")
     v.addWidget(hint)
-    btns = QHBoxLayout()
-    btns.addStretch(1)
-    cancel = QPushButton(QCoreApplication.translate("window", "取消"))
-    cancel.clicked.connect(dlg.reject)
-    ok = QPushButton(QCoreApplication.translate("window", "导入"))
-    ok.setObjectName("primary")
-    ok.clicked.connect(dlg.accept)
-    btns.addWidget(cancel)
-    btns.addWidget(ok)
-    v.addLayout(btns)
+    v.addLayout(dlg_button_row(
+        dlg_button(QCoreApplication.translate("window", "取消"), dlg.reject),
+        dlg_button(QCoreApplication.translate("window", "导入"), dlg.accept, primary=True)))
     csdify(dlg, QCoreApplication.translate("window", "导入预设"), _prep_dialog)
     if dlg.exec() != QDialog.DialogCode.Accepted:
         return ""
     return combo.currentData() or ""
+
+
+def _hamburger_icon(color, size=15, dpr=1.0):
+    """画"三横线"菜单图标。
+
+    为什么要自绘、为什么要按设备像素画(两个坑都踩过):
+      ① 不直接用 ☰(U+2630): 那个码位在中文字体里没有, 靠字体回退拿到别的字体的字形,
+         小字号下看着像个小箭头(v);
+      ② **按 devicePixelRatio 出图**: 第一版在 15px 的位图上画完交给 Qt 放大 1.25 倍(本机
+         125% 缩放), 线条被重采样得发虚、三条粗细还不匀 —— 与预览上屏那条教训是同一个
+         (见 README「预览发虚」)。这里 px = size×dpr 出图 + setDevicePixelRatio, 上屏就是 1:1。
+      线宽与间距都取整数设备像素(125% 下 3px 线宽 ≈ 2.4 逻辑像素), 这样三条一样粗。
+    """
+    from PySide6.QtGui import QIcon
+    dpr = float(dpr or 1.0)
+    px = max(9, int(round(size * dpr)))
+    pm = QPixmap(px, px)
+    pm.fill(Qt.GlobalColor.transparent)
+    p = QPainter(pm)
+    p.setRenderHint(QPainter.RenderHint.Antialiasing, False)   # 横平竖直的线, 不要抗锯齿
+    pen = QPen(QColor(color))
+    pen.setWidth(max(2, round(px / 9)))                        # 设备像素(约图标的 11%)
+    pen.setCapStyle(Qt.PenCapStyle.FlatCap)
+    p.setPen(pen)
+    inset = round(px * 0.18)
+    half = pen.width() // 2
+    for frac in (0.24, 0.5, 0.76):                             # 三条等距
+        y = min(px - half - 1, max(half, round(px * frac)))
+        p.drawLine(QPointF(inset, y), QPointF(px - inset, y))
+    p.end()
+    pm.setDevicePixelRatio(dpr)
+    return QIcon(pm)
 
 
 def _open_and_report(win, path, what):
@@ -939,9 +963,9 @@ class ImageInfoDialog(QDialog):
         if manual:
             cur.update({k: v for k, v in (core._format_manual_exif(manual) or {}).items()
                         if v and k in ("make", "model", "exposure", "fnumber", "iso")})
-            note = "「当前生效值」= 你在「自定义水印信息」里填的那份（它覆盖照片的 EXIF）"
+            note = self.tr("「当前生效值」= 你在「自定义水印信息」里填的那份（它覆盖照片的 EXIF）")
         else:
-            note = "「当前生效值」= 照片自己的 EXIF（未启用「自定义水印信息」）"
+            note = self.tr("「当前生效值」= 照片自己的 EXIF（未启用「自定义水印信息」）")
 
         v = QVBoxLayout(self)
         grid = QGridLayout()
@@ -999,18 +1023,12 @@ class ImageInfoDialog(QDialog):
         row(self.tr("水印显示（最终）"), effective_model or "—")
 
         v.addLayout(grid)
-        tip = QLabel(note + "；「水印显示」是再按 自定义 > 映射表 > 原始 算出的最终型号。")
+        tip = QLabel(note + self.tr("；「水印显示」是再按 自定义 > 映射表 > 原始 算出的最终型号。"))
         tip.setObjectName("hint")
         tip.setWordWrap(True)
         v.addWidget(tip)
         v.addStretch(1)
-        btns = QHBoxLayout()
-        btns.addStretch(1)
-        close = QPushButton(self.tr("关闭"))
-        close.setObjectName("primary")
-        close.clicked.connect(self.accept)
-        btns.addWidget(close)
-        v.addLayout(btns)
+        v.addLayout(dlg_button_row(dlg_button(self.tr("关闭"), self.accept, primary=True)))
         csdify(self, self.tr("图片信息"), _prep_dialog)
 
     @staticmethod
@@ -1180,18 +1198,12 @@ class ColorDialog(QDialog):
 
         acts = QHBoxLayout()
         acts.setSpacing(theme.GAP_CTRL)
-        b = QPushButton(self.tr("保存当前颜色"))
-        b.setFixedHeight(theme.CTRL_H)
+        b = dlg_button(self.tr("保存当前颜色"), self._remember)
         b.setToolTip(self.tr("把当前颜色存进「我的颜色」，下次直接点"))
-        b.clicked.connect(self._remember)
         acts.addWidget(b)
-        acts.addStretch(1)
-        close = QPushButton(self.tr("关闭"))
+        acts.addStretch(1)                       # 右侧那个"落点"按钮靠右
         # 取色是即时应用的, "关闭"就是这次操作的落点(不是取消), 给主按钮的强调色
-        close.setObjectName("primary")
-        close.setFixedHeight(theme.CTRL_H)
-        close.clicked.connect(self.accept)
-        acts.addWidget(close)
+        acts.addWidget(dlg_button(self.tr("关闭"), self.accept, primary=True))
         v.addLayout(acts)
 
         # 初始焦点收到对话框自身, **不要落在子控件上**: 色块与色号框都带 :focus 描边, 而焦点是
@@ -1395,7 +1407,7 @@ class ColorDialog(QDialog):
         try:
             self._state.save_custom_colors(arr)      # 上限由核心截到 MAX_USER_COLORS
         except Exception as e:                       # noqa: BLE001 - 存不上不该把弹窗弄崩
-            _message(self, QMessageBox.Icon.Warning, "保存失败", str(e))
+            _message(self, QMessageBox.Icon.Warning, self.tr("保存失败"), str(e))
             return False
         self._reload_custom()
         return True
@@ -1519,27 +1531,29 @@ class MapDialog(QDialog):
         form.addWidget(self._nice, 1)
         v.addLayout(form)
 
-        btns = QHBoxLayout()
-        for text, slot in (("添加 / 修改", self._add), ("删除选中", self._remove),
-                           ("保存到映射表", self._save)):
-            b = QPushButton(text)
-            b.clicked.connect(slot)
-            btns.addWidget(b)
-        btns.addStretch(1)
-        close = QPushButton(self.tr("关闭"))
-        close.clicked.connect(self.reject)
-        btns.addWidget(close)
-        v.addLayout(btns)
+        # 只有两个动作, 且都是**即时生效**(点完立刻写盘): 所以不再有单独的「保存到映射表」——
+        # 列表上一秒就变了, 再要求"保存"一次反而是误导; 也不再有「关闭」(标题栏那个 ✕ 就是关)。
+        # NOOP 必须包在**字面量**上(lupdate 看不穿变量): 曾经包在 text 上, 结果整条漏译
+        v.addLayout(dlg_button_row(
+            dlg_button(self.tr(QT_TRANSLATE_NOOP("MapDialog", "添加 / 修改")), self._add),
+            dlg_button(self.tr(QT_TRANSLATE_NOOP("MapDialog", "删除选中")), self._remove)))
 
         self._list.currentItemChanged.connect(self._on_select)
+        try:
+            self._data = dict(core.load_model_map(self._logo_dir) or {})
+        except Exception:                           # noqa: BLE001 - 读不出就当空表
+            self._data = {}
         self._reload()
         csdify(self, self.tr("型号映射管理"), _prep_dialog)   # 无边框 + 自绘标题栏
 
     def _reload(self):
-        try:
-            self._data = dict(core.load_model_map(self._logo_dir) or {})
-        except Exception:
-            self._data = {}
+        """把**内存里**这份映射表画进列表。
+
+        **不要在这里读文件**: 以前它每调一次就 load_model_map() 一次, 于是
+        「添加 / 修改」刚写进 self._data 的条目立刻被文件里的旧内容冲掉 —— 表现就是
+        "点添加没反应、列表始终是空的"(文件里本来就没有)。读盘只在 __init__ 里做一次,
+        写盘只在「保存到映射表」里做。
+        """
         self._list.clear()
         for k in sorted(self._data):
             self._list.addItem(f"{k}   →   {self._data[k]}")
@@ -1559,22 +1573,32 @@ class MapDialog(QDialog):
             return
         self._data[raw] = nice          # 允许把显示名清空
         self._reload()
+        self._persist()
 
     def _remove(self):
         raw = self._raw.text().strip()
         if raw in self._data:
             del self._data[raw]
             self._reload()
+            self._persist()
         self._raw.clear()
         self._nice.clear()
 
-    def _save(self):
+    def _persist(self):
+        """立刻写盘 —— 两个动作都是即时生效, 不再有单独的「保存到映射表」按钮。
+
+        写失败就报一句, 并把内存回滚成磁盘上那份(否则界面显示一份、文件里另一份,
+        下次开弹窗又是第三个样子)。
+        """
         try:
             core.save_model_map(self._logo_dir, self._data)
         except Exception as e:                      # noqa: BLE001
-            _message(self, QMessageBox.Icon.Warning, "保存失败", str(e))
-            return
-        self.accept()
+            _message(self, QMessageBox.Icon.Warning, self.tr("保存失败"), str(e))
+            try:
+                self._data = dict(core.load_model_map(self._logo_dir) or {})
+            except Exception:                       # noqa: BLE001
+                self._data = {}
+            self._reload()
 
 
 class MainWindow(QMainWindow):
@@ -1587,6 +1611,8 @@ class MainWindow(QMainWindow):
         self._input_path = ""
         self._input_name = ""
         self._raw_model = ""
+        self._raw_brand = ""             # 品牌只进「识别型号」那行的 tooltip
+        self._effective_model = ""       # 水印最终会印的型号(见 _update_effective_model)
         self._custom_model = ""
         self._output_dir = ""
         self._generating = False
@@ -1616,6 +1642,9 @@ class MainWindow(QMainWindow):
         self._sync_files_ui()
         self._sync_refresh_btn()         # 启动时还没选图: 「刷新预览效果」先按灰
         self._sync_info_btn()            # 「ℹ 图片信息」同理
+        # 也必须走一遍: 「复制原始型号」的可用态/说明文字在这里定下来 —— 少了这一步, 启动后
+        # 那个按钮是 enabled 的、tooltip 还是空的(用户报"没打开图片也能点")。
+        self._update_effective_model()
         self._unify_spins()
         self._unify_buttons()
         # 型号美化卡里两个按钮取同宽, 否则右边缘一宽一窄参差
@@ -1971,7 +2000,8 @@ class MainWindow(QMainWindow):
         t.setContentsMargins(theme.INSET_BAR, 0, 0, 0)
         t.setSpacing(8)
         # ☰ 菜单: 长尾功能收在这里, 不另起一条菜单栏(那会在"全平铺"的界面上多一条空栏)
-        self._menu_btn = QPushButton("☰")
+        self._menu_btn = QPushButton()
+        self._menu_btn.setIcon(_hamburger_icon(theme.MUTED, dpr=self.devicePixelRatioF()))
         self._menu_btn.setObjectName("mini")
         self._menu_btn.setFixedWidth(32)
         self._menu_btn.setCursor(Qt.PointingHandCursor)
@@ -1986,12 +2016,9 @@ class MainWindow(QMainWindow):
         self._input_label.setObjectName("muted")
         self._input_label.setMinimumWidth(160)
         t.addWidget(self._input_label, 1)
-        t.addWidget(QLabel(self.tr("识别型号")))
-        self._raw_label = QLabel("—")
-        self._raw_label.setStyleSheet("font-weight:bold; color:#334155; background:transparent;")
-        self._raw_label.setMinimumWidth(110)
-        t.addWidget(self._raw_label)
-        # ℹ 图片信息: 紧挨型号(型号就是从 EXIF 来的)。没图可看时置灰, 见 _sync_info_btn
+        # 「识别型号」不再放顶栏: 它和「型号美化」卡里的那一行显示的是同一件事, 两处重复
+        # (用户报"功能上冲突"), 现在统一到卡片里(见 _build_model_card)。
+        # ℹ 图片信息: 没图可看时置灰, 见 _sync_info_btn
         self._info_btn = QPushButton("ℹ")
         self._info_btn.setObjectName("mini")
         self._info_btn.setFixedWidth(32)
@@ -2016,10 +2043,15 @@ class MainWindow(QMainWindow):
         m.addAction(self.tr("导入预设…"), self._import_preset)
         m.addAction(self.tr("导出预设…"), self._export_preset)
         m.addSeparator()
-        m.addAction(self.tr("打开日志文件"), self._open_log_file)
-        m.addAction(self.tr("打开数据目录"), self._open_data_dir)
+        m.setToolTipsVisible(True)       # 菜单项也带 tooltip —— 每个入口指向哪个目录一目了然
+        a = m.addAction(self.tr("打开日志目录"), self._open_log_dir)
+        a.setToolTip(core.LOG_DIR)       # 日志就在程序目录下(LOG_DIR == BASE_DIR)
+        a = m.addAction(self.tr("打开数据目录"), self._open_data_dir)
+        a.setToolTip(core.DATA_DIR)      # 数据目录是它下面的 watermark_data 子目录
+        a = m.addAction(self.tr("打开 Logo 目录"), self._open_logo_dir)
+        a.setToolTip(self._params.get("logo_dir") or core.DEFAULT_LOGO_DIR)
         m.addSeparator()
-        lang = m.addMenu("语言")
+        lang = m.addMenu(self.tr("语言"))
         for code, label in i18n.LANGS:
             act = lang.addAction(label)
             act.setCheckable(True)
@@ -2028,10 +2060,11 @@ class MainWindow(QMainWindow):
         return m
 
     def _set_lang(self, code):
-        """切语言: 写进设置, 提示"重启后生效"(可以直接重启)。
+        """切语言: 写进设置, 提示**自己关掉重开**才生效。
 
-        **不做热切换**: 参数面板那 122 处文案是建窗时 tr() 出来的, 要热切得把整窗重建一遍 ——
-        批量生成/预览线程还在跑的时候重建风险高。重启是桌面软件的常见做法, 且零风险。
+        **不做热切换, 也不自动重启**: 参数面板那 122 处文案是建窗时 tr() 出来的, 热切换得把
+        整窗重建一遍(批量生成/预览线程还在跑时风险高); 自动重启则要走"先放掉单实例管道再起新
+        进程"那套, 从 IDE/快捷方式等不同入口启动时未必都起得来。交给用户手动重启最稳。
         """
         if code == self._lang:
             return
@@ -2041,32 +2074,8 @@ class MainWindow(QMainWindow):
             self._save_settings_now()               # 合并式保存: 只多写一个 lang 键
         except Exception as e:                      # noqa: BLE001 - 存不上不影响这次运行
             logging.warning(f"[i18n] 保存语言设置失败: {e}")
-        if _message(self, QMessageBox.Icon.Question, self.tr("语言"),
-                    self.tr("界面语言已保存，重启后生效。\nThe language will apply after a restart.\n\n"
-                            "现在重启？ / Restart now?"),
-                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-                    QMessageBox.StandardButton.Yes) == QMessageBox.StandardButton.Yes:
-            self._restart()
-
-    def _restart(self):
-        """重启自己: 先落盘、放掉单实例管道, 再起新进程, 最后退出本进程。
-
-        顺序要紧 —— 管道还握着的时候起新进程, 新进程会被自己这道单实例闸门挡掉
-        (它连得上, 就以为"已有实例在运行"), 结果是重启后什么都没起来。
-        """
-        try:
-            self._save_settings_now()
-            single.release()
-            entry = sys.argv[0] if os.path.isfile(sys.argv[0]) else ""
-            if not entry:                           # 从别处启动时(如 python -m): 退回仓库里的入口
-                entry = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(
-                    os.path.abspath(__file__)))), "main.py")
-            logging.info(f"[i18n] 重启: {sys.executable} {entry}")
-            QProcess.startDetached(sys.executable, [entry])
-        except Exception as e:                      # noqa: BLE001 - 起不来就只关窗, 用户自己重开
-            logging.warning(f"[i18n] 重启失败, 请手动重开: {e}")
-        self.close()
-        QApplication.quit()
+        _message(self, QMessageBox.Icon.Information, self.tr("语言"),
+                 self.tr("界面语言已保存，请关闭程序后重新打开生效。"))
 
     def _show_about(self):
         """关于: 版本 + 三个路径 + 许可提醒。版本号只在这里出现, 不做常驻显示。"""
@@ -2075,20 +2084,23 @@ class MainWindow(QMainWindow):
         from PySide6 import __version__ as pyside_version
 
         from xiangshuiyin import __version__ as app_version
-        _message(self, QMessageBox.Icon.Information, "关于",
-                 f"镶 · 水印（Qt 版）  {app_version}\n"
-                 f"Python {platform.python_version()} · PySide6 {pyside_version}\n"
-                 f"{platform.system()}-{platform.release()}\n\n"
-                 f"数据目录：{core.BASE_DIR}\n"
-                 f"日志文件：{core.LOG_FILE}\n"
-                 f"预览目录：{core.PREVIEW_DIR}\n\n"
-                 f"分发时请遵守 PySide6 的 LGPLv3（详见仓库 README 与 THIRD_PARTY_LICENSES）。")
+        # 正文带插值, 所以写成"模板 + format"并配 NOOP(见 i18n 模块说明); 标题也要 tr
+        _message(self, QMessageBox.Icon.Information, self.tr("关于"),
+                 self.tr(QT_TRANSLATE_NOOP(
+                     "MainWindow",
+                     "镶 · 水印（Qt 版）  {version}\n"
+                     "Python {py} · PySide6 {pyside}\n{os}\n\n"
+                     "程序目录：{base}\n数据目录：{data}\n日志目录：{logs}\n预览目录：{preview}\n\n"
+                     "分发时请遵守 PySide6 的 LGPLv3（详见仓库 README 与 THIRD_PARTY_LICENSES）。"))
+                 .format(version=app_version, py=platform.python_version(), pyside=pyside_version,
+                         os=f"{platform.system()}-{platform.release()}", base=core.BASE_DIR,
+                         data=core.DATA_DIR, logs=core.LOG_DIR, preview=core.PREVIEW_DIR))
 
-    def _open_log_file(self):
-        _open_and_report(self, core.LOG_FILE, "日志文件")
+    def _open_log_dir(self):
+        _open_and_report(self, core.LOG_DIR, "日志目录")
 
     def _open_data_dir(self):
-        _open_and_report(self, core.BASE_DIR, "数据目录")
+        _open_and_report(self, core.DATA_DIR, "数据目录")
 
     def _show_image_info(self):
         """「图片信息」弹窗: 照片里的 EXIF 与**最终会上水印的值**并排。
@@ -2101,7 +2113,7 @@ class MainWindow(QMainWindow):
             self._status(self.tr("先选择一张图片"))
             return
         dlg = ImageInfoDialog(path, self._manual if self._manual_on else None,
-                              self._effective_lab.text(), self)
+                              self._effective_model, self)
         dlg.exec()
 
     def _build_preview_pane(self):
@@ -2474,17 +2486,25 @@ class MainWindow(QMainWindow):
         self._model_edit.textChanged.connect(self._on_custom_model)
         self._map_btn = self._btn(self.tr("管理所有型号映射"), self._open_map_dialog)
         card.body.addWidget(self._row(QT_TRANSLATE_NOOP("MainWindow", "美化型号"), [self._model_edit, self._map_btn]))
-        self._effective_lab = ElidedLabel("—")
-        self._effective_lab.setObjectName("muted")
-        self._effective_lab.setToolTip(self.tr("按「美化型号 → 映射表 → 原始型号」的顺序取到的最终显示名"))
-        self._effective_lab.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
-        self._copy_btn = self._btn(self.tr("复制原始型号"), self._copy_raw_model, mini=True)
-        card.body.addWidget(self._row(QT_TRANSLATE_NOOP("MainWindow", "水印显示"), [self._effective_lab, self._copy_btn]))
+        # 「识别型号」= 照片里识别到的型号(与「美化型号/映射表」无关); 水印最终会印什么由
+        # tooltip 给出 —— 这样"识别"与"美化后"两件事都在, 又不占两行(以前顶栏与这里各显示一份,
+        # 看着像重复, 用户报过)。
+        self._model_lab = ElidedLabel("—")
+        # 不用 muted: 识别到的型号是"拿这张图会印什么"的依据, 以前它在顶栏是加粗深色的,
+        # 搬进卡片不该降格成灰字(其余行的值仍是 muted, 那是惯例, 这一行是例外)
+        self._model_lab.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+        self._copy_btn = self._btn(self.tr("复制原始型号"), self._copy_raw_model)
+        card.body.addWidget(self._row(QT_TRANSLATE_NOOP("MainWindow", "识别型号"),
+                                      [self._model_lab, self._copy_btn]))
         return card
 
     def _update_effective_model(self):
-        """水印最终会显示什么型号 —— 与渲染端 _inject_model_map + prettify_model 同一套规则:
-        临时美化名优先, 其次映射表, 最后回落原始型号。"""
+        """刷新「识别型号」那一行(以及"水印里会显示什么"的说明)。
+
+        `self._effective_model` 才是**水印最终会印的名字** —— 与渲染端 _inject_model_map +
+        prettify_model 同一套规则: 临时美化名优先, 其次映射表, 最后回落原始型号。它现在只出现在
+        tooltip 与「图片信息」弹窗里(那一行显示的是**识别到的**型号, 两件事不混着说)。
+        """
         raw = self._raw_model
         if self._custom_model and self._custom_model != raw:
             name = self._custom_model
@@ -2493,7 +2513,17 @@ class MainWindow(QMainWindow):
                 name = core.prettify_model(raw, self._params.get("model_map") or {})
             except Exception:
                 name = raw
-        self._effective_lab.setText(name or "—")
+        self._effective_model = name or ""
+        self._model_lab.setText(raw or "—")
+        tips = [self.tr("品牌：{brand}").format(brand=self._raw_brand)] if self._raw_brand else []
+        if name:
+            tips.append(self.tr("水印里会显示：{name}").format(name=name))
+        self._model_lab.setToolTip("\n".join(tips))
+        # 「复制原始型号」: 没有识别到型号(没选图 / 图里没 EXIF)时置灰 —— 以前它一直是 #mini 的
+        # 灰字样式, 明明可点却看着像禁用了(用户报过), 现在改成普通按钮 + 真的按状态置灰
+        self._copy_btn.setEnabled(bool(raw))
+        self._copy_btn.setToolTip(self.tr("把识别到的型号复制到剪贴板") if raw
+                                  else self.tr("还没有识别到型号（先选一张图片）"))
 
     def _build_manual_card(self):
         card = Card(QT_TRANSLATE_NOOP("Card", "自定义水印信息"))
@@ -2533,12 +2563,10 @@ class MainWindow(QMainWindow):
 
     def _build_preset_card(self):
         # 免得为一行 Logo 目录再占一张卡片的高度
-        card = Card(QT_TRANSLATE_NOOP("Card", "预设方案与 Logo"))
+        # Logo 目录那一行收进了 ☰ 菜单(用户: "logo目录及打开按钮, 收纳进菜单中") ——
+        # 卡片名字也回到「预设方案」: 它现在只装预设了
+        card = Card(QT_TRANSLATE_NOOP("Card", "预设方案"))
         card.reset_btn.setVisible(False)
-        self._logo_label = self._path_label()
-        card.body.addWidget(self._row(QT_TRANSLATE_NOOP("MainWindow", "Logo 目录"), [
-            self._logo_label,
-            self._btn(self.tr("打开目录"), self._open_logo_dir)]))
         self._preset_combo = NoWheelComboBox()
         self._preset_name = QLineEdit()
         self._preset_name.setPlaceholderText(self.tr("方案名（保存时必填）"))
@@ -2548,18 +2576,8 @@ class MainWindow(QMainWindow):
             self._btn(self.tr("加载"), self._preset_load),
             self._btn(self.tr("保存"), self._preset_save),
             self._btn(self.tr("删除"), self._preset_delete)]))
-        self._sync_logo_dir_label()
         self._reload_presets()
         return card
-
-    def _sync_logo_dir_label(self):
-        """
-
-        进 tooltip 的是完整路径 —— 标签会被中间省略, 悬停才看得到全的。
-        """
-        if not hasattr(self, "_logo_label"):
-            return
-        self._logo_label.setText(self._params.get("logo_dir") or core.DEFAULT_LOGO_DIR)
 
     def _open_logo_dir(self):
         """
@@ -2604,8 +2622,8 @@ class MainWindow(QMainWindow):
             return
         name = p.get("_preset_name") or key
         # 里没有 confirm), 这里先问一句, 与「恢复默认设置」「删除预设」同一个形态。
-        if _message(self, QMessageBox.Icon.Question, "加载预设",
-                    f"将把当前所有参数覆盖为预设「{name}」的值。继续？",
+        if _message(self, QMessageBox.Icon.Question, self.tr("加载预设"),
+                    self.tr("将把当前所有参数覆盖为预设「{name}」的值。继续？").format(name=name),
                     QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
                     QMessageBox.StandardButton.No) != QMessageBox.StandardButton.Yes:
             return
@@ -2685,7 +2703,8 @@ class MainWindow(QMainWindow):
             with open(path, encoding="utf-8") as f:
                 data = json.load(f)
         except Exception as e:                      # noqa: BLE001
-            _message(self, QMessageBox.Icon.Warning, "导入预设", f"读不了这个文件：\n{e}")
+            _message(self, QMessageBox.Icon.Warning, self.tr("导入预设"),
+                     self.tr("读不了这个文件：\n{err}").format(err=e))
             return
         if not isinstance(data, dict) or not data:
             _message(self, QMessageBox.Icon.Warning, self.tr("导入预设"), self.tr("这个文件里没有方案数据。"))
@@ -2706,8 +2725,9 @@ class MainWindow(QMainWindow):
             return
         cur = self._preset_data.get(slot) or {}
         cur_name = cur.get("_preset_name") if isinstance(cur, dict) else None
-        if cur_name and _message(self, QMessageBox.Icon.Question, "导入预设",
-                                 f"槽位 {slot} 已有方案「{cur_name}」，导入会覆盖它。继续？",
+        if cur_name and _message(self, QMessageBox.Icon.Question, self.tr("导入预设"),
+                                 self.tr("槽位 {slot} 已有方案「{name}」，导入会覆盖它。继续？")
+                                 .format(slot=slot, name=cur_name),
                                  QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
                                  QMessageBox.StandardButton.No) != QMessageBox.StandardButton.Yes:
             return
@@ -2723,8 +2743,8 @@ class MainWindow(QMainWindow):
             self._status(self.tr("该槽位为空，无需删除"))
             return
         name = self._preset_data[key].get("_preset_name") or key
-        if _message(self, QMessageBox.Icon.Question, "删除预设",
-                    f"确定删除「{name}」？",
+        if _message(self, QMessageBox.Icon.Question, self.tr("删除预设"),
+                    self.tr("确定删除「{name}」？").format(name=name),
                     QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
                     QMessageBox.StandardButton.No) != QMessageBox.StandardButton.Yes:
             return
@@ -2750,7 +2770,6 @@ class MainWindow(QMainWindow):
                 row.set_value(val)
         self._sync_mirror_rows(changed)
         self._sync_visibility()
-        self._sync_logo_dir_label()        # logo_dir 也在参数表里(加载预设/恢复默认都可能动它)
         self._touch()
 
     # ---------- 参数持久化 ----------
@@ -3048,6 +3067,9 @@ class MainWindow(QMainWindow):
         if self._raw_model:
             QApplication.clipboard().setText(self._raw_model)
             self._status(self.tr("已复制原始型号到剪贴板"))
+        else:
+            # 按钮在"没识别到型号"时是置灰的, 正常点不到; 这里兜一句免得静默无反应
+            self._status(self.tr("还没有识别到型号（先选一张图片）"))
 
     def _on_custom_model(self, text):
         self._custom_model = text.strip()
@@ -3075,8 +3097,7 @@ class MainWindow(QMainWindow):
             brand = (ex.get("make") or "").strip()
         except Exception:
             self._raw_model, brand = "", ""
-        self._raw_label.setText(self._raw_model or "—")
-        self._raw_label.setToolTip(self.tr("品牌：{brand}").format(brand=brand) if brand else "")
+        self._raw_brand = brand
         self._update_effective_model()
         if self._mode != "single":
             self._set_mode("single")            # 内部按需重渲

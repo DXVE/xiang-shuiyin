@@ -150,6 +150,34 @@ _BTN_TEXT = {
 }
 
 
+def dlg_button(text, slot=None, primary=False, parent=None):
+    """自绘弹窗里统一的按钮。
+
+    以前每个弹窗各写各的: 映射弹窗那三个按钮没设高度、关闭也不是主色, 与取色/图片信息弹窗对不上
+    (用户报"这两个按钮的样式和其他自绘弹窗不一致")。现在所有自绘弹窗的按钮都从这一个函数出,
+    样式(高度 CTRL_H / 主按钮 #primary / 手型光标)才真统一; 标题栏那个 ✕ 不走这里(它是弹窗壳的一部分)。
+    """
+    b = QPushButton(text, parent)
+    if primary:
+        b.setObjectName("primary")
+    b.setFixedHeight(theme.CTRL_H)
+    b.setCursor(Qt.CursorShape.PointingHandCursor)
+    if slot is not None:
+        b.clicked.connect(slot)
+    return b
+
+
+def dlg_button_row(*buttons):
+    """把按钮摆成弹窗底部那一行: 右对齐、间距统一。"""
+    row = QHBoxLayout()
+    row.setContentsMargins(0, 0, 0, 0)
+    row.setSpacing(theme.GAP_CTRL)
+    row.addStretch(1)
+    for b in buttons:
+        row.addWidget(b)
+    return row
+
+
 def _btn_text(btn):
     return QCoreApplication.translate("dialog", _BTN_TEXT[btn])
 
@@ -180,10 +208,7 @@ class MessageDialog(QDialog):
                   QMessageBox.StandardButton.No):
             if not (buttons & b):
                 continue
-            btn = QPushButton(_btn_text(b))
-            btn.setFixedHeight(theme.CTRL_H)
-            if b == self.result_button:
-                btn.setObjectName("primary")
+            btn = dlg_button(_btn_text(b), primary=(b == self.result_button))
             btn.clicked.connect(lambda _c, bb=b: self._pick(bb))
             row.addWidget(btn)
         root.addLayout(row)
