@@ -1,14 +1,15 @@
 # -*- coding: utf-8 -*-
 """
 镶·水印 · 渲染内核
-==================
-参数、EXIF、图像处理、process_single、AppState(预览/生成/预设/型号映射/配置)。
-调用方是同进程的界面层与 main.py, 不存在跨进程通讯。
+==========================
+参数、EXIF、图像处理、`process_single`、`AppState`(预览/生成/预设/型号映射/配置)。
+调用方是同进程的 Qt 界面(`src/xsy_qt/`)与 `main.py`, 不存在跨进程/桥通讯。
 
-- 渲染: 6 间距参数的三布局水印(unified / split_top_bottom / split_left_right)
-- 预览: 缩略图快速渲染 + 放大镜; 间距段几何经 geom_out 回传界面叠加高亮,
-  画布 PIL 图经 image_out 直接回给调用方(不落盘)
-- 持久化: 参数/预设/型号映射/settings 写入本程序数据目录, 见「目录常量」
+- 核心: 6 间距参数的三布局水印渲染(unified / split_top_bottom / split_left_right)
+- 预览: 缩略图快速渲染 + 放大镜确认细节, 间距段几何经 `geom_out` 回传界面叠加高亮,
+  画布 PIL 图经 `image_out` 直接回给调用方(不落盘)
+- 持久化: 参数/预设/型号映射/settings 统一写入本程序自己的数据目录, 见「目录常量」
+  (Windows: %LOCALAPPDATA%\\XiangShuiyin-QT6, macOS/Linux 同理; 可用 XSY_BASE_DIR 覆盖)
 
 依赖: Pillow, exifread
 """
@@ -40,9 +41,9 @@ if hasattr(sys.stdout, 'reconfigure'):
     sys.stdout.reconfigure(encoding='utf-8')
 
 # 预览/上传临时目录(程序退出时清理)
-# XSY_PREVIEW_DIR 指定独立临时目录: 目录被共用时, 任一进程退出时的 cleanup()
-# 会把对方正在显示的预览文件删掉
-PREVIEW_DIR = os.environ.get("XSY_PREVIEW_DIR") or os.path.join(tempfile.gettempdir(), "XiangShuiyin_preview")
+# 由 main.py 的 XSY_PREVIEW_DIR 指定; 这里的回退值也用本程序自己的名字 —— 导入本模块只读不写
+# 这个目录, 但共用一个临时目录时, 任一版退出时的 cleanup() 会把对方正在显示的预览文件删掉。
+PREVIEW_DIR = os.environ.get("XSY_PREVIEW_DIR") or os.path.join(tempfile.gettempdir(), "XiangShuiyin_preview_qt")
 
 # 实时预览缩略渲染的最大边长(低分辨率快速通道, 高清预览供放大镜确认细节)
 #   2500 = 常态档: 输入图先缩到 2500 再渲染(渲染快, 上屏前再由 PreviewBox 缩一次)
@@ -64,15 +65,17 @@ BLUR_WORK_MIN_SIDE = 400
 # 配置管理：目录常量、默认字体路径、设置文件的读写、型号映射文件的读写等
 # ---------- 目录常量 ----------
 # 配置数据目录: 按平台惯例选择——Windows: LOCALAPPDATA; macOS: ~/Library/Application Support;
-# Linux: $XDG_DATA_HOME 或 ~/.local/share。均在其下建本程序子目录。
-# Windows 使用 LOCALAPPDATA。
+# Linux: $XDG_DATA_HOME 或 ~/.local/share。均在其下建 XiangShuiyin-QT6 子目录。
+# Windows 使用 LOCALAPPDATA, 目录名归本程序所有, 配置与日志互不干扰。
 if os.name == 'nt':
     _data_root = os.environ.get('LOCALAPPDATA') or os.path.join(os.path.expanduser('~'), 'AppData', 'Local')
 elif sys.platform == 'darwin':
     _data_root = os.path.join(os.path.expanduser('~'), 'Library', 'Application Support')
 else:
     _data_root = os.environ.get('XDG_DATA_HOME') or os.path.join(os.path.expanduser('~'), '.local', 'share')
-# (导入本模块会按 BASE_DIR 建日志并轮转旧日志, 共用目录会互相删除对方的日志)
+# 数据目录: 正常由 main.py 通过 XSY_BASE_DIR 指定; **回退值也必须是本程序自己的目录** ——
+# 导入本模块会立刻按 BASE_DIR 建日志目录、轮转旧日志(_cleanup_old_logs 只留最近 3 份)并清理
+# DATA_DIR 下的 *.tmp* 残留, 回退到别的程序的目录就等于去创建/删除别人的文件。
 BASE_DIR = os.environ.get("XSY_BASE_DIR") or os.path.join(_data_root, "XiangShuiyin-QT6")
 DATA_DIR = os.path.join(BASE_DIR, "watermark_data")
 SETTINGS_FILE = os.path.join(DATA_DIR, "settings.json")
@@ -2126,20 +2129,7 @@ class AppState:
             pass
 
 
-_DIR = os.path.dirname(os.path.abspath(__file__))
-
-
-
-
-
-
-
-
-
-
-
-
-
+# ===== 目录扫描(批量处理用) =====
 def _list_images_in_dir(folder, recursive=False):
     """列出目录内的候选文件; recursive=True 时连子目录一起走。按文件名排序, 是否图片由调用方按魔数判定"""
     out = []

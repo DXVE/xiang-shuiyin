@@ -17,7 +17,7 @@ import time
 from PySide6.QtCore import QPointF, QRectF, QSize, Qt, QTimer, Signal
 from PySide6.QtGui import QColor, QImage, QPainter, QPainterPath, QPen, QPixmap
 from PySide6.QtWidgets import (
-    QAbstractSpinBox, QCheckBox, QColorDialog, QComboBox, QDialog,
+    QAbstractSpinBox, QApplication, QCheckBox, QColorDialog, QComboBox, QDialog,
     QFileDialog, QFrame, QGridLayout, QHBoxLayout, QLabel,
     QLineEdit, QListWidget, QMainWindow, QMenu, QMessageBox, QProgressBar, QPushButton,
     QScrollArea, QSizePolicy, QSlider, QSpinBox, QSplitter, QStackedWidget,
@@ -202,6 +202,14 @@ _SB_W = 10
 # _scale_for_display), 锐化现在只影响观感 —— 想"预览=成品"就置 0, 觉得字还有点软就给 30,
 # 看到笔画边上有白/黑描边(过冲)就往下降。
 _PREVIEW_SHARPEN = 60
+
+# ---------- 主窗口初始尺寸与左右分栏 ----------
+# 初始尺寸按**屏幕可用区**(已扣任务栏)的百分比算, 不写死像素: 1080p@125% 的逻辑可用区只有
+# 1536x816, 写死 860 高会把底栏与状态栏顶到屏幕外(实测就是这个问题)。留边 _WIN_EDGE px
+# 保证四边不贴边、还能拖动。数值可直接调。
+_WIN_W_RATIO, _WIN_H_RATIO, _WIN_EDGE = 0.6, 0.8, 100
+# 左列占比(左 4 : 右 6)。窗口缩放时按此比例重排; 用户手动拖过分隔条后不再自动分配。
+_SPLIT_LEFT = 0.4
 
 FONT_STYLE_COLS = ("显示", "粗体", "斜体")
 FONT_STYLE_GROUPS = [
@@ -1307,7 +1315,9 @@ class MainWindow(QMainWindow):
 
         self.setWindowTitle("镶 · 水印 (Qt 版)")
         self.setAcceptDrops(True)
-        self.resize(1240, 860)
+        self._split_user_set = False     # 用户是否手动拖过分隔条(拖过就不再自动分配比例)
+        self._fitted = False             # 是否已按屏幕可用区定过尺寸(见 _fit_to_screen)
+        self._fit_to_screen()
         self._build_ui()
         self._sync_visibility()
         self._mode_btns["single"].setChecked(True)
@@ -1418,6 +1428,64 @@ class MainWindow(QMainWindow):
         self._touch()
         self._status(f"已重置「{card.findChild(QLabel, 'cardTitle').text()}」为默认值")
 
+    # ---------- 窗口尺寸 / 分栏 ----------
+    def _fit_to_screen(self):
+        """按屏幕可用区(已扣任务栏)的百分比定初始尺寸并居中。
+
+        不写死像素的理由: 1080p@125% 下逻辑可用区只有 1536x816, 而"够用"的窗口高度要 860 ——
+        写死就会顶出屏幕, 底栏与状态栏落到屏幕外, 每次都要手动拉。留边 _WIN_EDGE px
+        保证四边不贴边。
+
+        只影响初始值: 之后用户怎么改窗口都不再干预(没有加尺寸持久化, 每次启动都用算出来的,
+        见 README 的"已知事项")。"""
+        scr = self.screen() or QApplication.primaryScreen()
+        if scr is not None:
+            a = scr.availableGeometry()
+            sw, sh = a.width(), a.height()
+        else:
+            sw, sh = 1536, 816          # 拿不到屏幕时按 1080p@125% 的可用区兜底
+        w = max(320, min(int(sw * _WIN_W_RATIO), sw - _WIN_EDGE))
+        h = max(240, min(int(sh * _WIN_H_RATIO), sh - _WIN_EDGE))
+        self.resize(w, h)
+        self.move(a.center().x() - w // 2, a.center().y() - h // 2)
+
+    def _apply_split_ratio(self):
+        """把左右列按 _SPLIT_LEFT 重排(窗口缩放时保持比例); 用户手动拖过后本次会话不再干预。
+
+        分母用 sum(sizes()): 它就是分隔条真正可分配的宽度, 与 handle 宽度(8px)无关, 不必手扣。
+        窗口极窄时(最小 674 宽 -> 40% = 270 < 左列最小 293) QSplitter 会自动钳到各自最小值,
+        比例优雅退让, 不会挤坏布局。"""
+        sp = getattr(self, "_split", None)
+        if sp is None or self._split_user_set:
+            return
+        total = sum(sp.sizes())
+        if total <= 0:                  # 首次布局还没走完, sizes() 没有意义
+            return
+        left = int(total * _SPLIT_LEFT)
+        sp.setSizes([left, total - left])
+
+    def _on_split_moved(self, *_pos):
+        self._split_user_set = True
+
+    def resizeEvent(self, e):
+        super().resizeEvent(e)
+        self._apply_split_ratio()
+
+    def showEvent(self, e):
+        super().showEvent(e)
+        if not self._fitted:
+            self._fitted = True
+            # 首帧时才知道窗口最终落在哪块屏(多屏下未必是 primaryScreen): 再按那块屏的可用区
+            # 收一次, 避免又出现"底部超出屏幕"。只在第一次做, 之后不动用户的调整。
+            scr = self.screen()
+            if scr is not None:
+                a = scr.availableGeometry()
+                w = min(self.width(), a.width() - _WIN_EDGE)
+                h = min(self.height(), a.height() - _WIN_EDGE)
+                if (w, h) != (self.width(), self.height()):
+                    self.resize(w, h)
+            self._apply_split_ratio()
+
     # ---------- 构建 ----------
     def _build_ui(self):
         # 预览控件先建: 页签里的参数行在构造时就要连它的 set_highlight
@@ -1435,7 +1503,8 @@ class MainWindow(QMainWindow):
 
         outer.addWidget(self._build_topbar())
 
-        split = QSplitter(Qt.Horizontal)
+        self._split = QSplitter(Qt.Horizontal)
+        split = self._split
         left = QWidget()
         lv = QVBoxLayout(left)
         # 左列不留横向内边距: 留白必须放在**视口之内**(页签行与卡片宿主)。放这里等于
@@ -1449,9 +1518,12 @@ class MainWindow(QMainWindow):
         lv.addWidget(self._stack, 1)
         split.addWidget(left)
         split.addWidget(self._build_preview_pane())
-        split.setStretchFactor(0, 0)
-        split.setStretchFactor(1, 1)
-        split.setSizes([540, 690])
+        # 左右按 _SPLIT_LEFT 的比例排布(见 _apply_split_ratio)。**不要**设 setStretchFactor:
+        # 那套是"初始尺寸之外多出来的空间按权重分", 左列会被冻在初始值上(改造前就是 540 恒定、
+        # 右边的预览独吞所有增量), 与"按比例"是两种语义。也不在这里 setSizes: 首次布局前
+        # sizes() 还没有意义, 初值由 showEvent 里的 _apply_split_ratio() 给。
+        split.setChildrenCollapsible(False)   # 左列变窄后防止被拖塌
+        split.splitterMoved.connect(self._on_split_moved)
         outer.addWidget(split, 1)
 
         outer.addWidget(self._build_bottombar())
@@ -2116,7 +2188,6 @@ class MainWindow(QMainWindow):
 
     def _copy_raw_model(self):
         if self._raw_model:
-            from PySide6.QtWidgets import QApplication
             QApplication.clipboard().setText(self._raw_model)
             self._status("已复制原始型号到剪贴板")
 

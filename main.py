@@ -3,8 +3,10 @@
 
 用法: .venv\\Scripts\\python.exe main.py
 
-必须在导入核心之前设置两个环境变量: 核心在 import 阶段就会按 BASE_DIR 建日志并轮转旧日志
-PREVIEW_DIR 共用则会在任一版退出时把对方正在显示的预览文件清掉。
+必须在导入核心之前设置两个环境变量: 核心在 import 阶段就会按 BASE_DIR 建日志目录、轮转旧日志
+(`_cleanup_old_logs` 只保留最近 3 份) 并清理 `*.tmp*` 残留, 所以这两个目录要先定下来。
+这里是**本程序自己的固定位置**(Windows: %LOCALAPPDATA%\\XiangShuiyin-QT6 + 临时预览目录),
+与任何其它程序无关; 用 setdefault 是为了让工具脚本能注入自己的临时目录(见 tools/)。
 """
 import os
 import sys
@@ -15,7 +17,6 @@ ROOT = Path(__file__).resolve().parent
 SRC = ROOT / "src"
 if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
-
 
 
 def _data_root():
@@ -54,6 +55,8 @@ def main():
     print(f"[启动] 数据目录: {core.BASE_DIR}")
     print(f"[启动] 预览目录: {core.PREVIEW_DIR}")
     print(f"[启动] 日志:     {os.path.join(core.LOG_DIR, 'log-' + core.LOG_TIMESTAMP + '.log')}")
+    if not os.path.exists(core.SETTINGS_FILE):
+        print("[启动] 未找到设置文件, 使用出厂默认参数")
     return app.exec()
 
 
