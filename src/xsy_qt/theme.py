@@ -60,10 +60,12 @@ GAP_ROW = 4           # 卡片内相邻行之间
 GAP_CTRL = 8          # 同一行内控件之间
 
 ARROW_DOWN = _asset("arrow_down.svg")
-CHECK_OFF = _asset("check_off.svg")
-CHECK_ON = _asset("check_on.svg")
-CHECK_OFF_HOVER = _asset("check_off_hover.svg")
-CHECK_ON_HOVER = _asset("check_on_hover.svg")
+# 开关(胶囊)素材: 36x20 的轨道 + 16px 白滑块, 滑块在左=关、在右=开。
+# **两个状态是两张静态图**: QSS 的 image 没法插值, 所以切换时滑块是"跳"过去的, 没有滑动动画
+SWITCH_OFF = _asset("switch_off.svg")
+SWITCH_ON = _asset("switch_on.svg")
+SWITCH_OFF_HOVER = _asset("switch_off_hover.svg")
+SWITCH_ON_HOVER = _asset("switch_on_hover.svg")
 MENU_CHECK = _asset("menu_check.svg")   # 可勾选菜单项的勾(换掉 Fusion 默认那个又粗又拖尾的)
 
 QSS = f"""
@@ -127,6 +129,16 @@ QLabel#cardTitle {{
 QLabel#hint {{ color: {MUTED}; font-size: 11px; background: transparent; }}
 QLabel#fieldLabel {{ background: transparent; }}
 QLabel#muted {{ color: {MUTED}; background: transparent; }}
+/*/* ---------- 「关于」弹窗 ----------
+   **字号必须写在这儿, 不能靠 setFont**: 上面那条全局 `QWidget {{ font-size: 12px }}` 会压过
+   widget 自己 setFont 设的字号(Qt 的样式表优先) —— 实测 `setFont(22px)` 单独存在时是 22px,
+   一旦被 addWidget 进这个弹窗就悄悄变回 12px。字距 QSS 给不了, 那部分仍由代码 setFont, 且要在
+   弹窗**抛光之后**再设一遍(见 AboutDialog 结尾那段)。 */
+QLabel#aboutName {{ font-size: 22px; font-weight: 600; color: #2f4a38; background: transparent; }}
+QLabel#aboutSub {{ font-size: 13px; color: {MUTED}; background: transparent; }}
+QLabel#aboutVer {{ font-size: 13px; font-weight: bold; color: #334155; background: transparent; }}
+QLabel#aboutInfo {{ font-size: 12px; color: {MUTED}; background: transparent; }}
+QLabel#aboutNote {{ font-size: 11px; color: {MUTED}; background: transparent; }}
 
 /* ---------- 按钮 ---------- */
 QPushButton {{
@@ -193,10 +205,16 @@ QLineEdit, QSpinBox, QDoubleSpinBox, QComboBox {{
     selection-background-color: {ACCENT};
 }}
 QComboBox {{ padding-right: 22px; }}
-QLineEdit:focus, QSpinBox:focus, QDoubleSpinBox:focus, QComboBox:focus {{
-    border-color: {ACCENT};
-}}
+/* 焦点态: 与按钮同一套口径 —— **不描一圈绿边**, 改用底色变一档。
+   原来这里是 `border-color: {ACCENT}`, 用户报"很不协调看着很掉价, 四边不等宽, 特别是圆角位置"。
+   根因不是颜色, 是分辨率取整: 1 逻辑像素的边框在 150% 缩放下落在设备像素网格之外, 实测
+   四边厚度是 "上1 下2 左2 右2", 而且那两条 2px 里有一条是半覆盖的淡绿(#b7cebe) —— 上下左右
+   本来就不可能一样宽。改成 2px 能凑成"四边都是 3 设备像素", 但那是把细圈换成粗圈, 更抢眼;
+   填充没有宽度, 也就不存在取整问题, 所以走底色(#EEF2EC, 与按钮悬停同一档)。
+   只读框那条规则在下面单独覆盖: 它的选择器特异性更高, 不写就会被 [readOnly] 的白底压回去。 */
+QLineEdit:focus, QSpinBox:focus, QDoubleSpinBox:focus, QComboBox:focus {{ background: #EEF2EC; }}
 QLineEdit[readOnly="true"] {{ background: #faf8f4; color: {MUTED}; }}
+QLineEdit[readOnly="true"]:focus {{ background: #EEF2EC; }}
 
 /* 数值框用 −/+ 步进按钮()。
    不用 QSpinBox 自带的上下箭头: 在 QSS 下 Qt 既不画原生箭头, 也不支持 CSS 那种
@@ -237,16 +255,25 @@ QSlider::handle:horizontal {{
 }}
 QSlider::handle:horizontal:hover {{ background: {ACCENT}; }}
 
-/* ---------- 复选框 ----------
-   指示器用 SVG 素材自绘。原来靠 Fusion 原生绘制 + 调色板 Highlight, 结果是
-   "未勾选只有一圈极淡的细框、勾选后只剩一个孤零零的对勾(方框整个不见)",
-   在白卡片上根本看不出是个可勾选项。素材方案能同时控制方框、填充与对勾。 */
+/* ---------- 勾选开关(胶囊) ----------
+   指示器用 SVG 素材。原来靠 Fusion 原生绘制 + 调色板 Highlight, 结果是"未勾选只有一圈极淡的
+   细框、勾选后只剩一个孤零零的对勾(方框整个不见)", 在白卡片上根本看不出是个可勾选项。
+   素材方案能同时控制轨道、滑块与悬停态。
+   形态: **28x16 的胶囊**(不是勾选框) —— 滑块在左=关、在右=开。尺寸是 36x20 降一档来的:
+   36x20 在参数卡里太出戏(用户: "太大太出戏, 全换小一档"), 而 28x16 的高度正好等于原来那个
+   16px 方框 —— 只放一个开关的行高因此回到 20px, 与这次改造前完全一致, 行高不再多出 4px。
+   **本程序所有勾选框都是这一套**(参数行的「开启」「圆形（整图正圆）」、水印开关网格的 9 个格位、
+   批量目录的「包含子文件夹」、手动信息的「启用（…）」), 所以这里没有第二套尺寸,
+   也别在别处另写 ::indicator 的宽高。 */
 QCheckBox {{ background: transparent; spacing: 7px; }}
-QCheckBox::indicator {{ width: 16px; height: 16px; }}
-QCheckBox::indicator:unchecked {{ image: url({CHECK_OFF}); }}
-QCheckBox::indicator:unchecked:hover {{ image: url({CHECK_OFF_HOVER}); }}
-QCheckBox::indicator:checked {{ image: url({CHECK_ON}); }}
-QCheckBox::indicator:checked:hover {{ image: url({CHECK_ON_HOVER}); }}
+QCheckBox::indicator {{ width: 28px; height: 16px; }}
+QCheckBox::indicator:unchecked {{ image: url({SWITCH_OFF}); }}
+QCheckBox::indicator:unchecked:hover {{ image: url({SWITCH_OFF_HOVER}); }}
+QCheckBox::indicator:checked {{ image: url({SWITCH_ON}); }}
+QCheckBox::indicator:checked:hover {{ image: url({SWITCH_ON_HOVER}); }}
+/* 网格里的格位没有文字标签, 那个 7px 的文字间距要归零 —— 否则开关会往左偏 3.5px,
+   与它上面的列头对不齐(格位靠 AlignCenter 居中, 居中算的是整个控件) */
+QCheckBox#cell {{ spacing: 0px; }}
 
 /* ---------- 滚动条 ----------
    左列的滚动条**常驻**(见 window._build_tab: 常驻才能让卡片宽度不跳), 但"常驻"不等于"平时要看得见":

@@ -107,8 +107,10 @@ class SessionStats:
         layer_hit, layer_miss, layer_pct = rates["层"]
 
         if compact:
+            # 紧凑版是**纯值**, 前缀由调用方给(「关于」弹窗写成「本次会话统计：<这句>」)——
+            # 曾经自带前缀, 于是拼出来是"本次会话统计：本次会话：暂无预览"。
             if not n:
-                return _t(QT_TRANSLATE_NOOP("stats", "本次会话：暂无预览"))
+                return _t(QT_TRANSLATE_NOOP("stats", "暂无预览"))
             gen_part = _t(QT_TRANSLATE_NOOP("stats", " · 生成 {gen}")).format(gen=gen) if gen else ""
             return (_t(QT_TRANSLATE_NOOP("stats", "预览 {n} · 渲染 p50 {r50:.0f}/p95 {r95:.0f}ms")).format(
                         n=n, r50=r50, r95=r95)

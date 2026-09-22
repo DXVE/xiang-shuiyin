@@ -21,8 +21,8 @@ from datetime import datetime
 from PySide6.QtCore import (QAbstractAnimation, QEasingCurve, QParallelAnimationGroup, QPointF,
                             QPropertyAnimation, QRectF, QSize, Qt,
                             QT_TRANSLATE_NOOP, QTimer, QUrl, Signal)
-from PySide6.QtGui import (QColor, QDesktopServices, QImage, QKeySequence, QPainter,
-                           QPainterPath, QPen, QPixmap, QShortcut)
+from PySide6.QtGui import (QColor, QDesktopServices, QFont, QIcon, QImage, QKeySequence,
+                           QPainter, QPainterPath, QPen, QPixmap, QShortcut)
 from PySide6.QtWidgets import (
     QAbstractSpinBox, QApplication, QCheckBox, QColorDialog, QComboBox, QDialog,
     QFileDialog, QFrame, QGraphicsOpacityEffect, QGridLayout, QHBoxLayout, QLabel,
@@ -153,18 +153,22 @@ PARAM_SPECS = [
          args=(0.0, 0.10), hint=QT_TRANSLATE_NOOP("ParamRow", "0~10%，默认 2%")),
 
     # ---------- 水印与效果 ----------
-    dict(tab="effects", card=QT_TRANSLATE_NOOP("Card", "图片"), key="bg_mode", label=QT_TRANSLATE_NOOP("ParamRow", "背景模式"), kind="choice",
+    dict(tab="effects", card=QT_TRANSLATE_NOOP("Card", "背景模式"), key="bg_mode", label=QT_TRANSLATE_NOOP("ParamRow", "背景模式"), kind="choice",
          args=[("blur", QT_TRANSLATE_NOOP("ParamRow", "模糊图片")), ("color", QT_TRANSLATE_NOOP("ParamRow", "纯色"))]),
-    dict(tab="effects", card=QT_TRANSLATE_NOOP("Card", "图片"), key="bg_color", label=QT_TRANSLATE_NOOP("ParamRow", "背景色"), kind="color"),
-    dict(tab="effects", card=QT_TRANSLATE_NOOP("Card", "图片"), key="blur_radius", label=QT_TRANSLATE_NOOP("ParamRow", "模糊半径"), kind="int",
+    # 背景色只在纯色模式下有意义: 模糊模式的底是"工作图放大回来的毛玻璃", 这个颜色根本不参与
+    # (见 core._build_background)。留在那儿只会让人以为"调了不起作用"(用户: "模糊背景模式下，
+    # 背景色选项应为隐藏"), 与下面那条"纯色模式不显示背景暗化"是同一套口径。
+    dict(tab="effects", card=QT_TRANSLATE_NOOP("Card", "背景模式"), key="bg_color", label=QT_TRANSLATE_NOOP("ParamRow", "背景色"), kind="color",
+         only_if=("bg_mode", ("color",))),
+    dict(tab="effects", card=QT_TRANSLATE_NOOP("Card", "背景模式"), key="blur_radius", label=QT_TRANSLATE_NOOP("ParamRow", "模糊半径"), kind="int",
          args=(1, 1000), hint=QT_TRANSLATE_NOOP("ParamRow", "1~1000，默认 150"), only_if=("bg_mode", ("blur",))),
     # 纯色模式不显示: 核心对纯色背景有意不做暗化(见 process_single 里的注释), 露着控件
-    dict(tab="effects", card=QT_TRANSLATE_NOOP("Card", "图片"), key="bg_darken_strength", label=QT_TRANSLATE_NOOP("ParamRow", "背景暗化"), kind="pct",
+    dict(tab="effects", card=QT_TRANSLATE_NOOP("Card", "背景模式"), key="bg_darken_strength", label=QT_TRANSLATE_NOOP("ParamRow", "背景暗化"), kind="pct",
          args=(0.0, 1.0), hint=QT_TRANSLATE_NOOP("ParamRow", "0~100%，默认 0；100=全黑（仅模糊模式）"),
          only_if=("bg_mode", ("blur",))),
-    dict(tab="effects", card=QT_TRANSLATE_NOOP("Card", "图片"), key="corner_radius", label=QT_TRANSLATE_NOOP("ParamRow", "图片圆角"), kind="int",
+    dict(tab="effects", card=QT_TRANSLATE_NOOP("Card", "背景模式"), key="corner_radius", label=QT_TRANSLATE_NOOP("ParamRow", "图片圆角"), kind="int",
          args=(0, 1000), hint=QT_TRANSLATE_NOOP("ParamRow", "0~1000 圆角，默认 0")),
-    dict(tab="effects", card=QT_TRANSLATE_NOOP("Card", "图片"), key="corner_circle", label=QT_TRANSLATE_NOOP("ParamRow", "圆形（整图正圆）"), kind="bool"),
+    dict(tab="effects", card=QT_TRANSLATE_NOOP("Card", "背景模式"), key="corner_circle", label=QT_TRANSLATE_NOOP("ParamRow", "圆形（整图正圆）"), kind="bool"),
 
     dict(tab="effects", card=QT_TRANSLATE_NOOP("Card", "图片描边"), key="enable_image_stroke", label=QT_TRANSLATE_NOOP("ParamRow", "开启"), kind="bool"),
     dict(tab="effects", card=QT_TRANSLATE_NOOP("Card", "图片描边"), key="image_stroke_color", label=QT_TRANSLATE_NOOP("ParamRow", "颜色"), kind="color",
@@ -194,7 +198,7 @@ PARAM_SPECS = [
 
     # 字体样式用网格布局(行=文字种类, 列=显示/粗体/斜体), 由 _build_font_style_card 构建;
     # 这条只用于占住卡片顺序
-    dict(tab="effects", card=QT_TRANSLATE_NOOP("Card", "字体样式"), key=None, special="_build_font_style_card"),
+    dict(tab="effects", card=QT_TRANSLATE_NOOP("Card", "水印开关"), key=None, special="_build_font_style_card"),
 
     dict(tab="effects", card=QT_TRANSLATE_NOOP("Card", "文字描边"), key="enable_text_stroke", label=QT_TRANSLATE_NOOP("ParamRow", "开启"), kind="bool"),
     dict(tab="effects", card=QT_TRANSLATE_NOOP("Card", "文字描边"), key="text_stroke_color", label=QT_TRANSLATE_NOOP("ParamRow", "颜色"), kind="color",
@@ -237,7 +241,7 @@ def _display_range(kind, lo, hi):
 _NOT_PERSISTED = {"logo_dir", "input_path", "output_path", "batch_dir", "output_dir", "model_map"}
 # 放大镜尺寸/倍数/圆角, (240×160, 3 倍, 12px 圆角)
 MAG_W, MAG_H, MAG_ZOOM, MAG_RADIUS = 240, 160, 3, 12
-MAG_MARGIN = 12      # 离预览框右上角的距离; 留出投影的余量
+MAG_MARGIN = 12      # 离预览框右上角的距离(投影已去掉, 这里就是纯留白)
 # 竖向滚动条占位宽度, 必须与 theme.QSS 里 `QScrollBar:vertical { width }` 一致(现在 14px):
 # _segbar_row 按这个值给页签行留右侧占位, 两边不同步的话页签卡片会比参数卡片宽出那条差
 _SB_W = 14
@@ -346,9 +350,10 @@ class ParamRow(QWidget):
             self.chk.toggled.connect(self._from_check)
             lay.addWidget(self.chk)
             if spec["label"].strip():
-                # 网格单元格给的是空格标签: 标签为空字符串时 Qt 连未勾选的方框都不画
-                # (不加任何样式表也一样, 实测非白像素为 0), 所以必须留一个空格;
-                # 这里按 strip() 判断, 空格标签不加弹性空白, 好让单元格按复选框大小居中
+                # 标签为空(字体/水印开关网格的格位)时**不加**弹性空白 —— 那些格位靠 grid 的
+                # AlignCenter 居中, 加了 stretch 就会把开关推偏。
+                # 注: 这里曾经是为了绕开"空标签的 QCheckBox 不画指示器", 那条在现在这套 QSS
+                # 素材下不成立(2026-09-23 复测: 空标签与空格标签的非白像素都是 1102)。
                 lay.addStretch(1)
         else:
             lab = QLabel(self.tr(spec["label"]))
@@ -783,12 +788,10 @@ class PreviewBox(QWidget):
         p.setRenderHint(QPainter.RenderHint.Antialiasing, True)
         p.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform, True)
 
-        # 柔和投影。QPainter 没有模糊, 用几层递增加粗的半透明描边近似
-        p.setBrush(Qt.NoBrush)
-        for w, alpha in ((12, 8), (7, 14), (3, 22)):
-            p.setPen(QPen(QColor(0, 0, 0, alpha), w))
-            r = box.adjusted(-w / 2, -w / 2 + 3, w / 2, w / 2 + 3)
-            p.drawRoundedRect(r, MAG_RADIUS + w / 2, MAG_RADIUS + w / 2)
+        # **不做投影**。原来用"几层递增加粗的半透明描边"近似模糊, 但
+        # 层数太少(宽 12/7/3、alpha 8/14/22)、半径还跟着 w/2 变, 三层叠不齐 → 透明度沿边缘**非单调**
+        # (实测剖面 `#15120f → #130f0d → #100e0c → #10100c` 先降后升), 肉眼就是沿弧一圈细纹
+        # (用户报"边框有一圈不明条纹")。放大镜本来就压在深色预览底上, 白边框已经够分辨, 索性去掉。
 
         # 圆角裁剪必须走 path: 用 setClipRect 会把图像内容填进方角, 再叠一圈圆角白边
         # 就成了"方角 + 白线溢出"(实测就长这样)
@@ -966,7 +969,6 @@ def _hamburger_icon(color, size=16, dpr=1.0):
     横线用 `fillRect` 按整数设备像素画, 不用 QPen: 笔宽是"以坐标为中心"的, 在非整数位置会落成
     半个像素(实心矩形则是精确的 w 像素厚)。三条的**间距由算式保证相等**, 见下面的 g。
     """
-    from PySide6.QtGui import QIcon
     dpr = float(dpr or 1.0)
     px = max(9, int(round(size * dpr)))                        # 设备像素画布
     w = max(2, int(round(px / 9)))                             # 每条横线的厚度(设备像素)
@@ -1001,6 +1003,157 @@ def _open_and_report(win, path, what):
         logging.warning(f"[打开] {what} 失败 {path}: {e}")
     win._notify(f"已打开{what}：{path}" if ok else f"打不开，路径是：{path}")
     return bool(ok)
+
+
+# 项目仓库地址。**占位符**: 仓库还没建, 建好后只改这一处(它同时是那个 GitHub 图标的 tooltip)。
+REPO_URL = "https://github.com/your-name/ShuiYin-QT6"
+_ABOUT_ICON = 20            # 「关于」弹窗里 GitHub 标识的显示边长(逻辑像素)
+
+
+class _IconLink(QLabel):
+    """一个只有图标、点它开浏览器的控件(「关于」弹窗底部的 GitHub 标识)。
+
+    **图标按设备像素出图**: `QIcon.pixmap(size, dpr)` 会让 SVG 在 size×dpr 上光栅化, 上屏 1:1,
+    一次重采样都不做(见 README「预览发虚」那条; 富文本 `<a><img>` 会被 QTextDocument 再缩一次)。
+    没有做成真锚点(富文本里的 `<a>`): 那样图标会发虚, 而这里要的只是"点一下打开仓库"。
+    给了手型光标 + tooltip(就是 URL) + 读屏名字, 可点性够。
+    """
+
+    def __init__(self, icon_path, size, url, accessible_name, parent=None):
+        super().__init__(parent)
+        self._url = url
+        pm = QIcon(icon_path).pixmap(QSize(size, size), self.devicePixelRatioF())
+        self.setPixmap(pm)
+        self.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.setToolTip(url)
+        self.setAccessibleName(accessible_name)
+
+    def mouseReleaseEvent(self, e):
+        if e.button() == Qt.MouseButton.LeftButton and self.rect().contains(e.position().toPoint()):
+            QDesktopServices.openUrl(QUrl(self._url))
+
+
+def _about_logo(size, dpr=1.0):
+    """关于框顶部的 logo。取打包素材, 按**设备像素**缩放(项目的老规矩: 别让 Qt 再放一次)。
+
+    拿不到素材就返回 None —— 关于框照样要能开(缺图不该让它崩)。
+    """
+    path = os.path.join(core.ASSETS_DIR, "exif-watermark-logo-1024.png")
+    pm = QPixmap(path)
+    if pm.isNull():
+        return None
+    px = max(1, int(round(size * dpr)))
+    pm = pm.scaled(px, px, Qt.AspectRatioMode.KeepAspectRatio,
+                   Qt.TransformationMode.SmoothTransformation)
+    pm.setDevicePixelRatio(dpr)
+    return pm
+
+
+def _about_label(text, obj_name, spacing=0.0, selectable=False):
+    """关于框里的一行文字: 字号/字重/颜色全交给 QSS(见 theme 里 `QLabel#about*` 那段注释 ——
+    全局 `QWidget {font-size:12px}` 会压过 setFont, 字号只能写 QSS)。
+
+    这里只做两件 QSS 做不到的事: **字距**(QSS 没有 letter-spacing)与**可选中**(路径要能复制)。
+    字距得等弹窗抛光之后再设一遍, 所以本函数只把想要的字距记在属性上, 由 AboutDialog 结尾统一施加。
+    """
+    lab = QLabel(text)
+    lab.setObjectName(obj_name)
+    lab.setProperty("letterSpacing", float(spacing))
+    lab.setAlignment(Qt.AlignmentFlag.AlignCenter)
+    if selectable:
+        lab.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+    return lab
+
+
+class AboutDialog(QDialog):
+    """关于: 顶部 logo + 程序名 + 一句话 + 版本/环境 + 数据目录 + 分发许可。
+
+    也是 logo + 标题 + 副标题, 见 README「顶部栏只留…」):
+        名字    22px / 字重 600 / 字距 6px / `#2f4a38`
+        副标题  13px / MUTED / 字距 2px
+    两者都是居中排布。字距只能用 QFont 设(QSS 没有 letter-spacing)。
+
+    **目录只留数据目录一条**(用户: "不需要写这么多目录, 只留程序数据目录就够"): 程序目录 =
+    日志目录, 它在 ☰ 菜单里能直接打开; 预览目录是临时目录, 对用户没有意义; 而数据目录是
+    设置/预设/字体的家, 需要能照着去找。
+
+    会话统计也在这儿(状态栏删掉后它的新家) —— 它是"本次会话累计", 不需要实时看, 按需打开正合适。
+    """
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        go_frameless(self)
+        self.setWindowTitle(self.tr("关于"))
+        import platform
+
+        from PySide6 import __version__ as pyside_version
+
+        from xiangshuiyin import __version__ as app_version
+
+        v = QVBoxLayout(self)
+        v.setContentsMargins(_DLG_PAD + 8, _DLG_PAD + 8, _DLG_PAD + 8, _DLG_PAD)
+        v.setSpacing(0)                  # 间距靠固定间隔撑, 比统一 spacing 好控(品牌区要更松)
+
+        logo = _about_logo(88, self.devicePixelRatioF())    # 关于弹窗标识尺寸
+        if logo is not None:
+            lb = QLabel()
+            lb.setPixmap(logo)
+            lb.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            v.addWidget(lb)
+            v.addSpacing(18)             # 标识下方的间距
+
+        v.addWidget(_about_label(self.tr("「镶 · 水印」"), "aboutName", spacing=6.0))
+        v.addSpacing(6)
+        v.addWidget(_about_label(self.tr("一帧入画　一镶成框"), "aboutSub", spacing=2.0))
+        v.addSpacing(18)
+        v.addWidget(_about_label(f"v{app_version}", "aboutVer"))    # 三级标题那一档
+        v.addSpacing(14)
+        # 环境两行: 版本号/系统名是数据, 只有下面那条模板要翻
+        v.addWidget(_about_label(self.tr("Python {py} · PySide6 {pyside}").format(
+            py=platform.python_version(), pyside=pyside_version), "aboutInfo"))
+        v.addSpacing(2)
+        build = platform.version().rsplit(".", 1)[-1]
+        v.addWidget(_about_label(f"{platform.system()} {platform.release()} · {build}",
+                                 "aboutInfo"))
+        v.addSpacing(8)
+        v.addWidget(_about_label(self.tr("数据目录：{path}").format(path=core.BASE_DIR),
+                                 "aboutInfo", selectable=True))
+        v.addSpacing(4)
+        v.addWidget(_about_label(self.tr("本次会话统计：{stats}").format(
+            stats=self._stats_text(parent)), "aboutInfo", selectable=True))
+        v.addSpacing(16)
+        note = _about_label(self.tr(
+            "分发时请遵守 PySide6 的 LGPLv3（详见仓库 README 与 THIRD_PARTY_LICENSES）。"),
+            "aboutNote")             # 备注: 灰色小字
+        note.setWordWrap(True)
+        note.setMaximumWidth(420)
+        v.addWidget(note)
+        v.addSpacing(14)
+        # 项目仓库的链接: GitHub 标识(素材 assets/github.svg) + 点击开默认浏览器。
+        # **不用富文本 <a><img>**: 那条路会把 SVG 交给 QTextDocument 再光栅化一次, 出来是发虚的
+        # (与"预览发虚/图标重采样"同一类问题)。改成自己按设备像素出图的标签(见 _IconLink)。
+        v.addWidget(_IconLink(theme._asset("github.svg"), _ABOUT_ICON, REPO_URL,
+                              self.tr("项目仓库（GitHub）"), self))
+        v.addSpacing(14)
+        v.addLayout(dlg_button_row(dlg_button(self.tr("关闭"), self.accept, primary=True)))
+        csdify(self, self.tr("关于"), _prep_dialog)
+        # **字距放在最后设**: QSS 抛光会把 setFont 的字号压回 12px, 但**不影响字距**; 而若在
+        # 抛光之前设, 那一次 setFont 会被整体覆盖掉。所以等 csdify/adjustSize 走完再逐行施加。
+        for lab in self.findChildren(QLabel):
+            sp = lab.property("letterSpacing")
+            if sp:
+                f = lab.font()
+                f.setLetterSpacing(QFont.SpacingType.AbsoluteSpacing, float(sp))
+                lab.setFont(f)
+
+    @staticmethod
+    def _stats_text(parent):
+        """会话统计(挂在主窗口上, 拿不到就留空 —— 关于框不该因为统计出错打不开)。"""
+        try:
+            return parent._stats.summary(compact=True)
+        except Exception:                            # noqa: BLE001
+            return ""
 
 
 class ImageInfoDialog(QDialog):
@@ -1333,13 +1486,13 @@ class ColorDialog(QDialog):
         acts.addWidget(dlg_button(self.tr("关闭"), self.accept, primary=True))
         v.addLayout(acts)
 
-        # 初始焦点收到对话框自身, **不要落在子控件上**: 色块与色号框都带 :focus 描边, 而焦点是
-        # 窗口激活时才生效的, 比首帧晚一两帧 —— 那两帧里控件先按"无焦点"画一遍, 随后才补上描边,
+        # 初始焦点收到对话框自身, **不要落在子控件上**: 色块与色号框都有 :focus 的外观变化, 而焦点是
+        # 窗口激活时才生效的, 比首帧晚一两帧 —— 那两帧里控件先按"无焦点"画一遍, 随后才补上,
         # 肉眼就是刚打开时那个色块"闪"了一下(实测: 首帧与稳定帧在色块区域差 204 个像素,
-        # 描边从 LINE #E6E0D6 变成 ACCENT #6F9C7D, 约 40ms 后才稳定)。
-        # 焦点放在对话框上, 从首帧起就没有描边变化; Tab 照常进入各控件(那时才该显出描边)。
+        # 色块的描边从 LINE #E6E0D6 变成 ACCENT #6F9C7D, 约 40ms 后才稳定)。
+        # 焦点放在对话框上, 从首帧起就没有变化; Tab 照常进入各控件(那时才该显出焦点)。
         # 注意: 不能改成"把焦点给别的控件"—— 焦点落到色号输入框上一样会闪(主题里 QLineEdit:focus
-        # 也改描边色), 必须让这一轮没有子控件持有焦点。
+        # 会换底色), 必须让这一轮没有子控件持有焦点。
         self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
         self.setFocus()
 
@@ -2372,27 +2525,8 @@ class MainWindow(QMainWindow):
                  self.tr("界面语言已保存，请关闭程序后重新打开生效。"))
 
     def _show_about(self):
-        """关于: 版本 + 三个路径 + 许可提醒。版本号只在这里出现, 不做常驻显示。"""
-        import platform
-
-        from PySide6 import __version__ as pyside_version
-
-        from xiangshuiyin import __version__ as app_version
-        # 正文带插值, 所以写成"模板 + format"并配 NOOP(见 i18n 模块说明); 标题也要 tr
-        # 末尾那句会话统计是"状态栏右侧那一格"的新家: 它是"本次会话累计", 本来就不需要实时看,
-        # 放到按需打开的关于框里正合适(内容每次打开现取)。
-        _message(self, QMessageBox.Icon.Information, self.tr("关于"),
-                 self.tr(QT_TRANSLATE_NOOP(
-                     "MainWindow",
-                     "镶 · 水印（Qt 版）  {version}\n"
-                     "Python {py} · PySide6 {pyside}\n{os}\n\n"
-                     "程序目录：{base}\n数据目录：{data}\n日志目录：{logs}\n预览目录：{preview}\n\n"
-                     "本次会话统计：{stats}\n\n"
-                     "分发时请遵守 PySide6 的 LGPLv3（详见仓库 README 与 THIRD_PARTY_LICENSES）。"))
-                 .format(version=app_version, py=platform.python_version(), pyside=pyside_version,
-                         os=f"{platform.system()}-{platform.release()}", base=core.BASE_DIR,
-                         data=core.DATA_DIR, logs=core.LOG_DIR, preview=core.PREVIEW_DIR,
-                         stats=self._stats.summary(compact=True)))
+        """关于: 品牌区 + 版本/环境 + 数据目录 + 分发许可(见 AboutDialog)。"""
+        AboutDialog(self).exec()
 
     def _open_log_dir(self):
         _open_and_report(self, core.LOG_DIR, "日志目录")
@@ -2679,22 +2813,31 @@ class MainWindow(QMainWindow):
         self._stack.setCurrentIndex(index)
 
     def _build_font_style_card(self):
-        """字体样式: 行=文字种类, 列=显示/粗体/斜体。
+        """水印开关: 行=文字种类, 列=显示/粗体/斜体。标题从「字体样式」改叫「水印开关」, 因为
+        这格里全是要"开/关"的东西(而且现在长得就是开关), 「样式」那个词反而像在说参数值。
 
         原来做成「Logo 文字 / └ 粗体 / └ 斜体 / 型号文字 / …」的平铺复选列表,
         三层归属全靠 └ 前缀暗示, 读起来是一串没有结构的复选框。改成网格后
         """
-        card = Card(QT_TRANSLATE_NOOP("Card", "字体样式"))
+        card = Card(QT_TRANSLATE_NOOP("Card", "水印开关"))
         card.reset_btn.clicked.connect(lambda _c, cd=card: self._reset_card(cd))
         grid = QGridLayout()
         grid.setContentsMargins(0, 2, 0, 0)
-        hsp = 22          # 网格列间距(比行内间距大些, 三列勾选框挨太紧不好点)
+        # 横向列间距给 0: 右侧三列是**等分**的, 间距由三列自己吸收(见下面 setColumnStretch),
+        # 再叠一层列间距会让三个格位各自偏一点
+        hsp = 0
         grid.setHorizontalSpacing(hsp)
         grid.setVerticalSpacing(5)
         # 第 0 列宽度按"让第一列控件落在其它卡片的控件列上"反推:
         #   本卡: 12 + col0 + hsp   其它卡片: 12 + _LABEL_W + GAP_CTRL
         # 自适应的话 col0 只有约 85px, 网格里的列会比其它卡片靠左, 同一页两条缩进线不齐
         grid.setColumnMinimumWidth(0, _LABEL_W + theme.GAP_CTRL - hsp)
+        # 右侧三列**三等分**(用户: "改为右侧区域三等分"): 三列都写 stretch=1, 余量等比摊分;
+        # 三列的最小宽度又都一样(格位就是 36px 的开关本身, 列头两字更窄), 所以算下来正好三等分 ——
+        # 每个列头都落在它下面那个开关的正上方。以前这里是把**多余的空白列**设成 stretch=1,
+        # 结果三列挤在左边、右边空一大片, 列头和开关也就贴在一起。
+        for c in range(1, len(FONT_STYLE_COLS) + 1):
+            grid.setColumnStretch(c, 1)
         for col, head in enumerate(FONT_STYLE_COLS, start=1):
             h = QLabel(head)
             h.setObjectName("hint")
@@ -2705,16 +2848,18 @@ class MainWindow(QMainWindow):
             lab.setObjectName("fieldLabel")
             grid.addWidget(lab, r, 0)
             for c, key in enumerate(keys, start=1):
-                # 标签给空格(见 ParamRow: 空标签的 QCheckBox 不画方框), 语义靠无障碍名与提示补上
-                row = ParamRow(dict(key=key, label=" ", kind="bool"), self._params.get(key))
+                # 格位给**空标签**(不是空格): 空标签下这个 QCheckBox 的宽度就是开关本身(配
+                # QSS 的 `#cell { spacing: 0px }`), AlignCenter 居中之后才与列头精确对齐;
+                # 语义靠无障碍名与提示补上(格位没有可见文字)
+                row = ParamRow(dict(key=key, label="", kind="bool"), self._params.get(key))
                 row.hovered.connect(self._preview.set_highlight)
+                row.chk.setObjectName("cell")
                 row.chk.setAccessibleName(f"{name}·{FONT_STYLE_COLS[c - 1]}")
                 row.chk.setToolTip(f"{name} · {FONT_STYLE_COLS[c - 1]}")
                 row.changed.connect(self._on_param)
                 self._rows[key] = row
                 card.keys.append(key)
                 grid.addWidget(row, r, c, Qt.AlignmentFlag.AlignCenter)
-        grid.setColumnStretch(len(FONT_STYLE_GROUPS[0][1]) + 1, 1)
         card.body.addLayout(grid)
         self._cards.append(card)
         return card
@@ -3377,7 +3522,7 @@ class MainWindow(QMainWindow):
     def request_preview(self):
         """请求一次预览。
 
-        画布固定按核心的 2500 档渲染(与原项目一致): 预览里的水印字本来就只有几像素高
+        画布按核心的缩略档渲染(见核心 PREVIEW_MAX_SIDE; 现 3400, **为放大镜的清晰度**从 2500 提上来的): 预览里的水印字本来就只有几像素高
         (成品 4000px 高、预览框 720px 高 → 字缩到约 1/6), 想看清细节用放大镜(它按像素宽度
         从固有源重采样)。**不要为了"上屏 1:1"去缩小画布** —— 实测那样更糊, 原因见核心
         make_preview 里的注释。
