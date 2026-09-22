@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 14 14">
+  <!-- 菜单项的勾(可勾选的菜单项, 目前只有「语言」子菜单)。换掉 Fusion 默认那个: 默认勾又粗又硬,
+       末笔还拖一条长尾巴(用户报"难看")。这里是一条 2px 圆头折线, 用主色的深一档(ACCENT2),
+       小字号下比 ACCENT 更清楚。用法见 theme.QSS 里的 QMenu::indicator:checked。 -->
+  <path d="M3.4 7.4 L6 10 L10.6 4.4" fill="none" stroke="#5C8870" stroke-width="2"
+        stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

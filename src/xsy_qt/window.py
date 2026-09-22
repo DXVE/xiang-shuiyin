@@ -4,10 +4,10 @@
 参数面板: 三个页签「文件与美化 / 字体与画布 / 水印与效果」,
 控件与取值范围由参数表驱动 —— 加参数只改表,
 
-本步已对齐: 三页签 · 全部参数控件 · 取色 · 字体路径 · 画布比例 · 布局 · 卡片分组重置 ·
-           显隐联动 · 拖放/选图 · 实时预览 · 单张生成
-未对齐( 后续): 批量 · 预设 · 型号映射弹窗 · 手动 EXIF · 取色板(预设色/收藏色) ·
-              放大镜 · 间距几何标注 · 启动页/状态吐司
+已对齐: 三页签 · 全部参数控件 · 取色(预设色/收藏色) · 字体路径 · 画布比例 · 布局 ·
+       显隐联动 · 拖放/选图 · 批量 · 实时预览(含状态标识) · 单张/批量生成 · 撤销重做 ·
+       预设(10 槽位) · 型号映射 · 手动 EXIF · 放大镜 · 间距几何标注 · 图片信息 · 吐司通知
+未做: 启动页(窗口秒开, 加了反而多一道闪烁)
 """
 import inspect
 import hashlib
@@ -18,13 +18,14 @@ import os
 import time
 from datetime import datetime
 
-from PySide6.QtCore import (QPointF, QRectF, QSize, Qt,
+from PySide6.QtCore import (QAbstractAnimation, QEasingCurve, QParallelAnimationGroup, QPointF,
+                            QPropertyAnimation, QRectF, QSize, Qt,
                             QT_TRANSLATE_NOOP, QTimer, QUrl, Signal)
 from PySide6.QtGui import (QColor, QDesktopServices, QImage, QKeySequence, QPainter,
                            QPainterPath, QPen, QPixmap, QShortcut)
 from PySide6.QtWidgets import (
     QAbstractSpinBox, QApplication, QCheckBox, QColorDialog, QComboBox, QDialog,
-    QFileDialog, QFrame, QGridLayout, QHBoxLayout, QLabel,
+    QFileDialog, QFrame, QGraphicsOpacityEffect, QGridLayout, QHBoxLayout, QLabel,
     QLineEdit, QListWidget, QMainWindow, QMenu, QMessageBox, QProgressBar, QPushButton,
     QScrollArea, QSizePolicy, QSlider, QSpinBox, QSplitter, QStackedWidget,
     QVBoxLayout, QWidget,
@@ -463,19 +464,14 @@ class ParamRow(QWidget):
     def _paint_swatch(self, color):
         """色块外观: 底色就是颜色本身, 色号用对比色写在上头(浅底黑字/深底白字)。
 
-        悬停与按下必须在**本控件自己的样式表里**把背景一起写掉: 只写 border 的话会落到
-        主题那条 `QPushButton:hover{background:#f1f5f9}`, 鼠标一上去色块变灰 —— 看着像
-        控件坏了, 也正是"点不动"观感的来源之一。
+        **与取色弹窗里的色块共用 `_swatch_qss`**: 这里以前另写了一套(悬停/按下变成 2px 主色
+        描边), 于是同一个色块在参数行里"悬停描绿边"、在弹窗里又是另一套 —— 全项目的"选中/
+        悬停高亮"该只有一份定义(用户让"检查其他地方有没有同样的样式")。
+        悬停/按下仍必须在本控件自己的样式表里把背景写掉, 否则会落到主题那条
+        `QPushButton:hover`, 鼠标一上去色块变灰 —— 看着像控件坏了, 也正是"点不动"观感的来源。
         """
-        col = QColor(color if isinstance(color, str) else "#ffffff")
-        fg = "#000" if col.lightness() > 128 else "#fff"
         self.swatch.setText(str(color))
-        self.swatch.setStyleSheet(
-            "QPushButton { background:%s; border:1px solid %s; border-radius:%dpx; color:%s; }"
-            "QPushButton:hover { background:%s; border:2px solid %s; }"
-            "QPushButton:pressed { background:%s; border:2px solid %s; }"
-            % (col.name(), theme.LINE, theme.RADIUS_CTRL, fg,
-               col.name(), theme.ACCENT, col.name(), theme.ACCENT))
+        self.swatch.setStyleSheet(_swatch_qss(color, radius=theme.RADIUS_CTRL))
 
     # ---- 内部 ----
     # _updating 守卫: set_value() 会反过来让控件发信号, 不挡住就会把"回填"误当成用户改动
@@ -952,35 +948,40 @@ def _save_file_dialog(parent, caption, directory="", default_name="", name_filte
     return files[0] if files else ""
 
 
-def _hamburger_icon(color, size=15, dpr=1.0):
+def _hamburger_icon(color, size=16, dpr=1.0):
     """画"三横线"菜单图标。
 
-    为什么要自绘、为什么要按设备像素画(两个坑都踩过):
+    为什么要自绘、为什么要按设备像素画(三个坑都踩过):
       ① 不直接用 ☰(U+2630): 那个码位在中文字体里没有, 靠字体回退拿到别的字体的字形,
          小字号下看着像个小箭头(v);
       ② **按 devicePixelRatio 出图**: 第一版在 15px 的位图上画完交给 Qt 放大 1.25 倍(本机
-         125% 缩放), 线条被重采样得发虚、三条粗细还不匀 —— 与预览上屏那条教训是同一个
-         (见 README「预览发虚」)。这里 px = size×dpr 出图 + setDevicePixelRatio, 上屏就是 1:1。
-      线宽与间距都取整数设备像素(125% 下 3px 线宽 ≈ 2.4 逻辑像素), 这样三条一样粗。
+         125% 缩放), 线条被重采样得发虚 —— 与预览上屏那条教训是同一个(见 README「预览发虚」);
+      ③ **出图的逻辑尺寸必须正好等于调用方要的 iconSize**, 否则照样被重采样一次: 以前默认
+         `size=15` 而 QPushButton 的 iconSize 是 16, Qt 会把 15 拉伸到 16 —— 三横于是被挤成
+         "间距 3、2"(`y4-5 / y9-10 / y13-14`, 用户报"三横不是均匀分布的")。
+         所以这里 `size` 默认改成 16(与 QPushButton 的默认 iconSize 一致), 并且
+         **`setDevicePixelRatio(px / size)` 而不是直接用 dpr** —— 让位图的逻辑尺寸正好是 size,
+         Qt 取图时一次重采样都不做。
+
+    横线用 `fillRect` 按整数设备像素画, 不用 QPen: 笔宽是"以坐标为中心"的, 在非整数位置会落成
+    半个像素(实心矩形则是精确的 w 像素厚)。三条的**间距由算式保证相等**, 见下面的 g。
     """
     from PySide6.QtGui import QIcon
     dpr = float(dpr or 1.0)
-    px = max(9, int(round(size * dpr)))
+    px = max(9, int(round(size * dpr)))                        # 设备像素画布
+    w = max(2, int(round(px / 9)))                             # 每条横线的厚度(设备像素)
+    gap = max(2, int(round(px * 0.15)))                        # 横线之间的空档(设备像素)
+    block = 3 * w + 2 * gap                                    # 三条横线 + 两个空档的总高
+    top = max(0, (px - block) // 2)                            # 上下留白相等 => 整块居中
+    inset = int(round(px * 0.18))
     pm = QPixmap(px, px)
     pm.fill(Qt.GlobalColor.transparent)
     p = QPainter(pm)
-    p.setRenderHint(QPainter.RenderHint.Antialiasing, False)   # 横平竖直的线, 不要抗锯齿
-    pen = QPen(QColor(color))
-    pen.setWidth(max(2, round(px / 9)))                        # 设备像素(约图标的 11%)
-    pen.setCapStyle(Qt.PenCapStyle.FlatCap)
-    p.setPen(pen)
-    inset = round(px * 0.18)
-    half = pen.width() // 2
-    for frac in (0.24, 0.5, 0.76):                             # 三条等距
-        y = min(px - half - 1, max(half, round(px * frac)))
-        p.drawLine(QPointF(inset, y), QPointF(px - inset, y))
+    p.setRenderHint(QPainter.RenderHint.Antialiasing, False)   # 横平竖直, 不要抗锯齿
+    for i in range(3):
+        p.fillRect(inset, top + i * (w + gap), px - 2 * inset, w, QColor(color))
     p.end()
-    pm.setDevicePixelRatio(dpr)
+    pm.setDevicePixelRatio(px / float(size))                   # 见上面 ③
     return QIcon(pm)
 
 
@@ -991,14 +992,14 @@ def _open_and_report(win, path, what):
     的逻辑, 所以没合到一起。
     """
     if not os.path.exists(path):
-        win._status(f"{what}不存在：{path}")
+        win._notify(f"{what}不存在：{path}")
         return False
     try:
         ok = QDesktopServices.openUrl(QUrl.fromLocalFile(path))
     except Exception as e:                      # noqa: BLE001
         ok = False
         logging.warning(f"[打开] {what} 失败 {path}: {e}")
-    win._status(f"已打开{what}：{path}" if ok else f"打不开，路径是：{path}")
+    win._notify(f"已打开{what}：{path}" if ok else f"打不开，路径是：{path}")
     return bool(ok)
 
 
@@ -1240,26 +1241,26 @@ def _swatch_qss(color, radius=theme.RADIUS_SMALL, selected=False):
     """色块样式(取色弹窗里的色块与「当前颜色」共用这一处定义)。
 
     悬停 / 按下 / 聚焦都必须把 background 一起写掉 —— 只写 border 的话会落到主题那条
-    `QPushButton:hover{background:#f1f5f9}`, 鼠标一上去色块就变灰, 看着像坏了。
+    `QPushButton:hover{background:#EEF2EC}`, 鼠标一上去色块就变灰, 看着像坏了。
 
-    border 粗细只在选中态变化(色块都是定宽定高, 不会引起重排), 悬停只换颜色 ——
-    粗细一变, 未选中↔选中的描边就会"跳"一下。选中另配 ✓ 字形, 不靠颜色单独表达。
+    **四种状态的几何完全一样**(margin 2px + border 2px), 只有描边颜色变:
+      · 粗细一变, 未选中↔选中的色块本身就会大小不一、"跳"一下;
+      · 那 2px margin 是关键: 描边于是**离开色块一圈**, 中间露出卡片底色 —— 选中态看着是
+        "色块外面套了一圈", 而不是描边糊在颜色上(用户报"高亮状态不好看": 深色块紧贴着一圈
+        绿边, 像被装进绿框里)。不选中时这圈是 LINE, 选中是主色。
+      · **不"悬停描绿边"**: 与按钮那条口径一致(README「按钮的悬停/按下只动底色, 不描边」),
+        悬停只把描边换成深一档的暖灰(MUTED), 不换色相。
+    选中另配 ✓ 字形, 不靠描边单独表达。
     """
     col = QColor(color)
     fg = "#000" if col.lightness() > 128 else "#fff"
-    if selected:
-        return ("QPushButton { background:%s; border:2px solid %s; border-radius:%dpx;"
-                " color:%s; font-weight:bold; padding:0; }"
-                "QPushButton:hover { background:%s; border:2px solid %s; }"
-                "QPushButton:pressed { background:%s; border:2px solid %s; }"
-                % (col.name(), theme.ACCENT, radius, fg,
-                   col.name(), theme.ACCENT2, col.name(), theme.ACCENT2))
-    return ("QPushButton { background:%s; border:1px solid %s; border-radius:%dpx;"
+    ring, ring_hot = ((theme.ACCENT, theme.ACCENT2) if selected else (theme.LINE, theme.MUTED))
+    return ("QPushButton { background:%s; border:2px solid %s; border-radius:%dpx; margin:2px;"
             " color:%s; font-weight:bold; padding:0; }"
-            "QPushButton:hover, QPushButton:focus { background:%s; border:1px solid %s; }"
-            "QPushButton:pressed { background:%s; border:1px solid %s; }"
-            % (col.name(), theme.LINE, radius, fg,
-               col.name(), theme.ACCENT, col.name(), theme.ACCENT2))
+            "QPushButton:hover, QPushButton:focus { background:%s; border:2px solid %s; }"
+            "QPushButton:pressed { background:%s; border:2px solid %s; }"
+            % (col.name(), ring, radius, fg,
+               col.name(), ring_hot, col.name(), ring_hot))
 
 
 class _ColorChip(QPushButton):
@@ -1729,6 +1730,162 @@ class MapDialog(QDialog):
             self._reload()
 
 
+# ---------- 吐司(一次性提示) ----------
+TOAST_MS = 3200
+TOAST_FADE_MS = 350
+TOAST_TOP = 14           # 离窗口内容顶部的距离
+TOAST_SLIDE = 16         # 出场与收起的位移
+TOAST_MIN_W, TOAST_MAX_W = 240, 560   # 吐司最小与最大宽度
+TOAST_PAD_X = 20         # 盒子左右内边距
+TOAST_CHROME = TOAST_PAD_X * 2 + 2   # 文字宽度之外的固定开销: 左右内边距 + 两侧 1px 描边
+
+
+class Toast(QWidget):
+    """**顶部居中**的一次性提示: "刚才发生了什么"(已保存/已导出/失败/请先选图…)。
+
+    它补的是**中间那一档**: 弹窗要用户点一下才走(适合"要不要"这类决策), 常驻的状态行又不显眼
+    且不会自己消失(适合"现在是什么"), 而"结果/失败"这类消息既需要被看到、又不需要回应。
+
+    内容一变就加 `.show`、3200ms 后移除; 视觉是深色底 + 0.35s 淡入 + 从上滑下 16px +
+    `pointer-events:none`。**位移与位置照抄**(顶部居中、从上方 16px 滑下、收起时往上退回去),
+    另外两处按本程序改:
+      · **做成主窗口内的浮层, 不开独立的半透明顶层窗口** —— 项目在 Win11 上被 DWM 的首帧错位
+        坑过一次(README「三种弹窗是自绘标题栏」), 新开无边框半透明窗口是同一类风险; 挂在中央
+        部件上则零窗口、零 DWM、dpr 也不用自己算(代价是它不能浮到窗口外, 对这个程序反而合适)。
+        构造函数里的注释(会与淡入用的 opacity 效果构成"效果套效果", 把整块画坏)。
+
+    顶部位置会压住工具栏那一行(文件名那一带)3.2 秒 —— 它**不吃鼠标事件**, 所以下面的按钮照常
+    可点(见 WA_TransparentForMouseEvents)。
+
+    两条纪律:
+      · **只由用户显式动作触发**。后台循环(自动预览、自动保存)一条都不发 —— 否则拖一次滑块
+        会弹出一串吐司, 比状态栏闪烁更糟(那条教训见 README「自动预览不碰状态栏」)。
+    """
+
+    def __init__(self, parent):
+        super().__init__(parent)
+        # 落到没设的那一层(然后按父子链传播, 不会穿透到下面真正该收到点击的控件)。
+        self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
+        lay = QVBoxLayout(self)
+        lay.setContentsMargins(0, 0, 0, 0)
+        self._box = QFrame(self)
+        self._box.setObjectName("toastBox")
+        self._box.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
+        # **样式表必须带选择器**: 不带选择器的规则会**连子控件一起**吃到 —— 第一版就是这样,
+        # 里面的 QLabel 也被套上了同一圈描边(抓图里文字外多出一个方框)。
+        # QGraphicsEffect —— 外层要用 opacity 做淡入, 投影就成了"效果套效果", Qt 会重入画笔并
+        # **把这一块整个画坏**(实测刷 QPainter::begin: A paint device can only be painted by one
+        # painter at a time, 抓图里吐司是花的)。深底在浅色界面上本来就跳得出来, 不差这一层影。
+        self._box.setStyleSheet(
+            "QFrame#toastBox { background: rgba(15,23,42,0.94); border: none;"
+            " border-radius: 10px; }")
+        bl = QVBoxLayout(self._box)
+        bl.setContentsMargins(TOAST_PAD_X, 12, TOAST_PAD_X, 12)   # 盒子内边距
+        self._label = QLabel(self._box)
+        self._label.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
+        self._label.setWordWrap(True)
+        self._label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self._label.setStyleSheet("color:#e2e8f0; font-size:13px; background:transparent;")
+        bl.addWidget(self._label)
+        lay.addWidget(self._box)
+
+        self._effect = QGraphicsOpacityEffect(self)
+        self._effect.setOpacity(0.0)
+        self.setGraphicsEffect(self._effect)
+        self._anim_pos = QPropertyAnimation(self, b"pos", self)
+        self._anim_op = QPropertyAnimation(self._effect, b"opacity", self)
+        self._anim = QParallelAnimationGroup(self)
+        self._anim.addAnimation(self._anim_pos)
+        self._anim.addAnimation(self._anim_op)
+        for a in (self._anim_pos, self._anim_op):
+            a.setDuration(TOAST_FADE_MS)
+            # 起步快、收尾缓, 对应 OutCubic; Qt 默认的 Linear 会显得生硬
+            a.setEasingCurve(QEasingCurve.Type.OutCubic)
+        # **听动画自己的 finished, 别用 singleShot 猜时间**: 猜早了那会儿还在收起、条件不成立,
+        # 就再没人来隐藏它了 —— 表现是 opacity 已经是 0、控件却还 visible(探针第 ⑤ 组抓到的)。
+        self._anim.finished.connect(self._on_anim_finished)
+        self._timer = QTimer(self)
+        self._timer.setSingleShot(True)
+        self._timer.setInterval(TOAST_MS)
+        self._timer.timeout.connect(self._fade_out)
+        self._hiding = False       # 当前那段动画是"出场"还是"收起"(缩放重排时要按方向改终点)
+        self.hide()
+
+    def target_pos(self):
+        """它该待的位置: 水平居中、离内容顶部 TOAST_TOP。"""
+        p = self.parentWidget()
+        if p is None:
+            return QPointF(0, TOAST_TOP)
+        return QPointF(max(0, (p.width() - self.width()) // 2), TOAST_TOP)
+
+    def show_message(self, text):
+        """显示一条(已显示的直接换文字并重置计时 —— 不排队、不堆叠)。"""
+        text = str(text)
+        self._label.setText(text)
+        # **换行要自己算**: 只给 QLabel 设 min/max 宽度 + WordWrap 是不够的 —— 布局拿 sizeHint
+        # 定尺寸时它按"当前宽度"算, 结果是压在最小宽度里**截断**(长文案只显示一行)。
+        # 正确做法: 按单行文本量一个宽度、夹到 [min,max], 用这个宽度当**固定宽**, 再用
+        # heightForWidth() 求出该宽度下真正要几行(短文案就停在最小宽度上)。
+        fm = self._label.fontMetrics()
+        w = min(TOAST_MAX_W - TOAST_CHROME,
+                max(TOAST_MIN_W - TOAST_CHROME, fm.horizontalAdvance(text)))
+        self._label.setFixedWidth(w)
+        self._label.setFixedHeight(self._label.heightForWidth(w))
+        self._box.adjustSize()
+        self.adjustSize()
+        self._hiding = False
+        end = self.target_pos()
+        was_visible = self.isVisible()
+        if not was_visible:
+            self.move(int(end.x()), int(end.y()) - TOAST_SLIDE)   # 从上方的 16px 处滑下来
+            self.show()
+        else:
+            self.move(int(end.x()), int(end.y()))                 # 换文字不重放动画, 只把位置摆正
+        self.raise_()
+        self._animate(end, 1.0)
+        self._timer.start()
+
+    def reflow(self):
+        """父控件尺寸变了: 重算目标位置。
+
+        **动画在跑时要改它的终点, 不能只 move()** —— 否则动画下一个 tick 就把控件拉回旧位置
+        (实测: 出场动画还没跑完时缩放窗口, 吐司会停在旧的水平位置上, 探针第 ⑨ 组抓到的)。
+        """
+        if not self.isVisible():
+            return
+        end = self.target_pos()
+        if self._hiding:
+            end = QPointF(end.x(), end.y() - TOAST_SLIDE)
+        if self._anim.state() == QAbstractAnimation.State.Running:
+            # **重起一段, 不要改在跑那段的终点**: `setEndValue()` 在运行中改终点会把控件
+            # 挪到 (0,0)(实测, 原因在 Qt 内部; 探针第 ⑨ 组抓到的), 而 _animate() 会拿
+            # "当前位置"当新起点, 于是动作接得上、终点也对。
+            self._animate(end, 0.0 if self._hiding else 1.0)
+        else:
+            self.move(int(end.x()), int(end.y()))
+
+    def _animate(self, pos, opacity):
+        self._anim.stop()
+        self._anim_pos.setStartValue(QPointF(self.x(), self.y()))
+        self._anim_pos.setEndValue(pos)
+        self._anim_op.setStartValue(self._effect.opacity())
+        self._anim_op.setEndValue(opacity)
+        self._anim.start()
+
+    def _fade_out(self):
+        """收起: 透明度归零 + 往上退回 TOAST_SLIDE(与出场反向)。"""
+        if not self.isVisible():
+            return
+        self._hiding = True
+        end = self.target_pos()
+        self._animate(QPointF(end.x(), end.y() - TOAST_SLIDE), 0.0)
+
+    def _on_anim_finished(self):
+        """动画跑完时收尾。只在**收到 0** 时隐藏 —— 出场动画跑完也走这里, 别把刚显示的藏了。"""
+        if self._effect.opacity() <= 0.01:
+            self.hide()
+
+
 class MainWindow(QMainWindow):
     def __init__(self, state):
         super().__init__()
@@ -1809,8 +1966,6 @@ class MainWindow(QMainWindow):
         self._event_watcher = EventWatcher(state, self)
         self._event_watcher.event.connect(self._on_event)
         self._event_watcher.start()
-        self._refresh_stats()            # 状态栏右侧先显示"尚无预览", 避免那块空白看着像坏了
-        self._status(self.tr("拖入图片即可开始"))
 
     # ---------- 参数 ----------
     def _load_params(self):
@@ -1907,7 +2062,7 @@ class MainWindow(QMainWindow):
         e = self._undo_stack.pop()
         self._restore(e["before"])
         self._redo_stack.append(e)
-        self._status(self.tr("已撤销：{label}").format(label=e["label"]))
+        self._notify(self.tr("已撤销：{label}").format(label=e["label"]))
         self._sync_undo_btns()
 
     def redo(self):
@@ -1917,7 +2072,7 @@ class MainWindow(QMainWindow):
         e = self._redo_stack.pop()
         self._restore(e["after"])
         self._undo_stack.append(e)
-        self._status(self.tr("已重做：{label}").format(label=e["label"]))
+        self._notify(self.tr("已重做：{label}").format(label=e["label"]))
         self._sync_undo_btns()
 
     def _sync_undo_btns(self):
@@ -1992,7 +2147,7 @@ class MainWindow(QMainWindow):
             self._touch()
 
         self._undo_step(f"__reset_card__{title}", f"重置「{title}」", _do)
-        self._status(self.tr("已重置「{title}」为默认值").format(title=title))
+        self._notify(self.tr("已重置「{title}」为默认值").format(title=title))
 
     # ---------- 窗口尺寸 / 分栏 ----------
     def _fit_to_screen(self):
@@ -2036,6 +2191,9 @@ class MainWindow(QMainWindow):
     def resizeEvent(self, e):
         super().resizeEvent(e)
         self._apply_split_ratio()
+        # 吐司是绝对定位的浮层, 窗口一改尺寸就得重算(在它显示的那 3.2 秒里窗口可能被拖过)
+        if getattr(self, "_toast", None) is not None and self._toast.isVisible():
+            self._toast.reflow()
 
     def showEvent(self, e):
         super().showEvent(e)
@@ -2092,39 +2250,17 @@ class MainWindow(QMainWindow):
         split.splitterMoved.connect(self._on_split_moved)
         outer.addWidget(split, 1)
 
-        outer.addWidget(self._build_bottombar())
-        self._status_bar = self.statusBar()
-        self._status_bar.setFixedHeight(theme.CTRL_H)   # 原来偏矮, 与按钮取齐
-        # 不用 QStatusBar 自带的 showMessage: 那行字是它自己绘制的, 既不受 contentsMargins
-        # 也不受 QSS padding 影响, 左缩进会跟顶栏/底栏差一截。换成自己的 QLabel 就能走布局,
-        # 与其它栏落在同一条左对齐线上。
-        self._status_label = QLabel("")
-        self._status_label.setObjectName("statusText")
-        self._status_bar.addWidget(self._status_label, 1)
-        # 状态栏右侧两组数字(等宽小字, 各自带 tooltip):
-        #   1) 每次渲染的耗时 —— 原来在预览框下方, 会让预览底边比左列高 21~22px("一高一低"),
-        #      搬到这儿后右列只剩预览一个孩子, 两侧底边自然齐平, 预览还多出那 21px 高度;
-        #   2) 本次会话的累计统计(悬停看完整分位与缓存命中率)。
-        self._perf = QLabel("")
-        self._perf.setStyleSheet("color:%s; font-family:Consolas,monospace; background:transparent;"
-                                 % theme.MUTED)
-        self._status_bar.addPermanentWidget(self._perf)
-        self._stats_label = QLabel("")
-        self._stats_label.setStyleSheet(
-            "color:%s; font-family:Consolas,monospace; background:transparent;" % theme.MUTED)
-        self._status_bar.addPermanentWidget(self._stats_label)
-        self._status_bar.setContentsMargins(theme.INSET_STATUS, 0, 0, 0)
-        # QStatusBar 的盒布局还会再加一点内部边距(由样式决定, 实测 2px), 首次布局后量一次补掉,
-        # 否则状态文本会比顶栏/底栏多缩进那一点
-        QTimer.singleShot(0, self._fix_status_inset)
-
-    def _refresh_stats(self):
-        """刷新状态栏右侧的会话统计(每次预览/生成结束时调用一次, 只做加法与一次排序)。"""
-        try:
-            self._stats_label.setText(self._stats.summary(compact=True))
-            self._stats_label.setToolTip(self._stats.summary())
-        except Exception as e:                      # 统计出问题绝不能影响主流程
-            logging.warning(f"[统计] 刷新失败: {e}")
+        self._bottombar = self._build_bottombar()   # 留引用: 吐司要浮在它之上(见 Toast._place)
+        outer.addWidget(self._bottombar)
+        # 吐司: 挂在中央部件上的浮层(不是独立窗口, 理由见 Toast 的类注释)。**最后建、raise_(),
+        # 保证它在所有控件之上** —— 它要盖在自己的布局之上而不参与布局。
+        self._toast = Toast(root)
+        # **状态栏整条删了**(它原来是"一次性结果"与"常驻状态"挤在一行的通道):
+        #   · 一次性结果 -> 吐司(_notify);
+        #   · 那几条常驻状态本来就有别的家在(文件名在顶栏与「输入图片」行、张数在「处理模式」卡片、
+        #     启动提示就是预览框里那句) -> 直接删, 不是搬;
+        #   · 耗时数字 -> 预览标题条右侧(见 _build_preview_header); 会话统计 -> 「关于」弹窗。
+        # 净赚 28px 预览高度, 而右列本来就只剩"标题条 + 预览"两段, 那条"两列底边齐平"的不变量不变。
 
     def _build_topbar(self):
         top = QFrame()
@@ -2243,16 +2379,20 @@ class MainWindow(QMainWindow):
 
         from xiangshuiyin import __version__ as app_version
         # 正文带插值, 所以写成"模板 + format"并配 NOOP(见 i18n 模块说明); 标题也要 tr
+        # 末尾那句会话统计是"状态栏右侧那一格"的新家: 它是"本次会话累计", 本来就不需要实时看,
+        # 放到按需打开的关于框里正合适(内容每次打开现取)。
         _message(self, QMessageBox.Icon.Information, self.tr("关于"),
                  self.tr(QT_TRANSLATE_NOOP(
                      "MainWindow",
                      "镶 · 水印（Qt 版）  {version}\n"
                      "Python {py} · PySide6 {pyside}\n{os}\n\n"
                      "程序目录：{base}\n数据目录：{data}\n日志目录：{logs}\n预览目录：{preview}\n\n"
+                     "本次会话统计：{stats}\n\n"
                      "分发时请遵守 PySide6 的 LGPLv3（详见仓库 README 与 THIRD_PARTY_LICENSES）。"))
                  .format(version=app_version, py=platform.python_version(), pyside=pyside_version,
                          os=f"{platform.system()}-{platform.release()}", base=core.BASE_DIR,
-                         data=core.DATA_DIR, logs=core.LOG_DIR, preview=core.PREVIEW_DIR))
+                         data=core.DATA_DIR, logs=core.LOG_DIR, preview=core.PREVIEW_DIR,
+                         stats=self._stats.summary(compact=True)))
 
     def _open_log_dir(self):
         _open_and_report(self, core.LOG_DIR, "日志目录")
@@ -2268,7 +2408,7 @@ class MainWindow(QMainWindow):
         """
         path = getattr(self, "_preview_src", "")
         if not path or not os.path.isfile(path):
-            self._status(self.tr("请先选择图片"))
+            self._notify(self.tr("请先选择图片"))
             return
         dlg = ImageInfoDialog(path, self)
         dlg.exec()
@@ -2331,6 +2471,14 @@ class MainWindow(QMainWindow):
         self._refresh_btn.setObjectName("ghost")
         self._refresh_btn.setCursor(Qt.PointingHandCursor)
         self._refresh_btn.clicked.connect(self._refresh_preview_clicked)
+        # 上次渲染的耗时: 原来在状态栏右侧, 状态栏删掉后挪到这儿 —— 它跟预览最相关, 放标题条里
+        # 比放底栏(与「导出到」的路径共一条伸缩带)更顺; 等宽小字弱色, 与按钮同排不抢。
+        # 数字每次渲染会跳, 但那是"仪表"行为(不是 README 里禁的那种整句状态消息刷屏)。
+        # **放在按钮左边**: 右边那个位置是「↺ 刷新预览效果」的(它是这一行的落点动作)。
+        self._perf = QLabel("")
+        self._perf.setStyleSheet("color:%s; font-family:Consolas,monospace; background:transparent;"
+                                 % theme.MUTED)
+        h.addWidget(self._perf)
         h.addWidget(self._refresh_btn)
         return self._preview_header
 
@@ -2598,10 +2746,15 @@ class MainWindow(QMainWindow):
     def _build_mode_card(self):
         card = Card(QT_TRANSLATE_NOOP("Card", "处理模式"))
         card.reset_btn.setVisible(False)
-        row = QWidget()
-        rh = QHBoxLayout(row)
-        rh.setContentsMargins(0, 0, 0, 0)
-        rh.setSpacing(6)
+        # 这一行**必须走 _row 那套栅格**(定宽标签 + 控制列), 不能自成一整行的胶囊:
+        # 胶囊的文字天生要留横向内边距, 所以它贴不到卡片内容左线 —— 以前它带 addStretch 独占一行,
+        # 结果是"文字比下面的标签右移 14px、右边界又落在控制列中间"(用户报"大小对不上, 缩进也对不上";
+        # 实测胶囊文字 x=27 vs 标签 x=13、右边界 175 vs 控制列 149..438)。放进控制列之后:
+        # 标签贴左线、胶囊的左/右边界就是控制列的左/右边界, 三条线全对上。
+        seg = QWidget()
+        sh = QHBoxLayout(seg)
+        sh.setContentsMargins(0, 0, 0, 0)
+        sh.setSpacing(6)
         self._mode_btns = {}
         for key, text in (("single", QT_TRANSLATE_NOOP("MainWindow", "单张图片")),
                           ("batch", QT_TRANSLATE_NOOP("MainWindow", "批量目录"))):
@@ -2610,9 +2763,10 @@ class MainWindow(QMainWindow):
             b.setCursor(Qt.PointingHandCursor)
             b.clicked.connect(lambda _c, k=key: self._set_mode(k))
             self._mode_btns[key] = b
-            rh.addWidget(b)
-        rh.addStretch(1)
-        card.body.addWidget(row)
+            sh.addWidget(b, 1)          # 各占一半: **不写死宽度** —— 窗口拉宽时两格跟着分
+        # (两格会是 142/141: 控制列宽 289 减 6px 间距是奇数, 除不尽 —— 外边缘与栅格严丝合缝,
+        #  内侧那 1px 差看不出; 要两格严格等宽就得留 1px 空档, 那反而更没道理)
+        card.body.addWidget(self._row(QT_TRANSLATE_NOOP("MainWindow", "模式"), seg))
 
         # 这里不再放「选择图片」按钮 —— 与顶部栏的「打开图片」功能重复, 只保留顶部那个;
         # 路径显示留着(顶栏只显示文件名, 这里能看到完整路径, 且可选中复制)
@@ -2743,13 +2897,13 @@ class MainWindow(QMainWindow):
         try:
             os.makedirs(path, exist_ok=True)        # 已存在时不报错
         except Exception as e:                      # noqa: BLE001 - 建不出来就退化成"报一句"
-            self._status(self.tr("Logo 目录不可用：{err}").format(err=e))
+            self._notify(self.tr("Logo 目录不可用：{err}").format(err=e))
             logging.warning(f"[目录] 创建 Logo 目录失败: {path} ({e})")
             return
         if QDesktopServices.openUrl(QUrl.fromLocalFile(path)):
-            self._status(self.tr("已打开 Logo 目录：{path}").format(path=path))
+            self._notify(self.tr("已打开 Logo 目录：{path}").format(path=path))
         else:
-            self._status(self.tr("无法打开 Logo 目录：{path}").format(path=path))
+            self._notify(self.tr("无法打开 Logo 目录：{path}").format(path=path))
 
     def _reload_presets(self, view):
         """把 10 个槽位列进 view 的下拉(显示各自存着的方案名, 空槽显示「— 空 —」)。
@@ -2779,7 +2933,7 @@ class MainWindow(QMainWindow):
         key = view.current_slot()
         p = self._preset_data.get(key) if key else None
         if not isinstance(p, dict):
-            self._status(self.tr("该槽位为空，无法加载"))
+            self._notify(self.tr("该槽位为空，无法加载"))
             return
         name = p.get("_preset_name") or key
         # 里没有 confirm), 这里先问一句, 与「恢复默认设置」「删除预设」同一个形态。
@@ -2791,7 +2945,7 @@ class MainWindow(QMainWindow):
         self._undo_step("__preset_load__", f"加载预设「{name}」",
                         lambda: self._apply_params(migrate_preset(p)))
         view.set_name(name)
-        self._status(self.tr("已加载预设：{name}").format(name=name))
+        self._notify(self.tr("已加载预设：{name}").format(name=name))
 
     def _preset_payload(self):
         """存进预设的那份参数(与 settings 的口径**刻意不同**)。
@@ -2817,7 +2971,7 @@ class MainWindow(QMainWindow):
             return
         name = view.name_text()
         if not name:
-            self._status(self.tr("请先输入方案名后再保存"))
+            self._notify(self.tr("请先输入方案名后再保存"))
             return
         cur = self._preset_data.get(key) or {}
         cur_name = cur.get("_preset_name") if isinstance(cur, dict) else None
@@ -2836,7 +2990,7 @@ class MainWindow(QMainWindow):
         view.reload()
         view.combo.setCurrentIndex(view.combo.findData(key))
         logging.info(f"[预设] 已保存: 槽位 {key}「{name}」-> {core.preset_path(key)}")
-        self._status(self.tr("已保存到槽位 {slot}：{name}").format(slot=key, name=name))
+        self._notify(self.tr("已保存到槽位 {slot}：{name}").format(slot=key, name=name))
 
     def _export_preset(self, view):
         """把当前选中的预设导出成一个 .json(给别人用)。
@@ -2847,7 +3001,7 @@ class MainWindow(QMainWindow):
         key = view.current_slot()
         rec = self._preset_data.get(key) if key else None
         if not isinstance(rec, dict):
-            self._status(self.tr("该槽位为空，没有可导出的方案"))
+            self._notify(self.tr("该槽位为空，没有可导出的方案"))
             return
         name = rec.get("_preset_name") or f"方案 {key}"
         # 默认文件名只是给对话框提个建议(用户可改), 所以顺手把 Windows 不认的字符换掉;
@@ -2863,11 +3017,11 @@ class MainWindow(QMainWindow):
             with open(path, "w", encoding="utf-8") as f:
                 json.dump(data, f, ensure_ascii=False, indent=2)
         except Exception as e:                      # noqa: BLE001 - 写不出去就报一句, 不弹窗
-            self._status(self.tr("导出失败：{err}").format(err=e))
+            self._notify(self.tr("导出失败：{err}").format(err=e))
             logging.warning(f"[预设] 导出失败 {path}: {e}")
             return
         logging.info(f"[预设] 已导出槽位 {key}「{name}」-> {path} (剔除机器路径) 共 {len(data)} 键")
-        self._status(self.tr("已导出方案「{name}」").format(name=name))
+        self._notify(self.tr("已导出方案「{name}」").format(name=name))
 
     def _import_preset(self, view):
         """把一个 .json 导入成预设。
@@ -2920,12 +3074,12 @@ class MainWindow(QMainWindow):
         view.reload()
         view.combo.setCurrentIndex(view.combo.findData(key))
         logging.info(f"[预设] 已导入 {path} -> 槽位 {key}「{name}」（{'覆盖' if cur_name else '空槽'}）")
-        self._status(self.tr("已导入方案「{name}」到槽位 {slot}").format(name=name, slot=key))
+        self._notify(self.tr("已导入方案「{name}」到槽位 {slot}").format(name=name, slot=key))
 
     def _preset_delete(self, view):
         key = view.current_slot()
         if not key or not isinstance(self._preset_data.get(key), dict):
-            self._status(self.tr("该槽位为空，无需删除"))
+            self._notify(self.tr("该槽位为空，无需删除"))
             return
         name = self._preset_data[key].get("_preset_name") or key
         if _message(self, QMessageBox.Icon.Question, self.tr("删除预设"),
@@ -2939,7 +3093,7 @@ class MainWindow(QMainWindow):
             return
         view.reload()
         view.set_name("")
-        self._status(self.tr("已删除槽位 {slot}：{name}").format(slot=key, name=name))
+        self._notify(self.tr("已删除槽位 {slot}：{name}").format(slot=key, name=name))
 
     def _apply_params(self, src):
         """把一整份参数铺回(加载预设 / 恢复默认用)。只吃已知键, 未知键忽略。
@@ -2978,7 +3132,7 @@ class MainWindow(QMainWindow):
             self.state.settings = s
             core.save_settings(s)                       # 原子写, 见核心 _save_json
         except Exception as e:                          # noqa: BLE001 - 存不上不该影响使用
-            self._status(self.tr("自动保存失败：{err}").format(err=e))
+            self._notify(self.tr("自动保存失败：{err}").format(err=e))
 
     def _touch(self):
         """参数变更的统一出口: 排一次保存 + 刷预览。"""
@@ -3022,7 +3176,7 @@ class MainWindow(QMainWindow):
 
         # 整批算一步撤销(快照里连 logo_dir / model_map 一起存, 所以撤得回来)
         self._undo_step("__reset_settings__", "恢复默认设置", _do)
-        self._status(self.tr("已恢复默认设置"))
+        self._notify(self.tr("已恢复默认设置"))
 
     def _reload_model_map(self):
         try:
@@ -3087,7 +3241,7 @@ class MainWindow(QMainWindow):
         cand = core._list_images_in_dir(folder, recursive=self._batch_recursive)
         images = [p for p in cand if self.state._sniff_image_type(p)]
         if not images:
-            self._status(self.tr("所选目录里没有受支持的图片")
+            self._notify(self.tr("所选目录里没有受支持的图片")
                          + (self.tr("（含子目录）") if self._batch_recursive
                             else self.tr("（可勾选「包含子文件夹」）")))
             return
@@ -3099,7 +3253,7 @@ class MainWindow(QMainWindow):
         self._batch_val.setText(self._batch_dir)
         self._batch_val.setToolTip(self._batch_dir)
         self._set_mode("batch")
-        self._status(self.tr("已载入 {n} 张图片，可开始生成").format(n=len(items)))
+        self._notify(self.tr("已载入 {n} 张图片，可开始生成").format(n=len(items)))
 
     # ---------- 预览 ----------
     def _manual_exif(self):
@@ -3109,13 +3263,13 @@ class MainWindow(QMainWindow):
         """
 
         自动预览之外的单入口: 渲染失败、或想对同一组参数再跑一次时用。点下去先按灰、等响应
+        状态标识本来就会一直显示「渲染中…」。
         """
         if not getattr(self, "_preview_src", ""):
-            self._status(self.tr("请先选择图片（也可直接拖入图片或文件夹）"))
+            self._notify(self.tr("请先选择图片（也可直接拖入图片或文件夹）"))
             return
         self._manual_preview = True
         self._refresh_btn.setEnabled(False)
-        self._status(self.tr("正在生成预览…"))
         self.request_preview()
 
     def _finish_manual_preview(self, ok):
@@ -3129,7 +3283,7 @@ class MainWindow(QMainWindow):
         self._manual_preview = False
         self._sync_refresh_btn()
         if ok:
-            self._status(self.tr("预览已生成"))
+            self._notify(self.tr("预览已生成"))
 
     def _sync_refresh_btn(self):
         """没有可预览的图时把「刷新预览效果」按灰。
@@ -3246,7 +3400,7 @@ class MainWindow(QMainWindow):
             # 这件事在界面上看不出来。
             self._preview_err = err
             self._finish_manual_preview(False)          # 手动刷新失败也要把按钮放回可点(重试入口)
-            self._status(self.tr("预览失败：") + err)
+            self._notify(self.tr("预览失败：") + err)
             logging.warning(f"[预览] 渲染失败: {err}")   # 失败也要留痕(以前只在状态栏闪一下)
             self._sync_chip()
             return
@@ -3283,7 +3437,6 @@ class MainWindow(QMainWindow):
         # 会话统计: 与界面上的 _stats 标签同一份数据源
         self._stats.add_preview(ms=ms, queue_ms=queue_ms, qimg_ms=qimg_ms, e2e_ms=e2e,
                                 arrived=arrived)
-        self._refresh_stats()
         # 上一次渲染的分段耗时挂到 tooltip: 参数改完不用去翻日志就知道时间花在哪一段
         st = resp.get("stage") or {}
         if st.get("stages"):
@@ -3331,10 +3484,10 @@ class MainWindow(QMainWindow):
     def _copy_raw_model(self):
         if self._raw_model:
             QApplication.clipboard().setText(self._raw_model)
-            self._status(self.tr("已复制原始型号到剪贴板"))
+            self._notify(self.tr("已复制原始型号到剪贴板"))
         else:
             # 按钮在"没识别到型号"时是置灰的, 正常点不到; 这里兜一句免得静默无反应
-            self._status(self.tr("未识别到型号（请先选择图片）"))
+            self._notify(self.tr("未识别到型号（请先选择图片）"))
 
     def _on_custom_model(self, text):
         self._custom_model = text.strip()
@@ -3343,10 +3496,10 @@ class MainWindow(QMainWindow):
 
     def set_input(self, path):
         if not os.path.isfile(path):
-            self._status(self.tr("请拖入图片文件"))
+            self._notify(self.tr("请拖入图片文件"))
             return
         if not self.state._sniff_image_type(path):
-            self._status(self.tr("不支持的图片格式"))
+            self._notify(self.tr("不支持的图片格式"))
             return
         self._input_path = path
         self._input_name = os.path.basename(path)
@@ -3369,7 +3522,7 @@ class MainWindow(QMainWindow):
         else:
             self._sync_preview_source()
             self.request_preview()
-        self._status(self.tr("已选择：{name}").format(name=self._input_name))
+        self._notify(self.tr("已选择：{name}").format(name=self._input_name))
 
     # ---------- 拖放(Qt 原生: 同进程事件, 无跨进程消息) ----------
     def dragEnterEvent(self, e):
@@ -3388,7 +3541,7 @@ class MainWindow(QMainWindow):
         e.acceptProposedAction()
         self._preview.set_hint(self.tr("请拖入图片，或点击「打开图片」"))
         if not paths:
-            self._status(self.tr("未收到文件"))
+            self._notify(self.tr("未收到文件"))
             return
         # 拖入目录 = 批量目录; 拖入多张 = 批量列表; 单张 = 单张
         folders = [p for p in paths if os.path.isdir(p)]
@@ -3398,7 +3551,7 @@ class MainWindow(QMainWindow):
             return
         images = [p for p in files if self.state._sniff_image_type(p)]
         if not images:
-            self._status(self.tr("不支持的图片格式"))
+            self._notify(self.tr("不支持的图片格式"))
             return
         if len(images) == 1:
             self.set_input(images[0])
@@ -3408,10 +3561,10 @@ class MainWindow(QMainWindow):
     # ---------- 生成 ----------
     def start_generate(self):
         if self._generating:
-            self._status(self.tr("正在处理中，请稍候"))
+            self._notify(self.tr("正在处理中，请稍候"))
             return
         if not self._output_dir:
-            self._status(self.tr("请先选择导出目录"))
+            self._notify(self.tr("请先选择导出目录"))
             return
         req = {
             "params": backend_params(self._params),
@@ -3423,25 +3576,24 @@ class MainWindow(QMainWindow):
         }
         if self._mode == "single":
             if not self._input_path:
-                self._status(self.tr("请先选择图片"))
+                self._notify(self.tr("请先选择图片"))
                 return
             req.update(mode="single", input_path=self._input_path,
                        original_name=self._input_name or "image.jpg")
         else:
             if not self._batch_files:
-                self._status(self.tr("请先选择要批量处理的图片"))
+                self._notify(self.tr("请先选择要批量处理的图片"))
                 return
             req.update(mode="batch", file_paths=self._batch_files)
         d = self.state.start_generate(req)
         if not d.get("ok"):
-            self._status(i18n.tr_msg(d.get("error")) or self.tr("无法开始处理"))
+            self._notify(i18n.tr_msg(d.get("error")) or self.tr("无法开始处理"))
             return
         self._generating = True
         self._gen_btn.setEnabled(False)
         self._progress.setVisible(True)
         self._progress.setValue(0)
         self._progress.setMaximum(len(self._batch_files) if self._mode == "batch" else 100)
-        self._status(self.tr("处理中…"))
 
     def _on_event(self, ev):
         t = ev.get("type")
@@ -3449,13 +3601,17 @@ class MainWindow(QMainWindow):
             total = ev.get("total") or 0
             self._progress.setVisible(True)
             self._progress.setMaximum(total or 100)
-            self._progress.setValue(ev.get("done") or 0)
+            done = ev.get("done") or 0
+            self._progress.setValue(done)
+            # 进度写在**进度条自己身上**(格式 n / N): 状态栏删掉之后, 那一行"处理中 x/y：文件名"
+            # 没有去处了 —— 而条本身就摆在那儿。文件名进它的 tooltip(要看清就悬停)。
+            if total:
+                self._progress.setFormat(f"{done} / {total}")
             name = ev.get("name")
             if name:
-                self._status(self.tr("处理中 {done}/{total}：{name}").format(
-                    done=ev.get("done"), total=total, name=i18n.tr_msg(name)))
+                self._progress.setToolTip(i18n.tr_msg(name))
         elif t == "log":
-            self._status(i18n.tr_msg(str(ev.get("msg") or "")))
+            self._notify(i18n.tr_msg(str(ev.get("msg") or "")))
         elif t == "finished":
             self._generating = False
             self._gen_btn.setEnabled(True)
@@ -3463,31 +3619,23 @@ class MainWindow(QMainWindow):
             msg = i18n.tr_msg(str(ev.get("message") or ""))
             # 生成耗时由核心在 finished 事件里带回来(单张=这一张, 批量=整批), 进会话统计
             self._stats.add_generated(ev.get("ms") or 0.0, ev.get("count") or 1)
-            self._refresh_stats()
             if ev.get("success"):
                 out_dir = ev.get("out_dir") or self._output_dir
-                self._status(self.tr("已完成：{msg}").format(msg=i18n.tr_msg(msg)))
+                self._notify(self.tr("已完成：{msg}").format(msg=i18n.tr_msg(msg)))
                 if out_dir:
                     core.open_path(out_dir)     # 完成后打开所在目录
             else:
-                self._status(self.tr("失败：") + msg.splitlines()[0] if msg else "失败")
-                _message(self, QMessageBox.Icon.Warning, "处理结果", msg or "处理失败")
+                _message(self, QMessageBox.Icon.Warning, self.tr("处理结果"),
+                                         msg or self.tr("处理失败"))
 
     # ---------- 杂项 ----------
-    def _fix_status_inset(self):
-        """把状态文本精确落到左对齐线上。
+    def _notify(self, text):
+        """一次性提示(吐司): 结果 / 失败 / 前置条件提示。只由**用户显式动作**触发。
 
-        `_status_label.x()` 是相对状态栏的坐标,**已经包含**我们设的 contentsMargins,
-        所以超出的部分只有 `x() - margins.left()` 这一段, 补掉它即可。
+        后台循环(自动预览、自动保存)一条都不要发 —— 拖一次滑块弹一串吐司比状态栏闪烁更糟。
         """
-        m = self._status_bar.contentsMargins()
-        extra = self._status_label.x() - m.left()
-        if extra:
-            self._status_bar.setContentsMargins(max(0, m.left() - extra), m.top(),
-                                                m.right(), m.bottom())
-
-    def _status(self, text):
-        self._status_label.setText(text)
+        if getattr(self, "_toast", None) is not None:
+            self._toast.show_message(text)
 
     def closeEvent(self, e):
         if self._save_timer.isActive():     # 防抖还没到点就关窗: 立刻落盘, 否则最后一次改动会丢

@@ -54,7 +54,6 @@ CTRL_H = 28           # 按钮/输入类控件的统一高度(原来普通 29 / 
 INSET_ROOT = 8                           # 根布局(顶栏/主体/底栏)的横向内边距
 INSET_COL = 10                           # 左列横向内边距(= 页面留白兼投影余量)
 INSET_BAR = INSET_COL                    # 顶栏/底栏在根布局之内, 与左列内容对齐
-INSET_STATUS = INSET_ROOT + INSET_BAR    # 状态栏在根布局之外(贴窗口边), 要把根布局那段也算上
 PAD_CARD = 12         # 卡片内边距
 GAP_CARD = 10         # 卡片与卡片之间
 GAP_ROW = 4           # 卡片内相邻行之间
@@ -65,6 +64,7 @@ CHECK_OFF = _asset("check_off.svg")
 CHECK_ON = _asset("check_on.svg")
 CHECK_OFF_HOVER = _asset("check_off_hover.svg")
 CHECK_ON_HOVER = _asset("check_on_hover.svg")
+MENU_CHECK = _asset("menu_check.svg")   # 可勾选菜单项的勾(换掉 Fusion 默认那个又粗又拖尾的)
 
 QSS = f"""
 /* ---------- 基础 ----------
@@ -296,8 +296,6 @@ QStatusBar {{
     border-top: 1px solid {LINE};
     color: {MUTED};
 }}
-QStatusBar::item {{ border: none; }}
-QLabel#statusText {{ color: {MUTED}; background: transparent; }}
 
 /* ---------- 分隔条 ---------- */
 QSplitter::handle {{ background: transparent; width: 8px; }}
@@ -318,6 +316,10 @@ QMenu::item {{
 }}
 QMenu::item:selected {{ background: #EFF3EF; color: {TEXT}; }}   /* 与页签悬停同一档 */
 QMenu::item:disabled {{ color: #b9b3a8; }}
+/* 可勾选菜单项的勾(目前只有「语言」子菜单那两项) —— 换成自己的素材: Fusion 默认那个又粗又硬、
+   末笔还拖一条长尾巴(用户报"难看")。尺寸与默认的指示器槽一致, 不动文字位置。 */
+QMenu::indicator {{ width: 14px; height: 14px; }}
+QMenu::indicator:checked {{ image: url({MENU_CHECK}); }}
 QMenu::separator {{ height: 1px; background: {LINE}; margin: 6px 8px; }}
 
 /* ---------- 提示框 ---------- */
