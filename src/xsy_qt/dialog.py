@@ -150,6 +150,11 @@ _BTN_TEXT = {
 }
 
 
+# 弹窗按钮的最小宽度: 「是 / 否 / 关闭」这种两字标签以前会因 #primary 的横向 padding 更大
+# (0 20px vs 0 14px)而宽窄不一(用户报了"自绘弹窗按钮不等宽")。给一个下限, 短标签就一样宽了。
+DLG_BTN_MIN_W = 76
+
+
 def dlg_button(text, slot=None, primary=False, parent=None):
     """自绘弹窗里统一的按钮。
 
@@ -161,6 +166,7 @@ def dlg_button(text, slot=None, primary=False, parent=None):
     if primary:
         b.setObjectName("primary")
     b.setFixedHeight(theme.CTRL_H)
+    b.setMinimumWidth(DLG_BTN_MIN_W)          # 短标签(是/否/关闭)与长标签都不会参差
     b.setCursor(Qt.CursorShape.PointingHandCursor)
     if slot is not None:
         b.clicked.connect(slot)

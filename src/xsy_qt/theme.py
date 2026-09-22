@@ -20,8 +20,13 @@ CARD = "#FDFCF9"
 LINE = "#E6E0D6"
 TEXT = "#0f172a"
 MUTED = "#7A756C"
-EMPTY_SLOT = "#C6BEB0"   # 空位虚线框: 比边框色(LINE)深一档, 否则在卡片上看不出有多少个空位
-WARN_BG = "#FDF6E3"
+# 「空 / 无」这类占位语义的中性灰(比边框色 LINE 深一档): 预览状态标识的「无预览」圆点用它。
+# 它曾经也用在「我的颜色」的空位虚线框上 —— 那个已改成浅实底(见 EMPTY_SLOT_BG): 九个虚线框
+# 并排太抢眼(用户: "看着好突兀"), 而"还剩几格"本来就有标题右边那句「已存 n / 10」在说。
+EMPTY_SLOT = "#C6BEB0"
+# 空位格子的底色: 贴窗口底色(BG #F3F0EA)再浅一点, 比卡片(#FDFCF9)深一点点 —— 刚好看出
+# "这里有一格", 又不像描边那样给每一格都勾一圈边(九格并排时那一圈圈边就是"突兀"的来源)
+EMPTY_SLOT_BG = "#F1EDE5"
 # 滚动条 handle 的静默色: 比背景(BG)与边框(LINE)都深一档, 保证鼠标一扫就能定位。
 # 第一版用了很淡的 #DDD6C8 + 4px 细 handle, 结论是"太细太淡、难以定位", 所以回到这个深度、
 # 并把 handle 放回 6px(见 QSS)。它只在**真的可以滚动**时出现(见 window._wire_scrollbar 的
@@ -56,7 +61,6 @@ GAP_ROW = 4           # 卡片内相邻行之间
 GAP_CTRL = 8          # 同一行内控件之间
 
 ARROW_DOWN = _asset("arrow_down.svg")
-ARROW_UP = _asset("arrow_up.svg")
 CHECK_OFF = _asset("check_off.svg")
 CHECK_ON = _asset("check_on.svg")
 CHECK_OFF_HOVER = _asset("check_off_hover.svg")
@@ -132,8 +136,11 @@ QPushButton {{
     padding: 0 14px;          /* 竖向不设 padding: 高度由 CTRL_H 定, 文字由按钮自身居中 */
     color: {TEXT};
 }}
-QPushButton:hover {{ background: #f1f5f9; border-color: {ACCENT}; }}
-QPushButton:pressed {{ background: {LINE}; }}
+/* 悬停/按下: **不再描一圈绿边**(用户: "选中时的样式不美观") —— 改成底色微微变一下:
+   悬停取极浅的暖绿灰(#EEF2EC, 比卡片 #FDFCF9 深一点点), 按下再深一档。
+   焦点与悬停同一套: 点击后按钮留着焦点, 两态不一致会让它"卡"在某个样式上。 */
+QPushButton:hover, QPushButton:focus {{ background: #EEF2EC; }}
+QPushButton:pressed {{ background: #E2E9E1; }}
 QPushButton:disabled {{ color: #b9b3a8; background: #f6f3ec; border-color: {LINE}; }}
 /* 可勾选按钮当 pill 用(处理模式的「单张图片 / 批量目录」) */
 QPushButton:checked {{
@@ -142,7 +149,7 @@ QPushButton:checked {{
     color: #fff;
     font-weight: bold;
 }}
-QPushButton:checked:hover {{ background: {ACCENT2}; }}
+QPushButton:checked:hover, QPushButton:checked:focus {{ background: {ACCENT2}; }}
 QPushButton#primary {{
     background: {ACCENT};
     border-color: {ACCENT2};
@@ -150,12 +157,32 @@ QPushButton#primary {{
     font-weight: bold;
     padding: 0 20px;
 }}
-QPushButton#primary:hover {{ background: {ACCENT2}; }}
+QPushButton#primary:hover, QPushButton#primary:focus {{ background: {ACCENT2}; }}
 QPushButton#primary:disabled {{ background: #b8c9bd; border-color: #a8b9ad; color: #f0f0f0; }}
 QPushButton#mini {{ padding: 0 8px; font-size: 11px; border-radius: {RADIUS_SMALL}px; color: {MUTED}; }}
+/* 迷你按钮(重置本组 / 复制 / ☰ / ℹ)悬停时略深一点, 与普通按钮同一套口径(都不描边) */
+QPushButton#mini:hover, QPushButton#mini:focus {{ background: #EEF2EC; color: {TEXT}; }}
+QPushButton#mini:pressed {{ background: #E2E9E1; }}
 /* 带菜单的按钮(QPushButton.setMenu)右下角会被 Qt 画一个下拉三角, 小图标按钮上看着就是多出
    一个小 "v"(顶栏 ☰ 上被用户报过) —— 这个按钮的语义是"点开菜单", 不需要那个三角, 关掉它 */
 QPushButton#mini::menu-indicator {{ image: none; width: 0px; height: 0px; }}
+/* 幽灵按钮: **无描边、无底色**, 只在悬停/按下时浮出色块 —— 给"次要动作"用。
+   第一个用它的是一目了然的那个反例: 「↺ 刷新预览效果」原本走 #mini, 但 #mini 是"迷你号的
+   普通按钮"(带 1px LINE 描边 + 卡片白底 + 28px 高), 在卡片上看着就是个正经按钮, 比它的
+   分量重 —— 它只是个"再来一次"的次要动作, 与预览状态标识同一套观感(平时只有字)。
+   注意 :disabled 必须单独写: #ghost 带 ID, 特异性高于 `QPushButton:disabled`, 不写的话
+   置灰时底色与字色都会被 #ghost 那两条盖回原样, 看不出不可点。 */
+QPushButton#ghost {{
+    background: transparent;
+    border: none;
+    padding: 0 8px;
+    font-size: 11px;
+    border-radius: {RADIUS_SMALL}px;
+    color: {MUTED};
+}}
+QPushButton#ghost:hover, QPushButton#ghost:focus {{ background: #EEF2EC; color: {TEXT}; }}
+QPushButton#ghost:pressed {{ background: #E2E9E1; }}
+QPushButton#ghost:disabled {{ background: transparent; color: #b9b3a8; }}
 
 /* ---------- 输入控件 ---------- */
 QLineEdit, QSpinBox, QDoubleSpinBox, QComboBox {{
@@ -300,14 +327,6 @@ QToolTip {{
     border: none;
     padding: 4px 8px;
     border-radius: 4px;
-}}
-
-/* ---------- 分组小标题(卡片内) ---------- */
-QLabel#groupLabel {{
-    color: {MUTED};
-    font-weight: bold;
-    background: transparent;
-    padding-top: 4px;
 }}
 """
 

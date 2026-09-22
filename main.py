@@ -35,7 +35,7 @@ os.environ.setdefault("XSY_PREVIEW_DIR",
 from xiangshuiyin import __version__ as app_version   # noqa: E402
 from xiangshuiyin import app as core          # noqa: E402 - 必须晚于上面的环境变量
 from xsy_qt import theme                      # noqa: E402
-from xsy_qt.window import MainWindow, _PREVIEW_SHARPEN, _SLOW_RENDER_MS   # noqa: E402
+from xsy_qt.window import MainWindow, _SLOW_RENDER_MS   # noqa: E402
 
 
 def main():
@@ -98,7 +98,7 @@ def _log_environment(win):
         logging.info(f"[环境] 窗口 {win.width()}x{win.height()} 分栏 {sizes} "
                      f"预览区 {win._preview.width()}x{win._preview.height()}")
     logging.info(f"[环境] 数据目录 {core.BASE_DIR} | 预览目录 {core.PREVIEW_DIR} | 日志 {core.LOG_FILE}")
-    logging.info(f"[环境] 档位 PREVIEW_MAX_SIDE={core.PREVIEW_MAX_SIDE} 上屏锐化={_PREVIEW_SHARPEN} "
+    logging.info(f"[环境] 档位 PREVIEW_MAX_SIDE={core.PREVIEW_MAX_SIDE} "
                  f"层缓存预算={core._LAYER_CACHE_BUDGET >> 20}MB 单层上限={core._LAYER_CACHE_MAX_PX // 1_000_000}MP "
                  f"慢调用阈值={_SLOW_RENDER_MS}ms")
 

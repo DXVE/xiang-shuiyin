@@ -17,6 +17,7 @@ env/
 .vscode/
 .idea/
 .zcode/
+.zcode*
 *.swp
 *.swo
 

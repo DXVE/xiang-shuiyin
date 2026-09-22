@@ -10,6 +10,7 @@
               放大镜 · 间距几何标注 · 启动页/状态吐司
 """
 import inspect
+import hashlib
 import json
 import logging
 import math
@@ -17,7 +18,7 @@ import os
 import time
 from datetime import datetime
 
-from PySide6.QtCore import (QCoreApplication, QPointF, QRectF, QSize, Qt,
+from PySide6.QtCore import (QPointF, QRectF, QSize, Qt,
                             QT_TRANSLATE_NOOP, QTimer, QUrl, Signal)
 from PySide6.QtGui import (QColor, QDesktopServices, QImage, QKeySequence, QPainter,
                            QPainterPath, QPen, QPixmap, QShortcut)
@@ -29,7 +30,7 @@ from PySide6.QtWidgets import (
     QVBoxLayout, QWidget,
 )
 
-from PIL import Image, ImageFilter
+from PIL import Image
 
 from xiangshuiyin import app as core
 
@@ -240,15 +241,42 @@ MAG_MARGIN = 12      # 离预览框右上角的距离; 留出投影的余量
 # _segbar_row 按这个值给页签行留右侧占位, 两边不同步的话页签卡片会比参数卡片宽出那条差
 _SB_W = 14
 
-# 预览显示缩放: 用 PIL 的 LANCZOS 而不是 QPixmap.scaled(Smooth) —— 见 PreviewBox._scale_for_display
-# 后面的 UnsharpMask 是"轻锐化"(半径1/阈值3), 数值按"过冲(白边)幅度"定, 实测(856px 宽的
-# 上屏设备像素图上, 与不锐化的偏差):
-#     percent  20 → 99.9 分位过冲 12/255, 最大 25      30 → 18 / 37     40 → 24 / 46
-#              60 → 34 / 68                            80 → 42 / 83    100 → 50 / 93
-# 60 是当初为补偿"上屏那步被 Qt 放大 1.25 倍"才加上去的; 那个损失已经修掉(见
-# _scale_for_display), 锐化现在只影响观感 —— 想"预览=成品"就置 0, 觉得字还有点软就给 30,
-# 看到笔画边上有白/黑描边(过冲)就往下降。
-_PREVIEW_SHARPEN = 60
+# 预览显示缩放: 用 PIL 的 LANCZOS 而不是 QPixmap.scaled(Smooth) —— 见 PreviewBox._scale_for_display。
+# **这里不再做锐化**: 曾经有一档 `_PREVIEW_SHARPEN`(半径1/阈值3 的 UnsharpMask)是为补偿"上屏那步
+# 被 Qt 放大 1.25 倍"加的; 那个损失按设备像素上屏修掉之后它就成了纯粹的观感旋钮, 代价却是每次
+# 换图/改尺寸白花 ~29ms(1088x963 实测), 而且让**预览比成品更锐**(percent=60 时 99.9 分位过冲
+# 34/255、最大 68) —— 等于你看到的不是会生成出来的东西。已删除, 预览现在就是成品口径。
+
+# ---------- 预览状态标识 ----------
+# 回答一个问题: 屏幕上这张图, 是不是当前参数渲出来的。
+# 五个状态的圆点色**取自主程序自己那组"莫兰迪"色**(见 PRESET_COLORS), 不另外造色号 ——
+# 否则标识与旁边的卡片/按钮一眼看出不是一个体系。
+PV_CHIP_DOT = {
+    "none": theme.EMPTY_SLOT,  # 未选图: 一档暗中性灰, 天然表示"没有"
+    "rendering": "#7C98A6",
+    "synced": theme.ACCENT,
+    "stale": "#B8895E",
+    "failed": "#B0676B",
+}
+PV_CHIP_H = 20          # 胶囊高度; **必须定高**, 理由见 PreviewStateChip 的类注释
+
+# 文案表。**中文字面量必须包在 NOOP 里**: lupdate 看不穿变量, 只包运行时那个 tr() 的话这几条
+# 会被整条漏译(表里的 context 要与消费它的类名一致 —— PreviewStateChip, 这样运行时 self.tr()
+# 查到的就是这里登记的那条)。
+_PV_CHIP_TEXT = {
+    "none": QT_TRANSLATE_NOOP("PreviewStateChip", "无预览"),
+    "rendering": QT_TRANSLATE_NOOP("PreviewStateChip", "渲染中…"),
+    "synced": QT_TRANSLATE_NOOP("PreviewStateChip", "已按当前参数渲染"),
+    "stale": QT_TRANSLATE_NOOP("PreviewStateChip", "参数已改，待渲染"),
+    "failed": QT_TRANSLATE_NOOP("PreviewStateChip", "渲染失败，未更新"),
+}
+_PV_CHIP_TIP = {
+    "none": QT_TRANSLATE_NOOP("PreviewStateChip", "还没选图片（或取样图已清空）"),
+    "rendering": QT_TRANSLATE_NOOP("PreviewStateChip", "已发出请求，正在渲染；拖动参数时多数时候停在这一态"),
+    "synced": QT_TRANSLATE_NOOP("PreviewStateChip", "屏幕上这张图对应此刻的全部参数（预览按缩略档渲染，看细节请用放大镜）"),
+    "stale": QT_TRANSLATE_NOOP("PreviewStateChip", "屏幕上这张图还是旧参数渲的，等这一轮渲染完成"),
+    "failed": QT_TRANSLATE_NOOP("PreviewStateChip", "上一次预览渲染失败，屏上留的是上一张成功的图"),
+}
 
 # ---------- 主窗口初始尺寸与左右分栏 ----------
 # 初始尺寸按**屏幕可用区**(已扣任务栏)的百分比算, 不写死像素: 1080p@125% 的逻辑可用区只有
@@ -528,6 +556,72 @@ def _qimage_to_pil(img: QImage):
                            "raw", "RGB", q.bytesPerLine())
 
 
+class PreviewStateChip(QFrame):
+    """预览标题条里的状态标识: 一个圆点 + 一句话(胶囊底), 挨着「效果预览」放。
+
+    **它要回答的问题**: 屏幕上这张图, 是不是当前参数渲出来的。
+    以前答不了 —— 回传的数据里只有图和几个耗时, 参数本身没被带回来, 请求发出去也没留下
+    可比的凭证; 而这条链路**天然存在"屏上这帧已经过期"的时刻**(在跑的那一轮不可中断、
+    待渲染槽还会被新请求覆盖)。所以现在请求带参数指纹、渲染线程原样回传, 界面把"屏上指纹"
+    与"此刻指纹"比一次就够了 —— 见 MainWindow._preview_token / _on_rendered。
+
+    四条判据(顺序即优先级, 由 MainWindow._preview_state 给出):
+      none      没选图 / 取样图被清空
+      rendering 有在途或排队的请求 —— **合并了"正在渲"与"改过还没渲"**: 拖滑块时一帧上屏时
+                "又改过了"几乎是常态, 若照字面各报一态, 两态会来回跳, 而它们对用户是同一种
+                事实(还没跟上)。真正该报"待渲染"的是"没人在渲、屏上还是旧参数"那种, 它只在
+                渲染失败后才出现。判据见 tools/_probe_preview_state.py 第 ⑤ 组
+                (模拟拖滑块 16 帧: 8 帧判为"还没跟上"、一次都没误报"待渲染")。
+      stale     没人在渲, 但屏上这帧的参数与当前不符
+      failed    最后一次尝试失败 —— 屏上留的是上一张成功的图, 不担保对应当前参数
+
+    **定高 20px**(PV_CHIP_H): 标题条那一行是旁边的「↺ 刷新预览效果」撑起来的 28px, 不给它
+    定高, 布局会把标识也拉成 28px —— 于是胶囊和按钮一样高、一样圆, 看着就是个能点的按钮
+    (在试验台里实测到的)。20px 也让 11px 的字上下各余约 3px。
+    """
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setFixedHeight(PV_CHIP_H)
+        # 不做成按钮: 不给光标、不给悬停态、不给边框 —— 旁边就有一个真按钮, 有这三样会被当成
+        # 第二个按钮(试验台里"胶囊"和`#mini`按钮并排时就是这个观感)。
+        lay = QHBoxLayout(self)
+        lay.setContentsMargins(8, 1, 8, 1)
+        lay.setSpacing(5)
+        self._dot = QLabel(self)
+        self._dot.setFixedSize(6, 6)
+        self._text = QLabel(self)
+        self._text.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
+        lay.addWidget(self._dot)
+        lay.addWidget(self._text)
+        self._state = ""
+        self.set_state("none")
+
+    def set_state(self, state, tip=""):
+        """切换状态。tip 给的是"为什么是这个状态"的一句话(渲染失败时带上原因)。"""
+        if state not in PV_CHIP_DOT:
+            state = "none"
+        self._state = state
+        dot = PV_CHIP_DOT[state]
+        self._text.setText(self.tr(_PV_CHIP_TEXT[state]))
+        self._dot.setStyleSheet(f"background: {dot}; border-radius: 3px;")
+        self._text.setStyleSheet("color: %s; font-size: 11px; background: transparent;" % dot)
+        # 淡底用状态色自己调透明度: 同一色系、不另造颜色, 与 `#mini` 悬停只有一档深浅同一口径
+        self.setStyleSheet("background: %s; border: none; border-radius: 9px;"
+                           % _rgba(dot, 0.13))
+        self.setToolTip(tip or self.tr(_PV_CHIP_TIP[state]))
+        self.adjustSize()
+
+    def state(self):
+        return self._state
+
+
+def _rgba(hex_color, alpha):
+    """#RRGGBB + 透明度 -> rgba(...)。标识的淡底用它, 免得手写一串近似色。"""
+    c = QColor(hex_color)
+    return f"rgba({c.red()},{c.green()},{c.blue()},{alpha})"
+
+
 class PreviewBox(QWidget):
     """预览显示区: 等比缩放居中。自绘(而非 QLabel)是为后续放大镜/间距几何标注留绘制入口
     """
@@ -572,21 +666,12 @@ class PreviewBox(QWidget):
            放大镜没有这一步(它从固有源按像素直接画, 只重采样一次), 所以"放大镜看着清楚、
            预览图发虚/起锯齿"是同一个原因, 不是渲染画布分辨率不够。
 
-        之后可选一次轻锐化, 把降采样糊掉的笔锋拉回来一点。
         只在控件尺寸/画面/dpr 变化时算一次(缓存在 _scaled), 一张 4090x3526 的画布约 10~40ms。
         """
         dpr = self.devicePixelRatioF()
         dev = QSize(max(1, round(target.width() * dpr)), max(1, round(target.height() * dpr)))
-        if self._pil is None:
-            pm = self._pix.scaled(dev, Qt.KeepAspectRatio,
-                                  Qt.TransformationMode.SmoothTransformation)
-            pm.setDevicePixelRatio(dpr)
-            return pm
         t0 = time.perf_counter()
         im = self._pil.resize((dev.width(), dev.height()), Image.LANCZOS)
-        if _PREVIEW_SHARPEN > 0:
-            im = im.filter(ImageFilter.UnsharpMask(radius=1.0, percent=_PREVIEW_SHARPEN,
-                                                   threshold=3))
         pm = QPixmap.fromImage(_pil_to_qimage(im))
         pm.setDevicePixelRatio(dpr)      # 位图是"1.25 倍的像素", 按逻辑坐标画才是 1:1
         # 上屏缩放跑在 GUI 线程上(实测慢的时候几十毫秒), 值得单独记一条。这里只在
@@ -594,7 +679,7 @@ class PreviewBox(QWidget):
         scale_ms = (time.perf_counter() - t0) * 1000
         src = self._pil.size
         logging.info(f"[上屏] 缩放 {src[0]}x{src[1]}→{dev.width()}x{dev.height()} "
-                     f"dpr={dpr:g} 耗时 {scale_ms:.0f}ms (PIL LANCZOS+锐化{_PREVIEW_SHARPEN})")
+                     f"dpr={dpr:g} 耗时 {scale_ms:.0f}ms (PIL LANCZOS)")
         if self.stats is not None:
             self.stats.add_display_scale(scale_ms)
         return pm
@@ -634,7 +719,23 @@ class PreviewBox(QWidget):
 
     def paintEvent(self, _e):
         p = QPainter(self)
-        p.fillRect(self.rect(), QColor("#333333"))     # 预览底色
+        # **抗锯齿必须在这里显式打开**: QPainter 默认是关的, 于是 fillPath/setClipPath 的圆弧
+        # 会画成一圈硬台阶 —— 与 QSS 画的卡片圆角(同一个 RADIUS_CARD)并排就是"看着不是一个体系"
+        # 的来源。实测(设备像素, 探针 tools/_probe_corner.py):
+        #     不开 → 圆弧上"半透明过渡像素" 0 个(纯台阶), 拟合半径 12.7
+        #     开   → 54 个, 拟合半径 11.9(=12, 卡片 11.6), 外轮廓剖面与卡片逐值差 <= 1 设备像素
+        # setClipPath 本身也会跟着抗锯齿(离屏对照实验: 只加这条提示, 裁剪+fillRect 与
+        # 不裁剪的 fillPath 结果逐像素相同), 所以图片/标注/放大镜的边缘一并变平滑。
+        # 剩余的一点"毛躁"来自深色与米色底的反差(同一条斜坡在浅色卡片上看不见), 试过加一圈
+        # 与卡片同口径的 1px 描边把深色从底色边上挪开 —— 数据上成立, 但 1:1 下用户看不出区别,
+        # 属于过度设计, 已撤掉(见 README「视觉节奏」)。
+        p.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+        # 深色底做成**与卡片同一档圆角**, 并裁剪到这条圆角路径上(图片/标注/放大镜一并被裁) ——
+        # 以前是整块方形灰底, 与左边那些圆角卡片放一起显得不是一个体系(用户提的)。
+        path = QPainterPath()
+        path.addRoundedRect(QRectF(self.rect()), theme.RADIUS_CARD, theme.RADIUS_CARD)
+        p.setClipPath(path)
+        p.fillPath(path, QColor("#333333"))            # 预览底色
         if self._pix is None:
             p.setPen(QColor("#9aa0a6"))
             p.drawText(self.rect(), Qt.AlignCenter, self._hint)
@@ -719,6 +820,9 @@ class PreviewBox(QWidget):
         g = self._geom
         if not g or not self._hl:
             return
+        # 这里画的都是横平竖直的 2px 色带/虚线框, **关掉抗锯齿**保持边缘利落(与预览底色的
+        # 圆角相反: paintEvent 开头那把 Antialiasing 是给圆弧用的, 直角线开了只会发虚)
+        p.setRenderHint(QPainter.RenderHint.Antialiasing, False)
         cw, ch = g.get("canvas") or (0, 0)
         if not cw or not ch:
             return
@@ -1209,8 +1313,8 @@ class ColorDialog(QDialog):
       当前颜色   一格色块(点它开系统取色器, 拖动取色/调透明度都靠它) + 一个色号输入框。
                  色号只显示一处: 色块只负责"是什么颜色", 文字交给输入框。
       预设颜色   点一下即应用; 当前用的那个带 ✓ 和强调色描边, 一眼看出选中的是哪个。
-      我的颜色   点应用, **双击改这一格的颜色**, 右键删除。空位画虚线框并固定画满
-                 10 格, 卡片标题右边另写「已存 n / 10」—— 虚线框只说得出"还有空",
+      我的颜色   点应用, **双击改这一格的颜色**, 右键删除。空位是浅底格子(不勾边、不可点)
+                 并固定画满 10 格, 卡片标题右边另写「已存 n / 10」—— 格子只说得出"还有空",
                  说不出"占了几格"。
 
     点色块是**即时应用**(弹窗不关): 预览在工作线程里跑、主窗口照常重绘, 能一边点一边
@@ -1351,7 +1455,7 @@ class ColorDialog(QDialog):
             return []
 
     def _grid(self, colors, cols, total=0, editable=False):
-        """色块网格。`total>0` 时**固定画满 total 个位置**, 没存颜色的画虚线框 ——
+        """色块网格。`total>0` 时**固定画满 total 个位置**, 没存颜色的画浅底空位格 ——
         这样用户一眼能看到总共有几个位置、还剩几个, 而不是对着空荡荡一片猜。
         末列留一条伸缩位: 色块是定宽的, 弹窗被拉宽时它们保持左对齐, 不会被均匀拉开。"""
         box = QWidget()
@@ -1366,13 +1470,15 @@ class ColorDialog(QDialog):
         return box
 
     def _chip(self, color, index=-1, editable=False):
-        if color is None:                     # 空位: 虚线框, 不可点
+        if color is None:                     # 空位: 浅实底、无描边, 不可点
             lab = QLabel()
             lab.setFixedSize(_CHIP_W, _CHIP_H)
             lab.setAccessibleName(self.tr("空位"))
             lab.setToolTip(self.tr("空位"))
-            lab.setStyleSheet("background:transparent; border:1px dashed %s; border-radius:%dpx;"
-                              % (theme.EMPTY_SLOT, theme.RADIUS_SMALL))
+            # 只给一层极浅的底, **不勾边**: 十格里通常只有一两格有颜色, 剩下的并排勾边会把
+            # 整张卡片的注意力全吸过去(用户: "看着好突兀"), 而"还剩几格"标题右边已经写着
+            lab.setStyleSheet("background:%s; border:none; border-radius:%dpx;"
+                              % (theme.EMPTY_SLOT_BG, theme.RADIUS_SMALL))
             return lab
         b = _ColorChip(color, index)
         b.setFixedSize(_CHIP_W, _CHIP_H)
@@ -1664,6 +1770,11 @@ class MainWindow(QMainWindow):
         self._manual_on = False
         self._manual = {"make": "", "model": "", "exposure": "", "fnumber": "", "iso": ""}
         self._manual_preview = False     # 是否是「刷新预览效果」点出来的那一轮(只它才动状态栏)
+        # 预览状态标识的两份"账"(见 _preview_state):
+        #   _shown_token —— 屏幕上那张图对应的参数指纹(只有**成功**上屏才更新)
+        #   _preview_err —— 最近一次尝试的失败原因(None=最近一次是成功的)
+        self._shown_token = None
+        self._preview_err = None
         # 撤销/重做(见 _begin_undo): 栈 + 在途事务 + 收尾定时器
         self._undo_stack, self._redo_stack, self._undo_txn = [], [], None
         # 当前界面语言(启动时 main.py 已按 settings['lang'] 装好翻译器)
@@ -2185,10 +2296,11 @@ class MainWindow(QMainWindow):
         放一行字会显得两块不同源。
 
         **高度与左列页签块严格相等(42px)** —— 左边是 6px 内边距 + 28px 按钮 + 6px 内边距
-        + 1px 边框 ×2, 这里用同一套算法(竖向 6px 内边距 + 同一个 28px 高的迷你按钮), 于是
+        + 1px 边框 ×2, 这里用同一套算法(竖向 6px 内边距 + 同一个 28px 高的按钮), 于是
         两块的上沿、下沿在同一条线上。这是拿预览高度换来的(42px + GAP_CARD = 52px), 是
         "两列顶部协调"的代价; 想省下来就得让标题条浮在预览之上(不占布局高度), 见 README。
-        按钮与卡片里的「↺ 重置本组」同款(#mini: 11px、MUTED 色、可见边框)。
+        里面三样: 「效果预览」标题 + 状态标识(见 PreviewStateChip) + 「↺ 刷新预览效果」
+        (幽灵按钮 #ghost: 无描边无底色, 悬停才浮出色块 —— 它是次要动作, 见那里的注释)。
         **不挂投影**(其它卡片都有): 右列顶端没有留白余量, 投影会被裁掉。
         """
         self._preview_header = QFrame()
@@ -2199,9 +2311,17 @@ class MainWindow(QMainWindow):
         title = QLabel(self.tr("效果预览"))
         title.setObjectName("cardTitle")
         h.addWidget(title)
+        # 状态标识紧跟在标题右边(而不是挨着那个刷新按钮): 它说的是"这张图与当前参数的关系",
+        # 读起来是「效果预览 · 已按当前参数渲染」, 属于标题; 挪到右边就会与真按钮并排、被当成
+        # 第二个按钮。它**不参与撑高标题条**(固定 20px, 见 PV_CHIP_H), 42px 那条不变量不受影响。
+        self._state_chip = PreviewStateChip(self._preview_header)
+        h.addWidget(self._state_chip)
         h.addStretch(1)
         self._refresh_btn = QPushButton(self.tr("↺ 刷新预览效果"))
-        self._refresh_btn.setObjectName("mini")     # 与卡片里的「↺ 重置本组」同一款
+        # **幽灵按钮**(#ghost: 无描边无底色, 悬停才浮出色块), 不是 #mini —— 它是"再来一次"的
+        # 次要动作, 而 #mini 是迷你号的普通按钮(带描边 + 卡片白底 + 28px 高), 摆在标题条上
+        # 看着就是个正经按钮, 分量比它该有的大(用户: "应该是次要的")。
+        self._refresh_btn.setObjectName("ghost")
         self._refresh_btn.setCursor(Qt.PointingHandCursor)
         self._refresh_btn.clicked.connect(self._refresh_preview_clicked)
         h.addWidget(self._refresh_btn)
@@ -3021,6 +3141,77 @@ class MainWindow(QMainWindow):
             return
         self._info_btn.setEnabled(bool(getattr(self, "_preview_src", "")))
 
+    def _preview_payload(self):
+        """预览请求的载荷 —— **发请求与算指纹共用这一份**, 免得两边以后漂移。
+
+        指纹必须覆盖"会让这张图变的全部输入": 取样图、全部后端参数、美化/自定义型号、手动
+        EXIF。少一项, 改它就会显示成"屏上这张就是当前参数渲的"(错的那一侧)。
+        """
+        return {
+            "input_path": self._preview_src,
+            "params": backend_params(self._params),
+            "raw_model": self._raw_model,
+            "custom_model": self._custom_model,
+            "manual_exif": self._manual_exif(),
+            # 直接要内存图像: 核心不落盘, 省掉 JPEG 编码/写盘/读回解码(约 95ms/次)
+            "inline_image": True,
+        }
+
+    def _preview_token(self):
+        """当前参数对应的指纹(短哈希)。它与"屏上那帧的指纹"相等 <=> 屏上这帧就是当前参数渲的。
+
+        取哈希而不是自增版本号: 参数改一圈又改回来时, 版本号变了、图其实没变, 而指纹天然
+        相等(不会白报一次"待渲染")。序列化一次小字典 + sha1 是微秒级, 每次请求/每帧上屏各算
+        一次也不值得缓存。
+
+        `default=repr` 是给"万一有非 JSON 值"兜底用的 —— repr 不会抛异常, 所以这个函数**没有
+        失败分支**: 标识宁可少报一次"最新", 也不能因为算不出指纹就报错或说谎。
+        """
+        raw = json.dumps(self._preview_payload(), sort_keys=True, ensure_ascii=False,
+                         default=repr)
+        return hashlib.sha1(raw.encode("utf-8")).hexdigest()[:12]
+
+    def _preview_state(self, queued_hint=False):
+        """状态标识的判据(顺序即优先级)。
+
+        `queued_hint` 是回传帧带来的"回传那一刻队列里是否已排着更新的请求" —— 只在
+        _on_rendered 里传, 用来堵住"两次渲染的响应在事件队列里排队、界面处理前一帧时后一帧
+        还没轮到"这种瞬间(那一刻 _preview_worker.busy() 可能已经空了)。
+        """
+        if not getattr(self, "_preview_src", ""):
+            return "none"
+        # 建窗过程中(渲染线程还没起)也可能走到这里, 所以不直接取属性
+        worker = getattr(self, "_preview_worker", None)
+        if queued_hint or (worker is not None and worker.busy()):
+            # **"正在渲"与"改过还没渲"合并成这一态**: 拖滑块时"帧上屏时又改过了"几乎是常态,
+            # 各报一态的话两态会来回跳, 而这对用户是同一种事实 —— 还没跟上。真正该报
+            # 「待渲染」的是"没人在渲、屏上还是旧参数"(它只在渲染失败后才出现)。
+            # 判据(拖动 16 帧: 8 帧判为"还没跟上"、0 次误报"待渲染")见 tools/_probe_preview_state.py 第 ⑤ 组。
+            return "rendering"
+        if self._preview_err is not None:
+            # 失败**优先于**"指纹相等"与"一张都没渲成过":
+            #   · 屏上留的是上一张成功的图, 即使参数没变过(指纹相等)也不担保它对应现在的输入
+            #     (比如源文件已被换掉/删掉);
+            #   · 一张都没成过时(首次渲染就失败), 报「无预览」会把失败藏起来 —— 那正是最需要
+            #     告诉用户的一刻。
+            return "failed"
+        if self._shown_token is None:
+            return "none"           # 一张都还没渲成过, 且没有失败
+        if self._shown_token != self._preview_token():
+            return "stale"
+        return "synced"
+
+    def _sync_chip(self, queued_hint=False):
+        """把状态标识刷成当前判据的结果。每次请求发出、每帧上屏/失败、取样图变更时各调一次。"""
+        if not hasattr(self, "_state_chip"):
+            return
+        st = self._preview_state(queued_hint)
+        tip = ""
+        if st == "failed" and self._preview_err:
+            # 失败原因来自核心(中文 f-string), 按项目约定在**显示边界**过 tr_msg, 匹配不到就原样
+            tip = self.tr(_PV_CHIP_TIP["failed"]) + "\n" + i18n.tr_msg(str(self._preview_err))
+        self._state_chip.set_state(st, tip)
+
     def request_preview(self):
         """请求一次预览。
 
@@ -3030,28 +3221,33 @@ class MainWindow(QMainWindow):
         make_preview 里的注释。
         """
         if not getattr(self, "_preview_src", ""):
+            self._sync_chip()
             return
+        req = self._preview_payload()
+        # 身份标识随请求走, 由渲染线程原样回传: 界面据此知道"屏上这帧是哪一组参数渲的"
+        req["token"] = self._preview_token()
         # 不防抖、不作废: 覆盖待渲染槽即可, 渲染线程每轮取最新一份
-        self._preview_worker.request({
-            "input_path": self._preview_src,
-            "params": backend_params(self._params),
-            "raw_model": self._raw_model,
-            "custom_model": self._custom_model,
-            "manual_exif": self._manual_exif(),
-            # 直接要内存图像: 核心不落盘, 省掉 JPEG 编码/写盘/读回解码(约 95ms/次)
-            "inline_image": True,
-        })
+        self._preview_worker.request(req)
+        self._sync_chip()
 
     def _on_rendered(self, resp):
         if not resp.get("ok"):
             err = i18n.tr_msg(str(resp.get("error") or ""))
+            # 屏上那张图**不动**(保留上一张成功的), 但记下失败: 状态标识要据此报「渲染失败」
+            # —— 以前失败只在状态栏闪一下、日志留一条, 内存里没留痕, 于是"屏上这张对不上"
+            # 这件事在界面上看不出来。
+            self._preview_err = err
             self._finish_manual_preview(False)          # 手动刷新失败也要把按钮放回可点(重试入口)
             self._status(self.tr("预览失败：") + err)
             logging.warning(f"[预览] 渲染失败: {err}")   # 失败也要留痕(以前只在状态栏闪一下)
+            self._sync_chip()
             return
         img = resp.get("image")
         if img is not None:
             self._preview.set_image(img)
+        # 只有**成功**才更新"屏上指纹": 失败时屏上留的是上一张, 指纹也就还该是上一帧的
+        self._shown_token = resp.get("token")
+        self._preview_err = None
         self._preview.set_geo(resp.get("geom"))
         e2e = (time.perf_counter() - resp.get("_req_t", time.perf_counter())) * 1000
         self._perf.setText(self.tr("渲染 {ms:.0f} ms · 请求→显示 {e2e:.0f} ms")
@@ -3091,6 +3287,8 @@ class MainWindow(QMainWindow):
                 + "\n\n" + self.tr("参数指纹:") + "\n" + str(st.get("sig", "")))
         else:
             self._perf.setToolTip("")
+        # 状态标识放最后刷: 它要看的是"这一刻"的判据(回传时队列里有没有已经排上的新请求)
+        self._sync_chip(queued_hint=bool(resp.get("queued")))
 
     # ---------- 自定义水印信息(手动 EXIF) ----------
     def _on_manual_toggle(self, on):

@@ -39,6 +39,10 @@ class PreviewWorker(QThread):
     但**在跑的那一轮不会被中断**: 它照常渲完、照常上屏(此时参数可能已经又改过)。于是
     "请求→上屏"会等于"等上一轮跑完 + 自己这一轮", 前一段常被误读成渲染变慢 ——
     所以这里统计 _arrived_during(渲染期间又到达了几次请求), 由界面写进日志。
+
+    回传的 resp 里另外带两样东西给"预览状态标识"用(见 window.PreviewStateChip):
+    `token`(这一帧对应哪一组参数, 原样带回)与 `queued`(回传这一刻队列里是否已排着更新的
+    请求)。有了它们, 界面才能回答"屏幕上这张图是不是当前参数渲出来的"。
     """
 
     rendered = Signal(dict)
@@ -59,6 +63,15 @@ class PreviewWorker(QThread):
             self._pending = (req, time.perf_counter())
             self._cv.notify()
 
+    def busy(self):
+        """现在有没有活(在跑或排队)。界面用它把状态标识立刻切成「渲染中」。
+
+        可以直接在 GUI 线程同步调用: 渲染期间本类**不持有** _cv(render 是在锁外做的),
+        所以这里最多等一瞬, 不会把界面卡住。
+        """
+        with self._cv:
+            return self._inflight or self._pending is not None
+
     def stop(self):
         with self._cv:
             self._stopping = True
@@ -76,13 +89,23 @@ class PreviewWorker(QThread):
                 req, t0 = self._pending
                 self._pending = None
                 self._inflight = True
-                arrived = self._arrived_during
-                self._arrived_during = 0
+                self._arrived_during = 0        # 本轮从零开始数
             # 排队 = 从"用户发起"到"真正开渲"的等待(只可能是等上一轮跑完), 与渲染耗时分开记
             resp = self._render(req, queue_ms=(time.perf_counter() - t0) * 1000)
+            with self._cv:
+                # 这两个数**必须在回传这一刻取**, 不能在本轮开始时取:
+                #   以前 arrived 是每轮开始时读的, 读到的其实是**上一轮**渲染期间的到达数
+                #   (滞后一整轮) —— 而"屏上这帧过没过期"要看的就是这一轮的到达情况与回传时的
+                #   队列, 用滞后一轮的数字会把**最新那一帧**标成过期(停手后不再有新请求来冲掉,
+                #   于是那个错误标签会一直挂着)。
+                arrived = self._arrived_during
+                queued = self._pending is not None
+                self._arrived_during = 0
+                self._inflight = False
             resp["_req_t"] = t0
+            resp["token"] = req.get("token")    # 身份标识: 成功与失败两条路径都要带
             resp["arrived_during"] = arrived
-            self._inflight = False
+            resp["queued"] = queued
             self.rendered.emit(resp)
 
     def _render(self, req, queue_ms=0.0):

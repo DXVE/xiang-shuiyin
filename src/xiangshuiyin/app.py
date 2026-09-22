@@ -14,7 +14,6 @@
 依赖: Pillow, exifread
 """
 
-import base64
 import collections
 import json
 import logging
@@ -30,7 +29,6 @@ import threading
 import time
 import uuid
 from datetime import datetime
-from pathlib import Path
 
 import exifread
 from PIL import Image
@@ -747,12 +745,6 @@ def _layer_cached(key, build, mutable=False):
         # 入缓存后返回副本给会改图的调用方(缓存里那份要保持干净)
         return val.copy() if mutable else val
     return val
-
-
-def _layer_cache_clear():
-    with _LAYER_CACHE_LOCK:
-        _LAYER_CACHE.clear()
-        _LAYER_CACHE_BYTES[0] = 0
 
 
 def _src_key(input_path):
@@ -1859,7 +1851,6 @@ class AppState:
         self._rendering_count = 0   # 渲染中计数(多窗口并发渲染互不干扰), >0 时新预览返回旧图
         self._render_lock = threading.Lock()   # 保护 _rendering_count 原子增减(多线程桥接下防漂移)
         self._sel_lock = threading.Lock()
-        self._pv_seq = 0        # 预览文件名自增序号
         # 预览缩略图缓存: {(原文件绝对路径, mtime_ns, size): (src 路径, 原图高度)}
         self._thumb_cache = {}
         self._thumb_lock = threading.Lock()
@@ -1868,19 +1859,7 @@ class AppState:
         # 供 _allowed_open_dir 白名单判断「打开所在目录」是否放行
         self.user_dirs = set()
         ensure_dir(PREVIEW_DIR)
-        # _clean_preview() 已移至 main() 后台线程执行, 不阻塞窗口出现
         self.exit_reason = None  # 退出原因(页面点退出/Ctrl+C), 供退出日志打印
-
-    def _clean_preview(self):
-        try:
-            if os.path.isdir(PREVIEW_DIR):
-                for f in os.listdir(PREVIEW_DIR):
-                    try:
-                        os.remove(os.path.join(PREVIEW_DIR, f))
-                    except Exception:
-                        pass
-        except Exception:
-            pass
 
     def _is_allowed_input(self, p):
         """输入路径校验。
@@ -1922,10 +1901,6 @@ class AppState:
             return ".ico"                # ICO
         return None
 
-    def _is_supported_image(self, p):
-        """校验文件头魔数是否为受支持的图片格式(与 _sniff_image_type 同一魔数表)"""
-        return self._sniff_image_type(p) is not None
-
     def _allowed_open_dir(self, p):
         """校验 open_dir 目标目录是否在白名单内(导出目录/PREVIEW_DIR), 返回规范化绝对路径或 None。
         open_dir 可被界面「打开所在目录」调用, 若不限制可诱导打开任意路径"""
@@ -1963,9 +1938,6 @@ class AppState:
         return {"make": exif.get("make"), "model": exif.get("model")}
 
     # ---------- 型号映射 ----------
-    def get_model_map(self, logo_dir):
-        return {"map": load_model_map(logo_dir or DEFAULT_LOGO_DIR)}
-
     def save_model_map(self, logo_dir, map_dict):
         save_model_map(logo_dir or DEFAULT_LOGO_DIR, map_dict or {})
         return {"ok": True}

@@ -42,7 +42,6 @@ class SessionStats:
         self._lock = threading.Lock()
         self._core = core            # 用来读核心的三个缓存计数器(只读)
         self.previews = 0            # 预览成功次数
-        self.failed = 0              # 预览失败次数
         self.arrived_total = 0       # "渲染期间又到达"的请求总数
         self.renders = deque(maxlen=_SAMPLES)     # 纯渲染耗时
         self.queues = deque(maxlen=_SAMPLES)      # 排队(等上一轮)
@@ -61,10 +60,6 @@ class SessionStats:
             self.convs.append(qimg_ms)
             self.e2es.append(e2e_ms)
             self.arrived_total += int(arrived or 0)
-
-    def add_preview_failed(self):
-        with self._lock:
-            self.failed += 1
 
     def add_display_scale(self, ms):
         with self._lock:
@@ -102,7 +97,6 @@ class SessionStats:
             scales = list(self.scales)
             e2es = list(self.e2es)
             arrived = self.arrived_total
-            failed = self.failed
             gen, gen_ms = self.generated, self.gen_ms
         r50, r95, rmax = _fmt_deque(renders)
         q50, q95, qmax = _fmt_deque(queues)
@@ -121,8 +115,7 @@ class SessionStats:
                     + _t(QT_TRANSLATE_NOOP("stats", " · 层缓存 {pct:.0f}% · 队列 {arrived}{gen_part}")).format(
                         pct=layer_pct, arrived=arrived, gen_part=gen_part))
 
-        lines = [_t(QT_TRANSLATE_NOOP("stats", "本次会话: 预览 {n} 次")).format(n=n)
-                 + (_t(QT_TRANSLATE_NOOP("stats", ", 失败 {failed} 次")).format(failed=failed) if failed else "")]
+        lines = [_t(QT_TRANSLATE_NOOP("stats", "本次会话: 预览 {n} 次")).format(n=n)]
         if n:
             lines.append(_t(QT_TRANSLATE_NOOP("stats", "  渲染      p50 {r50:.0f}ms / p95 {r95:.0f}ms / max {rmax:.0f}ms"))
                          .format(r50=r50, r95=r95, rmax=rmax))
@@ -148,13 +141,13 @@ class SessionStats:
     def summary_oneline(self):
         """退出日志用的一行版(与多行版同源, 但按一行排版写, 不做换行符替换那种糊弄)"""
         with self._lock:
-            n, failed, arrived = self.previews, self.failed, self.arrived_total
+            n, arrived = self.previews, self.arrived_total
             renders, queues, convs = list(self.renders), list(self.queues), list(self.convs)
             scales, e2es = list(self.scales), list(self.e2es)
             gen, gen_ms = self.generated, self.gen_ms
         rates = self.cache_rates()
         layer_hit, layer_miss, layer_pct = rates["层"]
-        parts = [f"预览 {n} 次" + (f"(失败 {failed})" if failed else "")]
+        parts = [f"预览 {n} 次"]
         if n:
             r50, r95, rmax = _fmt_deque(renders)
             q50, _q95, qmax = _fmt_deque(queues)
