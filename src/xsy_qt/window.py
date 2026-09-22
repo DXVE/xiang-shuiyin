@@ -117,7 +117,7 @@ PARAM_SPECS = [
     dict(tab="font", card=QT_TRANSLATE_NOOP("Card", "最小字号设置"), key="min_font_size", label=QT_TRANSLATE_NOOP("ParamRow", "最小字号"), kind="int",
          args=(0, 200), hint=QT_TRANSLATE_NOOP("ParamRow", "0~200px，默认 20")),
     dict(tab="font", card=QT_TRANSLATE_NOOP("Card", "最小字号设置"), key="low_res_enhance", label=QT_TRANSLATE_NOOP("ParamRow", "低分辨率增强"),
-         kind="bool", hint=QT_TRANSLATE_NOOP("ParamRow", "图片高度<1500px 时 2 倍渲染")),
+         kind="bool", hint=QT_TRANSLATE_NOOP("ParamRow", "图片高度小于 1500px 时 2 倍渲染")),
 
     dict(tab="font", card=QT_TRANSLATE_NOOP("Card", "画布比例"), key="canvas_ratio_mode", label=QT_TRANSLATE_NOOP("ParamRow", "画布比例"), kind="choice",
          args=[("original", QT_TRANSLATE_NOOP("ParamRow", "跟随原图")), ("1:1", "1:1"), ("3:2", QT_TRANSLATE_NOOP("ParamRow", "3:2（横）")), ("2:3", QT_TRANSLATE_NOOP("ParamRow", "2:3（竖）")),
@@ -271,11 +271,11 @@ _PV_CHIP_TEXT = {
     "failed": QT_TRANSLATE_NOOP("PreviewStateChip", "渲染失败，未更新"),
 }
 _PV_CHIP_TIP = {
-    "none": QT_TRANSLATE_NOOP("PreviewStateChip", "还没选图片（或取样图已清空）"),
-    "rendering": QT_TRANSLATE_NOOP("PreviewStateChip", "已发出请求，正在渲染；拖动参数时多数时候停在这一态"),
-    "synced": QT_TRANSLATE_NOOP("PreviewStateChip", "屏幕上这张图对应此刻的全部参数（预览按缩略档渲染，看细节请用放大镜）"),
-    "stale": QT_TRANSLATE_NOOP("PreviewStateChip", "屏幕上这张图还是旧参数渲的，等这一轮渲染完成"),
-    "failed": QT_TRANSLATE_NOOP("PreviewStateChip", "上一次预览渲染失败，屏上留的是上一张成功的图"),
+    "none": QT_TRANSLATE_NOOP("PreviewStateChip", "未选择图片"),
+    "rendering": QT_TRANSLATE_NOOP("PreviewStateChip", "正在渲染，完成后自动更新"),
+    "synced": QT_TRANSLATE_NOOP("PreviewStateChip", "预览已与当前参数一致（缩略档渲染，细节请用放大镜查看）"),
+    "stale": QT_TRANSLATE_NOOP("PreviewStateChip", "预览尚未更新到当前参数，渲染完成后自动更新"),
+    "failed": QT_TRANSLATE_NOOP("PreviewStateChip", "上次预览渲染失败，当前显示的是上一张成功的预览"),
 }
 
 # ---------- 主窗口初始尺寸与左右分栏 ----------
@@ -538,7 +538,7 @@ class Card(QFrame):
         head.addStretch(1)
         self.reset_btn = QPushButton(self.tr("↺ 重置本组"))
         self.reset_btn.setObjectName("mini")
-        self.reset_btn.setToolTip(self.tr("把本卡片的参数恢复为出厂默认"))
+        self.reset_btn.setToolTip(self.tr("将本卡片参数恢复为出厂默认值"))
         self.reset_btn.setCursor(Qt.PointingHandCursor)
         head.addWidget(self.reset_btn)
         v.addLayout(head)
@@ -635,7 +635,7 @@ class PreviewBox(QWidget):
         self._pil = None
         self._scaled = None
         self._scaled_for = None
-        self._hint = self.tr("拖入图片，或点「打开图片」")
+        self._hint = self.tr("请拖入图片，或点击「打开图片」")
         self._geom = None      # 间距段几何(画布像素坐标), 由 make_preview 的 resp.geom 回传
         self._hl = set()       # 当前要高亮的间距段键
         self._mag_pos = None   # 放大镜: 光标在控件内的位置(None=不显示)
@@ -1003,16 +1003,21 @@ def _open_and_report(win, path, what):
 
 
 class ImageInfoDialog(QDialog):
-    """图片信息: 照片自己的 EXIF / 文件信息, 与**最终会上水印的值**并排。
+    """图片信息: **如实报告这张图上读到了什么** —— 文件信息(只读文件头) + 照片自己的 EXIF。
 
-    为什么要并排: 勾了「自定义水印信息」之后, 品牌、型号、拍摄参数(快门/光圈/ISO)这三组都会被
-    那份手动信息覆盖(见核心 `process_single` 里 `manual_exif` 的三处用法) —— 只看 EXIF 根本
-    分不清印出来的到底是哪个, 这是这个程序最容易糊涂的一处。
+    这里**不推算"最后会印成什么"**: 曾经并排一列「当前生效值」、底下还有一行「水印显示（最终）」,
+    回答的是"印出来的到底是哪个"。但那属于推算结果 —— 一旦有「美化型号」/「型号映射」/「自定义
+    水印信息」参与进来, 它就跟"这张图里到底存了什么"混在一张表里, 反而看不清(用户: "只需要如实
+    显示出图片上读出的 exif 信息即可, 不需要显示最终啥样生效值是啥样")。
+    要看"水印里会显示什么", 主界面「识别型号」那一行的 tooltip 已经在说。
+
+    所以这一组的小标题是**「照片 EXIF 信息」**而不是原来的「水印里会用到的值」: 勾了「自定义
+    水印信息」之后水印用的并不是这几个值(那个勾的语义就是"忽略照片 EXIF"), 沿用旧标题就成了假话。
 
     文件那几项(大小/像素/格式/时间)都是**只读文件头**, 不解码整张图。
     """
 
-    def __init__(self, path, manual, effective_model, parent=None):
+    def __init__(self, path, parent=None):
         super().__init__(parent)
         go_frameless(self)
         self.setWindowTitle(self.tr("图片信息"))
@@ -1020,15 +1025,6 @@ class ImageInfoDialog(QDialog):
 
         info = self._collect(path, parent)
         photo = info["photo"]
-        # 当前生效值: 勾了自定义信息就用那份(与 _format_manual_exif 同一套补 `s`/`f/`/`ISO`),
-        # 没勾就是照片自己的
-        cur = dict(photo)
-        if manual:
-            cur.update({k: v for k, v in (core._format_manual_exif(manual) or {}).items()
-                        if v and k in ("make", "model", "exposure", "fnumber", "iso")})
-            note = self.tr("「当前生效值」= 你在「自定义水印信息」里填的那份（它覆盖照片的 EXIF）")
-        else:
-            note = self.tr("「当前生效值」= 照片自己的 EXIF（未启用「自定义水印信息」）")
 
         v = QVBoxLayout(self)
         grid = QGridLayout()
@@ -1046,7 +1042,7 @@ class ImageInfoDialog(QDialog):
             grid.addWidget(lab, r[0], 0, 1, span)
             r[0] += 1
 
-        def row(label, value, value2=None, elide=False):
+        def row(label, value, elide=False):
             lab = QLabel(self.tr(label))
             lab.setObjectName("fieldLabel")
             lab.setWordWrap(True)
@@ -1057,8 +1053,6 @@ class ImageInfoDialog(QDialog):
             else:
                 w1 = QLabel(str(value or "—"))
             grid.addWidget(w1, r[0], 1)
-            if value2 is not None:
-                grid.addWidget(QLabel(str(value2 or "—")), r[0], 2)
             r[0] += 1
 
         group(self.tr("文件"))
@@ -1068,28 +1062,16 @@ class ImageInfoDialog(QDialog):
         row(self.tr("像素"), f"{info['w']} × {info['h']}" if info["w"] else "—")
         row(self.tr("格式"), (info["ext"] or "—").lstrip(".").upper())
         row(self.tr("修改时间"), info["mtime"])
-        group(self.tr("水印里会用到的值"), span=3)
-        h1 = QLabel(self.tr("照片里的值"))
-        h2 = QLabel(self.tr("当前生效值"))
-        for h in (h1, h2):
-            h.setObjectName("hint")
-        grid.addWidget(h1, r[0], 1)
-        grid.addWidget(h2, r[0], 2)
-        r[0] += 1
+        # 只有一列值, 就不必再来一行列头了(原来那行「照片里的值 / 当前生效值」是为两列对照用的)
+        group(self.tr("照片 EXIF 信息"))
         for label, key in ((QT_TRANSLATE_NOOP("ImageInfoDialog", "品牌"), "make"),
                            (QT_TRANSLATE_NOOP("ImageInfoDialog", "型号"), "model"),
                            (QT_TRANSLATE_NOOP("ImageInfoDialog", "快门"), "exposure"),
                            (QT_TRANSLATE_NOOP("ImageInfoDialog", "光圈"), "fnumber"),
                            ("ISO", "iso")):
-            same = photo[key] == cur[key]
-            row(label, photo[key], photo[key] if same else cur[key])
-        row(self.tr("水印显示（最终）"), effective_model or "—")
+            row(label, photo[key])
 
         v.addLayout(grid)
-        tip = QLabel(note + self.tr("；「水印显示」是再按 自定义 > 映射表 > 原始 算出的最终型号。"))
-        tip.setObjectName("hint")
-        tip.setWordWrap(True)
-        v.addWidget(tip)
         v.addStretch(1)
         v.addLayout(dlg_button_row(dlg_button(self.tr("关闭"), self.accept, primary=True)))
         csdify(self, self.tr("图片信息"), _prep_dialog)
@@ -1167,7 +1149,7 @@ class PresetDialog(QDialog):
             return w
 
         v = QVBoxLayout(self)
-        tip = QLabel(self.tr("一个槽位一个文件（presets1..10.json）；导入是按当前选中的槽位落地的。"))
+        tip = QLabel(self.tr("一个槽位一个文件（presets1..10.json）；导入将保存到当前选中的槽位。"))
         tip.setObjectName("hint")
         tip.setWordWrap(True)
         v.addWidget(tip)
@@ -1313,8 +1295,8 @@ class ColorDialog(QDialog):
       当前颜色   一格色块(点它开系统取色器, 拖动取色/调透明度都靠它) + 一个色号输入框。
                  色号只显示一处: 色块只负责"是什么颜色", 文字交给输入框。
       预设颜色   点一下即应用; 当前用的那个带 ✓ 和强调色描边, 一眼看出选中的是哪个。
-      我的颜色   点应用, **双击改这一格的颜色**, 右键删除。空位是浅底格子(不勾边、不可点)
-                 并固定画满 10 格, 卡片标题右边另写「已存 n / 10」—— 格子只说得出"还有空",
+      我的颜色   点应用, **双击改这一格的颜色**, 右键删除。空位画成浅底格子(不勾边、不可点)
+                 并固定画满 10 格, 卡片标题右边另写「已保存 n / 10」—— 格子只说得出"还有空",
                  说不出"占了几格"。
 
     点色块是**即时应用**(弹窗不关): 预览在工作线程里跑、主窗口照常重绘, 能一边点一边
@@ -1343,7 +1325,7 @@ class ColorDialog(QDialog):
         acts = QHBoxLayout()
         acts.setSpacing(theme.GAP_CTRL)
         b = dlg_button(self.tr("保存当前颜色"), self._remember)
-        b.setToolTip(self.tr("把当前颜色存进「我的颜色」，下次直接点"))
+        b.setToolTip(self.tr("将当前颜色保存到「我的颜色」，下次可直接使用"))
         acts.addWidget(b)
         acts.addStretch(1)                       # 右侧那个"落点"按钮靠右
         # 取色是即时应用的, "关闭"就是这次操作的落点(不是取消), 给主按钮的强调色
@@ -1419,7 +1401,7 @@ class ColorDialog(QDialog):
         row.addWidget(self._hex, 1)
         body.addLayout(row)
 
-        hint = QLabel(self.tr("点色块开取色器，也可直接输入色号"))
+        hint = QLabel(self.tr("点击色块打开取色器，也可直接输入色号"))
         hint.setObjectName("hint")
         body.addWidget(hint)
         return frame
@@ -1438,7 +1420,7 @@ class ColorDialog(QDialog):
         self._custom_box = self._grid(self._custom(), _COLS_USER,
                                       total=MAX_USER_COLORS, editable=True)
         body.addWidget(self._custom_box)
-        tip = QLabel(self.tr("点色块即应用；双击改色，右键删除"))
+        tip = QLabel(self.tr("点击色块即应用；双击修改颜色，右键删除"))
         tip.setObjectName("hint")
         body.addWidget(tip)
         self._sync_custom_note()
@@ -1446,7 +1428,7 @@ class ColorDialog(QDialog):
 
     def _sync_custom_note(self):
         """把「已存几个 / 共几个」写在卡片标题右边。"""
-        self._custom_note.setText(self.tr("已存 {n} / {total}").format(n=len(self._custom()), total=MAX_USER_COLORS))
+        self._custom_note.setText(self.tr("已保存 {n} / {total}").format(n=len(self._custom()), total=MAX_USER_COLORS))
 
     def _custom(self):
         try:
@@ -1473,8 +1455,8 @@ class ColorDialog(QDialog):
         if color is None:                     # 空位: 浅实底、无描边, 不可点
             lab = QLabel()
             lab.setFixedSize(_CHIP_W, _CHIP_H)
-            lab.setAccessibleName(self.tr("空位"))
-            lab.setToolTip(self.tr("空位"))
+            lab.setAccessibleName(self.tr("未使用"))
+            lab.setToolTip(self.tr("未使用"))
             # 只给一层极浅的底, **不勾边**: 十格里通常只有一两格有颜色, 剩下的并排勾边会把
             # 整张卡片的注意力全吸过去(用户: "看着好突兀"), 而"还剩几格"标题右边已经写着
             lab.setStyleSheet("background:%s; border:none; border-radius:%dpx;"
@@ -1484,7 +1466,7 @@ class ColorDialog(QDialog):
         b.setFixedSize(_CHIP_W, _CHIP_H)
         b.setCursor(Qt.PointingHandCursor)
         b.setAccessibleName(self.tr("颜色 {color}").format(color=color))   # 色块只画颜色, 读屏得靠名字才认得出
-        b.setToolTip(color + (self.tr("　双击改色 · 右键删除") if editable
+        b.setToolTip(color + (self.tr("　双击修改颜色 · 右键删除") if editable
                                      else self.tr("　点击应用")))
         self._paint_chip(b, color)
         b.activated.connect(self._choose)
@@ -1586,7 +1568,7 @@ class ColorDialog(QDialog):
 
     def _chip_menu(self, index, color, btn):
         menu = QMenu(self)
-        menu.addAction(self.tr("改这一格的颜色…")).triggered.connect(lambda: self._edit_saved(index))
+        menu.addAction(self.tr("修改该位置的颜色…")).triggered.connect(lambda: self._edit_saved(index))
         menu.addAction(self.tr("删除该颜色")).triggered.connect(lambda: self._remove(color))
         menu.exec(btn.mapToGlobal(btn.rect().bottomLeft()))
 
@@ -1715,7 +1697,7 @@ class MapDialog(QDialog):
         raw = self._raw.text().strip()
         nice = self._nice.text().strip()
         if not raw:
-            _message(self, QMessageBox.Icon.Information, self.tr("提示"), self.tr("请先填「原始型号」"))
+            _message(self, QMessageBox.Icon.Information, self.tr("提示"), self.tr("请先填写「原始型号」"))
             return
         self._data[raw] = nice          # 允许把显示名清空
         self._reload()
@@ -1780,7 +1762,7 @@ class MainWindow(QMainWindow):
         # 当前界面语言(启动时 main.py 已按 settings['lang'] 装好翻译器)
         self._lang = (state.settings or {}).get("lang") or i18n.DEFAULT_LANG
 
-        self.setWindowTitle(self.tr("镶 · 水印 (Qt 版)"))
+        self.setWindowTitle(self.tr("镶 · 水印（Qt 版）"))
         self.setAcceptDrops(True)
         self._split_user_set = False     # 用户是否手动拖过分隔条(拖过就不再自动分配比例)
         self._fitted = False             # 是否已按屏幕可用区定过尺寸(见 _fit_to_screen)
@@ -1828,7 +1810,7 @@ class MainWindow(QMainWindow):
         self._event_watcher.event.connect(self._on_event)
         self._event_watcher.start()
         self._refresh_stats()            # 状态栏右侧先显示"尚无预览", 避免那块空白看着像坏了
-        self._status(self.tr("拖入图片即可开始（放大镜/间距标注/取色板见后续步骤）"))
+        self._status(self.tr("拖入图片即可开始"))
 
     # ---------- 参数 ----------
     def _load_params(self):
@@ -2174,13 +2156,13 @@ class MainWindow(QMainWindow):
         self._info_btn.setObjectName("mini")
         self._info_btn.setFixedWidth(32)
         self._info_btn.setCursor(Qt.PointingHandCursor)
-        self._info_btn.setToolTip(self.tr("这张照片的 EXIF 与最终会上水印的值"))
+        self._info_btn.setToolTip(self.tr("查看照片 EXIF 与文件信息"))
         self._info_btn.setAccessibleName(self.tr("图片信息"))
         self._info_btn.clicked.connect(self._show_image_info)
         t.addWidget(self._info_btn)
         reset = QPushButton(self.tr("恢复默认设置"))
         reset.setObjectName("mini")
-        reset.setToolTip(self.tr("把所有参数恢复为出厂默认"))
+        reset.setToolTip(self.tr("将所有参数恢复为出厂默认值"))
         reset.setCursor(Qt.PointingHandCursor)
         reset.clicked.connect(self._reset_settings)
         t.addWidget(reset)
@@ -2202,12 +2184,37 @@ class MainWindow(QMainWindow):
         a.setToolTip(self._params.get("logo_dir") or core.DEFAULT_LOGO_DIR)
         m.addSeparator()
         lang = m.addMenu(self.tr("语言"))
-        for code, label in i18n.LANGS:
+        # **可选语言码跟在文字后面**(「语言  CN/EN」): 「语言」二字非中文使用者认不出, 加上码就
+        # 一眼知道这个入口是"语言切换、可选中文与英文"**——两个码都写出来, 不是只显示当前那个**
+        # (它说明的是"这个入口是干嘛的"; 当前选的是哪个由子菜单里的 ✓ 表示)。
+        # 放在**文字里**而不是当图标: ① Qt 的菜单图标只能画在**左侧**, 而且会给整份菜单留出图标列
+        # (其余项一起右移), 放不到文字右边; ② 图标与勾号共用左侧同一列, 一挂图标就不画 ✓ 了
+        # (上一版就这么把勾号吃掉的)。做进文字则两样都不动。
+        # 码本身**不翻译**; 子菜单里的两项仍**各用母语写自己**(「中文」/「English」, 也不拿去 tr())。
+        self._lang_menu = lang
+        self._lang_acts = []
+        for code, label, badge in i18n.LANGS:
             act = lang.addAction(label)
             act.setCheckable(True)
             act.setChecked(code == self._lang)
             act.triggered.connect(lambda _c, co=code: self._set_lang(co))
+            self._lang_acts.append((code, badge, act))
+        self._sync_lang_menu()
         return m
+
+    def _sync_lang_menu(self):
+        """刷这一行(文字里的可选语言码)与子菜单的勾号。
+
+        文字是**从 `i18n.LANGS` 现算**的(加了语言不用再手改这一行); 勾号跟着 `self._lang`
+        —— 切语言要重启才生效(见 _set_lang), 但**设置是当场就存下的**, 菜单还显示旧值会让人
+        以为没点上。
+        """
+        if not hasattr(self, "_lang_menu"):
+            return
+        self._lang_menu.menuAction().setText(
+            self.tr("语言") + "  " + "/".join(b for _c, b, _a in self._lang_acts))
+        for c, _b, act in self._lang_acts:
+            act.setChecked(c == self._lang)
 
     def _set_lang(self, code):
         """切语言: 写进设置, 提示**自己关掉重开**才生效。
@@ -2219,6 +2226,7 @@ class MainWindow(QMainWindow):
         if code == self._lang:
             return
         self._lang = code
+        self._sync_lang_menu()          # 菜单当场反映新选的语言(界面文案要重启才变, 见类注释)
         try:
             self.state.settings["lang"] = code
             self._save_settings_now()               # 合并式保存: 只多写一个 lang 键
@@ -2253,17 +2261,16 @@ class MainWindow(QMainWindow):
         _open_and_report(self, core.DATA_DIR, "数据目录")
 
     def _show_image_info(self):
-        """「图片信息」弹窗: 照片里的 EXIF 与**最终会上水印的值**并排。
+        """「图片信息」弹窗: 文件信息 + 照片自己的 EXIF(如实报告, 不推算"最后会印成什么")。
 
-        并排是有用的: 勾了「自定义水印信息」之后, 品牌/型号/拍摄参数会被那份手动信息覆盖,
-        单看 EXIF 分不清"我印出来的到底是哪个"。
+        要看"水印里到底会显示什么"就去看「识别型号」那一行的 tooltip —— 那件事要综合「美化型号」
+        /「型号映射」/「自定义水印信息」, 不该跟"这张图里存了什么"混在同一张表里(见 ImageInfoDialog)。
         """
         path = getattr(self, "_preview_src", "")
         if not path or not os.path.isfile(path):
-            self._status(self.tr("先选择一张图片"))
+            self._status(self.tr("请先选择图片"))
             return
-        dlg = ImageInfoDialog(path, self._manual if self._manual_on else None,
-                              self._effective_model, self)
+        dlg = ImageInfoDialog(path, self)
         dlg.exec()
 
     def _build_preview_pane(self):
@@ -2333,7 +2340,7 @@ class MainWindow(QMainWindow):
         b.setContentsMargins(theme.INSET_BAR, 0, 0, 0)   # 与顶栏、状态栏同一条左对齐线
         b.setSpacing(8)
         b.addWidget(QLabel(self.tr("导出到")))
-        self._out_label = ElidedLabel(self.tr("(跟随原图目录)"))
+        self._out_label = ElidedLabel(self.tr("（跟随原图目录）"))
         self._out_label.setObjectName("muted")
         b.addWidget(self._out_label, 1)
         pick_out = QPushButton(self.tr("选择输出目录"))
@@ -2641,8 +2648,8 @@ class MainWindow(QMainWindow):
         card = Card(QT_TRANSLATE_NOOP("Card", "型号美化"))
         card.reset_btn.setVisible(False)
         self._model_edit = QLineEdit()
-        self._model_edit.setPlaceholderText(self.tr("临时美化名（本次生效）"))
-        self._model_edit.setToolTip(self.tr("留空则用映射表；填了本次强制使用这个名字"))
+        self._model_edit.setPlaceholderText(self.tr("临时美化型号（仅本次有效）"))
+        self._model_edit.setToolTip(self.tr("留空则使用映射表；填写后强制使用该名称"))
         self._model_edit.textChanged.connect(self._on_custom_model)
         self._map_btn = self._btn(self.tr("管理所有型号映射"), self._open_map_dialog)
         card.body.addWidget(self._row(QT_TRANSLATE_NOOP("MainWindow", "美化型号"), [self._model_edit, self._map_btn]))
@@ -2663,7 +2670,8 @@ class MainWindow(QMainWindow):
 
         `self._effective_model` 才是**水印最终会印的名字** —— 与渲染端 _inject_model_map +
         prettify_model 同一套规则: 临时美化名优先, 其次映射表, 最后回落原始型号。它现在只出现在
-        tooltip 与「图片信息」弹窗里(那一行显示的是**识别到的**型号, 两件事不混着说)。
+        下面那个 tooltip 里(「识别型号」那一行显示的是**识别到的**型号, 两件事不混着说; 「图片
+        信息」弹窗只如实报照片自己的 EXIF, 不推算这个)。
         """
         raw = self._raw_model
         if self._custom_model and self._custom_model != raw:
@@ -2677,13 +2685,13 @@ class MainWindow(QMainWindow):
         self._model_lab.setText(raw or "—")
         tips = [self.tr("品牌：{brand}").format(brand=self._raw_brand)] if self._raw_brand else []
         if name:
-            tips.append(self.tr("水印里会显示：{name}").format(name=name))
+            tips.append(self.tr("水印将显示：{name}").format(name=name))
         self._model_lab.setToolTip("\n".join(tips))
         # 「复制原始型号」: 没有识别到型号(没选图 / 图里没 EXIF)时置灰 —— 以前它一直是 #mini 的
         # 灰字样式, 明明可点却看着像禁用了(用户报过), 现在改成普通按钮 + 真的按状态置灰
         self._copy_btn.setEnabled(bool(raw))
-        self._copy_btn.setToolTip(self.tr("把识别到的型号复制到剪贴板") if raw
-                                  else self.tr("还没有识别到型号（先选一张图片）"))
+        self._copy_btn.setToolTip(self.tr("复制识别到的型号到剪贴板") if raw
+                                  else self.tr("未识别到型号（请先选择图片）"))
 
     def _build_manual_card(self):
         card = Card(QT_TRANSLATE_NOOP("Card", "自定义水印信息"))
@@ -2705,12 +2713,12 @@ class MainWindow(QMainWindow):
                   QT_TRANSLATE_NOOP("MainWindow", "原样输出")),
                  ("exposure", QT_TRANSLATE_NOOP("MainWindow", "快门"),
                   QT_TRANSLATE_NOOP("MainWindow", "如 1/125"),
-                  QT_TRANSLATE_NOOP("MainWindow", "自动补 s 后缀")),
+                  QT_TRANSLATE_NOOP("MainWindow", "自动补充 s 后缀")),
                  ("fnumber", QT_TRANSLATE_NOOP("MainWindow", "光圈"),
                   QT_TRANSLATE_NOOP("MainWindow", "如 2.8"),
-                  QT_TRANSLATE_NOOP("MainWindow", "自动补 f/ 前缀")),
+                  QT_TRANSLATE_NOOP("MainWindow", "自动补充 f/ 前缀")),
                  ("iso", "ISO", QT_TRANSLATE_NOOP("MainWindow", "如 100"),
-                  QT_TRANSLATE_NOOP("MainWindow", "自动补 ISO 前缀")))
+                  QT_TRANSLATE_NOOP("MainWindow", "自动补充 ISO 前缀")))
         for key, label, ph, tip in specs:
             e = QLineEdit()
             e.setPlaceholderText(self.tr(ph))
@@ -2741,7 +2749,7 @@ class MainWindow(QMainWindow):
         if QDesktopServices.openUrl(QUrl.fromLocalFile(path)):
             self._status(self.tr("已打开 Logo 目录：{path}").format(path=path))
         else:
-            self._status(self.tr("打不开，Logo 目录是：{path}").format(path=path))
+            self._status(self.tr("无法打开 Logo 目录：{path}").format(path=path))
 
     def _reload_presets(self, view):
         """把 10 个槽位列进 view 的下拉(显示各自存着的方案名, 空槽显示「— 空 —」)。
@@ -2809,7 +2817,7 @@ class MainWindow(QMainWindow):
             return
         name = view.name_text()
         if not name:
-            self._status(self.tr("请先输入方案名再保存"))
+            self._status(self.tr("请先输入方案名后再保存"))
             return
         cur = self._preset_data.get(key) or {}
         cur_name = cur.get("_preset_name") if isinstance(cur, dict) else None
@@ -2877,17 +2885,17 @@ class MainWindow(QMainWindow):
                 data = json.load(f)
         except Exception as e:                      # noqa: BLE001
             _message(self, QMessageBox.Icon.Warning, self.tr("导入预设"),
-                     self.tr("读不了这个文件：\n{err}").format(err=e))
+                     self.tr("无法读取该文件：\n{err}").format(err=e))
             return
         if not isinstance(data, dict) or not data:
-            _message(self, QMessageBox.Icon.Warning, self.tr("导入预设"), self.tr("这个文件里没有方案数据。"))
+            _message(self, QMessageBox.Icon.Warning, self.tr("导入预设"), self.tr("该文件中没有方案数据。"))
             return
         # 只吃"单个方案"。老版 presets.json(槽位版)是"槽位 -> 方案"的字典, 判据是"有没有方案参数键"
         if not any(k in data for k in ("bg_color", "canvas_ratio_mode", "canvas_ratio",
                                       "font_path", "layout_mode")):
             _message(self, QMessageBox.Icon.Warning, self.tr("导入预设"),
-                     self.tr("这个文件里不像是单个方案（可能是老版的 presets.json）。"
-                             "请用「导出预设」得到单个方案文件后再导入。"))
+                     self.tr("该文件不是单个方案格式（可能是旧版 presets.json）。"
+                             "请先用「导出预设」导出单个方案文件，再导入。"))
             return
         name = str(data.get("_preset_name") or os.path.splitext(os.path.basename(path))[0])
         payload = {k: v for k, v in data.items()
@@ -3001,7 +3009,7 @@ class MainWindow(QMainWindow):
         注意 logo_dir 不在参数行里(没有控件), 得单独从 default_params 取回。
         """
         if _message(self, QMessageBox.Icon.Question, self.tr("恢复默认设置"),
-                    self.tr("将把所有参数恢复为出厂默认，当前的调参会被覆盖。继续？"),
+                    self.tr("将把当前所有参数恢复为出厂默认，现有调整会丢失。继续？"),
                     QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
                     QMessageBox.StandardButton.No) != QMessageBox.StandardButton.Yes:
             return
@@ -3052,7 +3060,7 @@ class MainWindow(QMainWindow):
         self._sync_info_btn()           # 「ℹ 图片信息」同理
         if not want:
             self._preview.clear()
-            self._preview.set_hint(self.tr("拖入图片，或点「打开图片」"))
+            self._preview.set_hint(self.tr("请拖入图片，或点击「打开图片」"))
         return True
 
     def _sync_files_ui(self):
@@ -3062,7 +3070,7 @@ class MainWindow(QMainWindow):
         self._row_batch_rec.setVisible(not single)
         self._batch_count.setVisible(not single)
         if not single and self._batch_files:
-            self._batch_count.setText(self.tr("已载入 {n} 张（预览与调参取样第一张）")
+            self._batch_count.setText(self.tr("已载入 {n} 张（预览与调参取第一张）")
                                       .format(n=len(self._batch_files)))
         elif not single:
             self._batch_count.setText(self.tr("尚未载入图片"))
@@ -3091,7 +3099,7 @@ class MainWindow(QMainWindow):
         self._batch_val.setText(self._batch_dir)
         self._batch_val.setToolTip(self._batch_dir)
         self._set_mode("batch")
-        self._status(self.tr("已载入 {n} 张图片，可点「开始生成」").format(n=len(items)))
+        self._status(self.tr("已载入 {n} 张图片，可开始生成").format(n=len(items)))
 
     # ---------- 预览 ----------
     def _manual_exif(self):
@@ -3103,7 +3111,7 @@ class MainWindow(QMainWindow):
         自动预览之外的单入口: 渲染失败、或想对同一组参数再跑一次时用。点下去先按灰、等响应
         """
         if not getattr(self, "_preview_src", ""):
-            self._status(self.tr("请先选择一张图片（也可直接拖入图片或文件夹）"))
+            self._status(self.tr("请先选择图片（也可直接拖入图片或文件夹）"))
             return
         self._manual_preview = True
         self._refresh_btn.setEnabled(False)
@@ -3132,8 +3140,8 @@ class MainWindow(QMainWindow):
             return
         has = bool(getattr(self, "_preview_src", ""))
         self._refresh_btn.setEnabled(has)
-        self._refresh_btn.setToolTip(self.tr("立即按当前参数重渲一次预览") if has
-                                     else self.tr("先选择一张图片（或拖入图片）再刷新预览"))
+        self._refresh_btn.setToolTip(self.tr("按当前参数重新渲染预览") if has
+                                     else self.tr("请先选择图片后再刷新预览"))
 
     def _sync_info_btn(self):
         """没图可看时把「ℹ 图片信息」按灰(与「刷新预览效果」同一个口径)。"""
@@ -3265,7 +3273,7 @@ class MainWindow(QMainWindow):
                  f"请求→就绪 {e2e:.0f}ms"]
         if arrived:
             # 排队时间往往就是它造成的: 在跑的那一轮不会被中断, 新请求要等它跑完
-            parts.append(f"渲染期间又到达 {arrived} 次请求(上一轮不可中断, 排队主要来自这里)")
+            parts.append(f"渲染期间新增 {arrived} 次请求(上一轮不可中断, 排队主要来自这里)")
         line = " | ".join(parts)
         if ms + queue_ms >= _SLOW_RENDER_MS:
             logging.warning(line + f" [偏慢: 渲染 {ms:.0f}ms]")
@@ -3317,7 +3325,7 @@ class MainWindow(QMainWindow):
 
     def _set_output_dir(self, path, manual):
         self._output_dir = path
-        self._out_label.setText(("" if manual else self.tr("(跟随原图) ")) + path)
+        self._out_label.setText(("" if manual else self.tr("（跟随原图） ")) + path)
         self._out_label.setToolTip(path)
 
     def _copy_raw_model(self):
@@ -3326,7 +3334,7 @@ class MainWindow(QMainWindow):
             self._status(self.tr("已复制原始型号到剪贴板"))
         else:
             # 按钮在"没识别到型号"时是置灰的, 正常点不到; 这里兜一句免得静默无反应
-            self._status(self.tr("还没有识别到型号（先选一张图片）"))
+            self._status(self.tr("未识别到型号（请先选择图片）"))
 
     def _on_custom_model(self, text):
         self._custom_model = text.strip()
@@ -3338,7 +3346,7 @@ class MainWindow(QMainWindow):
             self._status(self.tr("请拖入图片文件"))
             return
         if not self.state._sniff_image_type(path):
-            self._status(self.tr("不是受支持的图片格式"))
+            self._status(self.tr("不支持的图片格式"))
             return
         self._input_path = path
         self._input_name = os.path.basename(path)
@@ -3367,18 +3375,18 @@ class MainWindow(QMainWindow):
     def dragEnterEvent(self, e):
         if e.mimeData().hasUrls() and any(u.isLocalFile() for u in e.mimeData().urls()):
             e.acceptProposedAction()
-            self._preview.set_hint(self.tr("松手以载入"))
+            self._preview.set_hint(self.tr("松开鼠标以载入"))
 
     def dragMoveEvent(self, e):
         e.acceptProposedAction()
 
     def dragLeaveEvent(self, _e):
-        self._preview.set_hint(self.tr("拖入图片，或点「打开图片」"))
+        self._preview.set_hint(self.tr("请拖入图片，或点击「打开图片」"))
 
     def dropEvent(self, e):
         paths = [u.toLocalFile() for u in e.mimeData().urls() if u.isLocalFile()]
         e.acceptProposedAction()
-        self._preview.set_hint(self.tr("拖入图片，或点「打开图片」"))
+        self._preview.set_hint(self.tr("请拖入图片，或点击「打开图片」"))
         if not paths:
             self._status(self.tr("未收到文件"))
             return
@@ -3390,7 +3398,7 @@ class MainWindow(QMainWindow):
             return
         images = [p for p in files if self.state._sniff_image_type(p)]
         if not images:
-            self._status(self.tr("不是受支持的图片格式"))
+            self._status(self.tr("不支持的图片格式"))
             return
         if len(images) == 1:
             self.set_input(images[0])

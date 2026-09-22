@@ -54,7 +54,7 @@ def main():
         print("[启动] 程序已在运行，已激活已有窗口；本次启动退出")
         return 0
 
-    app.setApplicationName(QCoreApplication.translate("main", "镶·水印 (Qt 版)"))
+    app.setApplicationName(QCoreApplication.translate("main", "镶 · 水印（Qt 版）"))
     theme.apply_font(app)
     theme.apply_palette(app)          # 应用主题配色与字体
     icon = os.path.join(core.ASSETS_DIR, "exif-watermark-icon.ico")

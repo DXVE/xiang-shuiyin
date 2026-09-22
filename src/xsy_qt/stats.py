@@ -42,7 +42,7 @@ class SessionStats:
         self._lock = threading.Lock()
         self._core = core            # 用来读核心的三个缓存计数器(只读)
         self.previews = 0            # 预览成功次数
-        self.arrived_total = 0       # "渲染期间又到达"的请求总数
+        self.arrived_total = 0       # "渲染期间新增"的请求总数
         self.renders = deque(maxlen=_SAMPLES)     # 纯渲染耗时
         self.queues = deque(maxlen=_SAMPLES)      # 排队(等上一轮)
         self.convs = deque(maxlen=_SAMPLES)       # PIL->QImage
@@ -108,20 +108,20 @@ class SessionStats:
 
         if compact:
             if not n:
-                return _t(QT_TRANSLATE_NOOP("stats", "本次会话: 尚无预览"))
+                return _t(QT_TRANSLATE_NOOP("stats", "本次会话：暂无预览"))
             gen_part = _t(QT_TRANSLATE_NOOP("stats", " · 生成 {gen}")).format(gen=gen) if gen else ""
             return (_t(QT_TRANSLATE_NOOP("stats", "预览 {n} · 渲染 p50 {r50:.0f}/p95 {r95:.0f}ms")).format(
                         n=n, r50=r50, r95=r95)
                     + _t(QT_TRANSLATE_NOOP("stats", " · 层缓存 {pct:.0f}% · 队列 {arrived}{gen_part}")).format(
                         pct=layer_pct, arrived=arrived, gen_part=gen_part))
 
-        lines = [_t(QT_TRANSLATE_NOOP("stats", "本次会话: 预览 {n} 次")).format(n=n)]
+        lines = [_t(QT_TRANSLATE_NOOP("stats", "本次会话：预览 {n} 次")).format(n=n)]
         if n:
             lines.append(_t(QT_TRANSLATE_NOOP("stats", "  渲染      p50 {r50:.0f}ms / p95 {r95:.0f}ms / max {rmax:.0f}ms"))
                          .format(r50=r50, r95=r95, rmax=rmax))
             lines.append(_t(QT_TRANSLATE_NOOP("stats", "  排队      p50 {q50:.0f}ms / p95 {q95:.0f}ms / max {qmax:.0f}ms"))
                          .format(q50=q50, q95=q95, qmax=qmax)
-                         + _t(QT_TRANSLATE_NOOP("stats", "   (渲染期间又到达 {n} 次请求)")).format(n=arrived))
+                         + _t(QT_TRANSLATE_NOOP("stats", "   （渲染期间新增 {n} 次请求）")).format(n=arrived))
             lines.append(_t(QT_TRANSLATE_NOOP("stats", "  转图      p50 {c50:.0f}ms")).format(c50=c50))
             lines.append(_t(QT_TRANSLATE_NOOP("stats", "  上屏缩放  p50 {s50:.0f}ms")).format(s50=s50))
             lines.append(_t(QT_TRANSLATE_NOOP("stats", "  请求→就绪  p50 {e50:.0f}ms / p95 {e95:.0f}ms / max {emax:.0f}ms"))
@@ -159,7 +159,7 @@ class SessionStats:
                       f"转图 p50 {c50:.0f}ms",
                       f"上屏缩放 p50 {s50:.0f}ms",
                       f"请求→就绪 p50 {e50:.0f}/p95 {e95:.0f}/max {emax:.0f}ms",
-                      f"渲染期间又到达 {arrived} 次请求"]
+                      f"渲染期间新增 {arrived} 次请求"]
         mh, mm, _mp = rates["蒙版"]
         th, tm, _tp = rates["缩略图"]
         parts += [f"层缓存 {layer_hit}/{layer_miss} ({layer_pct:.0f}%, {rates['占用MB']:.0f}MB)",

@@ -8,13 +8,8 @@
             <translation>↺ Reset group</translation>
         </message>
         <message>
-            <location filename="../window.py" line="554" />
-            <source>把本卡片的参数恢复为出厂默认</source>
-            <translation>Restore this card's parameters to factory defaults</translation>
-        </message>
-        <message>
             <location filename="../window.py" line="205" />
-            <location filename="../window.py" line="2546" />
+            <location filename="../window.py" line="2534" />
             <source>字体样式</source>
             <translation>Font style</translation>
         </message>
@@ -105,17 +100,22 @@
             <translation>Text shadow</translation>
         </message>
         <message>
-            <location filename="../window.py" line="2606" />
+            <location filename="../window.py" line="554" />
+            <source>将本卡片参数恢复为出厂默认值</source>
+            <translation>Restore this card's parameters to factory defaults</translation>
+        </message>
+        <message>
+            <location filename="../window.py" line="2594" />
             <source>处理模式</source>
             <translation>Mode</translation>
         </message>
         <message>
-            <location filename="../window.py" line="2655" />
+            <location filename="../window.py" line="2643" />
             <source>型号美化</source>
             <translation>Model naming</translation>
         </message>
         <message>
-            <location filename="../window.py" line="2703" />
+            <location filename="../window.py" line="2692" />
             <source>自定义水印信息</source>
             <translation>Custom watermark info</translation>
         </message>
@@ -123,106 +123,106 @@
     <context>
         <name>ColorDialog</name>
         <message>
-            <location filename="../window.py" line="1345" />
-            <location filename="../window.py" line="1380" />
-            <location filename="../window.py" line="1553" />
+            <location filename="../window.py" line="1328" />
+            <location filename="../window.py" line="1363" />
+            <location filename="../window.py" line="1538" />
             <source>选择颜色</source>
             <translation>Pick a color</translation>
         </message>
         <message>
-            <location filename="../window.py" line="1361" />
+            <location filename="../window.py" line="1344" />
             <source>保存当前颜色</source>
             <translation>Save current color</translation>
         </message>
         <message>
-            <location filename="../window.py" line="1362" />
-            <source>把当前颜色存进「我的颜色」，下次直接点</source>
+            <location filename="../window.py" line="1345" />
+            <source>将当前颜色保存到「我的颜色」，下次可直接使用</source>
             <translation>Save the current color to "My colors" for one-click reuse</translation>
         </message>
         <message>
-            <location filename="../window.py" line="1366" />
+            <location filename="../window.py" line="1349" />
             <source>关闭</source>
             <translation>Close</translation>
         </message>
         <message>
-            <location filename="../window.py" line="1419" />
-            <location filename="../window.py" line="1425" />
+            <location filename="../window.py" line="1402" />
+            <location filename="../window.py" line="1408" />
             <source>当前颜色</source>
             <translation>Current color</translation>
         </message>
         <message>
-            <location filename="../window.py" line="1426" />
+            <location filename="../window.py" line="1409" />
             <source>点击打开系统取色器（可拖动取色、调透明度）</source>
             <translation>Click to open the system color picker (drag to sample, adjust opacity)</translation>
         </message>
         <message>
-            <location filename="../window.py" line="1432" />
+            <location filename="../window.py" line="1415" />
             <source>色号</source>
             <translation>Hex</translation>
         </message>
         <message>
-            <location filename="../window.py" line="1433" />
+            <location filename="../window.py" line="1416" />
             <source>直接输入色号（如 #6F9C7D），回车生效</source>
             <translation>Type a hex value (e.g. #6F9C7D) and press Enter</translation>
         </message>
         <message>
-            <location filename="../window.py" line="1438" />
-            <source>点色块开取色器，也可直接输入色号</source>
+            <location filename="../window.py" line="1421" />
+            <source>点击色块打开取色器，也可直接输入色号</source>
             <translation>Click a swatch to open the picker, or type a hex value</translation>
         </message>
         <message>
-            <location filename="../window.py" line="1444" />
+            <location filename="../window.py" line="1440" />
+            <source>点击色块即应用；双击修改颜色，右键删除</source>
+            <translation>Click to apply; double-click to edit, right-click to delete</translation>
+        </message>
+        <message>
+            <location filename="../window.py" line="1448" />
+            <source>已保存 {n} / {total}</source>
+            <translation>{n} / {total} saved</translation>
+        </message>
+        <message>
+            <location filename="../window.py" line="1475" />
+            <location filename="../window.py" line="1476" />
+            <source>未使用</source>
+            <translation>Empty</translation>
+        </message>
+        <message>
+            <location filename="../window.py" line="1486" />
+            <source>　双击修改颜色 · 右键删除</source>
+            <translation> Double-click to edit · Right-click to delete</translation>
+        </message>
+        <message>
+            <location filename="../window.py" line="1588" />
+            <source>修改该位置的颜色…</source>
+            <translation>Change this color…</translation>
+        </message>
+        <message>
+            <location filename="../window.py" line="1427" />
             <source>预设颜色</source>
             <translation>Preset colors</translation>
         </message>
         <message>
-            <location filename="../window.py" line="1449" />
+            <location filename="../window.py" line="1432" />
             <source>我的颜色</source>
             <translation>My colors</translation>
         </message>
         <message>
-            <location filename="../window.py" line="1457" />
-            <source>点色块即应用；双击改色，右键删除</source>
-            <translation>Click to apply; double-click to edit, right-click to delete</translation>
-        </message>
-        <message>
-            <location filename="../window.py" line="1465" />
-            <source>已存 {n} / {total}</source>
-            <translation>{n} / {total} saved</translation>
-        </message>
-        <message>
-            <location filename="../window.py" line="1492" />
-            <location filename="../window.py" line="1493" />
-            <source>空位</source>
-            <translation>Empty</translation>
-        </message>
-        <message>
-            <location filename="../window.py" line="1500" />
+            <location filename="../window.py" line="1485" />
             <source>颜色 {color}</source>
             <translation>Color {color}</translation>
         </message>
         <message>
-            <location filename="../window.py" line="1501" />
-            <source>　双击改色 · 右键删除</source>
-            <translation> Double-click to edit · Right-click to delete</translation>
-        </message>
-        <message>
-            <location filename="../window.py" line="1502" />
+            <location filename="../window.py" line="1487" />
             <source>　点击应用</source>
             <translation> Click to apply</translation>
         </message>
         <message>
-            <location filename="../window.py" line="1570" />
+            <location filename="../window.py" line="1555" />
             <source>保存失败</source>
             <translation>Save failed</translation>
         </message>
         <message>
-            <location filename="../window.py" line="1603" />
-            <source>改这一格的颜色…</source>
-            <translation>Change this color…</translation>
-        </message>
-        <message>
-            <location filename="../window.py" line="1604" />
+            <location filename="../window.py" line="1589" />
             <source>删除该颜色</source>
             <translation>Delete this color</translation>
         </message>
@@ -230,98 +230,68 @@
     <context>
         <name>ImageInfoDialog</name>
         <message>
-            <location filename="../window.py" line="1032" />
-            <location filename="../window.py" line="1109" />
+            <location filename="../window.py" line="1038" />
+            <location filename="../window.py" line="1092" />
             <source>图片信息</source>
             <translation>Image info</translation>
         </message>
         <message>
-            <location filename="../window.py" line="1043" />
-            <source>「当前生效值」= 你在「自定义水印信息」里填的那份（它覆盖照片的 EXIF）</source>
-            <translation>"In effect now" comes from the Custom watermark info you filled in (it overrides the photo EXIF)</translation>
-        </message>
-        <message>
-            <location filename="../window.py" line="1045" />
-            <source>「当前生效值」= 照片自己的 EXIF（未启用「自定义水印信息」）</source>
-            <translation>"In effect now" is the photo own EXIF (Custom watermark info is off)</translation>
-        </message>
-        <message>
-            <location filename="../window.py" line="1078" />
+            <location filename="../window.py" line="1073" />
             <source>文件</source>
             <translation>File</translation>
         </message>
         <message>
-            <location filename="../window.py" line="1079" />
+            <location filename="../window.py" line="1074" />
             <source>路径</source>
             <translation>Path</translation>
         </message>
         <message>
-            <location filename="../window.py" line="1081" />
+            <location filename="../window.py" line="1076" />
             <source>大小</source>
             <translation>Size</translation>
         </message>
         <message>
-            <location filename="../window.py" line="1082" />
+            <location filename="../window.py" line="1077" />
             <source>像素</source>
             <translation>Pixels</translation>
         </message>
         <message>
-            <location filename="../window.py" line="1083" />
+            <location filename="../window.py" line="1078" />
             <source>格式</source>
             <translation>Format</translation>
         </message>
         <message>
-            <location filename="../window.py" line="1084" />
+            <location filename="../window.py" line="1079" />
             <source>修改时间</source>
             <translation>Modified</translation>
         </message>
         <message>
-            <location filename="../window.py" line="1085" />
-            <source>水印里会用到的值</source>
-            <translation>Values used in the watermark</translation>
+            <location filename="../window.py" line="1081" />
+            <source>照片 EXIF 信息</source>
+            <translation>Photo EXIF</translation>
         </message>
         <message>
-            <location filename="../window.py" line="1086" />
-            <source>照片里的值</source>
-            <translation>From the photo</translation>
-        </message>
-        <message>
-            <location filename="../window.py" line="1087" />
-            <source>当前生效值</source>
-            <translation>In effect now</translation>
-        </message>
-        <message>
-            <location filename="../window.py" line="1093" />
+            <location filename="../window.py" line="1082" />
             <source>品牌</source>
             <translation>Make</translation>
         </message>
         <message>
-            <location filename="../window.py" line="1094" />
+            <location filename="../window.py" line="1083" />
             <source>型号</source>
             <translation>Model</translation>
         </message>
         <message>
-            <location filename="../window.py" line="1095" />
+            <location filename="../window.py" line="1084" />
             <source>快门</source>
             <translation>Shutter</translation>
         </message>
         <message>
-            <location filename="../window.py" line="1096" />
+            <location filename="../window.py" line="1085" />
             <source>光圈</source>
             <translation>Aperture</translation>
         </message>
         <message>
-            <location filename="../window.py" line="1100" />
-            <source>水印显示（最终）</source>
-            <translation>Watermark shows (final)</translation>
-        </message>
-        <message>
-            <location filename="../window.py" line="1103" />
-            <source>；「水印显示」是再按 自定义 &gt; 映射表 &gt; 原始 算出的最终型号。</source>
-            <translation>; "Watermark shows" is resolved as custom &gt; mapping table &gt; raw model.</translation>
-        </message>
-        <message>
-            <location filename="../window.py" line="1108" />
+            <location filename="../window.py" line="1091" />
             <source>关闭</source>
             <translation>Close</translation>
         </message>
@@ -344,127 +314,132 @@
             <translation>Watermark and effects</translation>
         </message>
         <message>
-            <location filename="../window.py" line="1799" />
-            <source>镶 · 水印 (Qt 版)</source>
-            <translation>ShuiYin · Watermark (Qt)</translation>
-        </message>
-        <message>
-            <location filename="../window.py" line="1847" />
-            <source>拖入图片即可开始（放大镜/间距标注/取色板见后续步骤）</source>
-            <translation>Drop an image to start</translation>
-        </message>
-        <message>
-            <location filename="../window.py" line="1944" />
+            <location filename="../window.py" line="1929" />
             <source>已撤销：{label}</source>
             <translation>Undone: {label}</translation>
         </message>
         <message>
-            <location filename="../window.py" line="1954" />
+            <location filename="../window.py" line="1939" />
             <source>已重做：{label}</source>
             <translation>Redone: {label}</translation>
         </message>
         <message>
-            <location filename="../window.py" line="1966" />
+            <location filename="../window.py" line="1951" />
             <source>撤销：{label}（Ctrl+Z）</source>
             <translation>Undo: {label} (Ctrl+Z)</translation>
         </message>
         <message>
-            <location filename="../window.py" line="1967" />
+            <location filename="../window.py" line="1952" />
             <source>撤销（Ctrl+Z）</source>
             <translation>Undo (Ctrl+Z)</translation>
         </message>
         <message>
-            <location filename="../window.py" line="1968" />
+            <location filename="../window.py" line="1953" />
             <source>重做：{label}（Ctrl+Shift+Z）</source>
             <translation>Redo: {label} (Ctrl+Shift+Z)</translation>
         </message>
         <message>
-            <location filename="../window.py" line="1969" />
+            <location filename="../window.py" line="1954" />
             <source>重做（Ctrl+Shift+Z）</source>
             <translation>Redo (Ctrl+Shift+Z)</translation>
         </message>
         <message>
-            <location filename="../window.py" line="2030" />
+            <location filename="../window.py" line="2015" />
             <source>已重置「{title}」为默认值</source>
             <translation>"{title}" reset to defaults</translation>
         </message>
         <message>
-            <location filename="../window.py" line="2176" />
-            <location filename="../window.py" line="2177" />
+            <location filename="../window.py" line="2161" />
+            <location filename="../window.py" line="2162" />
             <source>菜单</source>
             <translation>Menu</translation>
         </message>
         <message>
-            <location filename="../window.py" line="2180" />
+            <location filename="../window.py" line="2165" />
             <source>打开图片</source>
             <translation>Open image</translation>
         </message>
         <message>
-            <location filename="../window.py" line="2183" />
-            <location filename="../window.py" line="2626" />
+            <location filename="../window.py" line="2168" />
+            <location filename="../window.py" line="2614" />
             <source>未选择图片</source>
             <translation>No image selected</translation>
         </message>
         <message>
-            <location filename="../window.py" line="2214" />
+            <location filename="../window.py" line="2179" />
+            <source>查看照片 EXIF 与文件信息</source>
+            <translation>View the photo's EXIF and file information</translation>
+        </message>
+        <message>
+            <location filename="../window.py" line="2185" />
+            <source>将所有参数恢复为出厂默认值</source>
+            <translation>Restore all parameters to factory defaults</translation>
+        </message>
+        <message>
+            <location filename="../window.py" line="2199" />
             <source>打开日志目录</source>
             <translation>Open log folder</translation>
         </message>
         <message>
-            <location filename="../window.py" line="2671" />
+            <location filename="../window.py" line="2337" />
+            <source>（跟随原图目录）</source>
+            <translation>(follows source folder)</translation>
+        </message>
+        <message>
+            <location filename="../window.py" line="2646" />
+            <source>临时美化型号（仅本次有效）</source>
+            <translation>Temporary pretty model (this run only)</translation>
+        </message>
+        <message>
+            <location filename="../window.py" line="2647" />
+            <source>留空则使用映射表；填写后强制使用该名称</source>
+            <translation>Leave empty to use the mapping table; if filled, this name is forced for this run</translation>
+        </message>
+        <message>
+            <location filename="../window.py" line="2659" />
             <source>识别型号</source>
             <translation>Model</translation>
         </message>
         <message>
-            <location filename="../window.py" line="2194" />
-            <source>这张照片的 EXIF 与最终会上水印的值</source>
-            <translation>This photo's EXIF vs. what goes into the watermark</translation>
-        </message>
-        <message>
-            <location filename="../window.py" line="2195" />
+            <location filename="../window.py" line="2180" />
             <source>图片信息</source>
             <translation>Image info</translation>
         </message>
         <message>
-            <location filename="../window.py" line="2198" />
-            <location filename="../window.py" line="3024" />
+            <location filename="../window.py" line="2183" />
+            <location filename="../window.py" line="3013" />
             <source>恢复默认设置</source>
             <translation>Reset to defaults</translation>
         </message>
         <message>
-            <location filename="../window.py" line="2200" />
-            <source>把所有参数恢复为出厂默认</source>
-            <translation>Restore all parameters to factory defaults</translation>
-        </message>
-        <message>
-            <location filename="../window.py" line="2209" />
-            <location filename="../window.py" line="2255" />
+            <location filename="../window.py" line="2194" />
+            <location filename="../window.py" line="2240" />
             <source>关于</source>
             <translation>About</translation>
         </message>
         <message>
-            <location filename="../window.py" line="2216" />
+            <location filename="../window.py" line="2201" />
             <source>打开数据目录</source>
             <translation>Open data folder</translation>
         </message>
         <message>
-            <location filename="../window.py" line="2218" />
+            <location filename="../window.py" line="2203" />
             <source>打开 Logo 目录</source>
             <translation>Open logo folder</translation>
         </message>
         <message>
-            <location filename="../window.py" line="2221" />
-            <location filename="../window.py" line="2244" />
+            <location filename="../window.py" line="2206" />
+            <location filename="../window.py" line="2229" />
             <source>语言</source>
             <translation>Language</translation>
         </message>
         <message>
-            <location filename="../window.py" line="2245" />
+            <location filename="../window.py" line="2230" />
             <source>界面语言已保存，请关闭程序后重新打开生效。</source>
             <translation>Language saved — close the app and open it again to apply.</translation>
         </message>
         <message>
-            <location filename="../window.py" line="2256" />
+            <location filename="../window.py" line="2241" />
             <source>镶 · 水印（Qt 版）  {version}
 Python {py} · PySide6 {pyside}
 {os}
@@ -487,546 +462,537 @@ Preview folder: {preview}
 When redistributing, comply with PySide6s LGPLv3 (see README and THIRD_PARTY_LICENSES).</translation>
         </message>
         <message>
-            <location filename="../window.py" line="2280" />
-            <source>先选择一张图片</source>
-            <translation>Select an image first</translation>
-        </message>
-        <message>
-            <location filename="../window.py" line="2327" />
+            <location filename="../window.py" line="2312" />
             <source>效果预览</source>
             <translation>Preview</translation>
         </message>
         <message>
-            <location filename="../window.py" line="2336" />
+            <location filename="../window.py" line="2321" />
             <source>↺ 刷新预览效果</source>
             <translation>↺ Refresh preview</translation>
         </message>
         <message>
-            <location filename="../window.py" line="2348" />
+            <location filename="../window.py" line="2336" />
             <source>导出到</source>
             <translation>Output to</translation>
         </message>
         <message>
-            <location filename="../window.py" line="2349" />
-            <source>(跟随原图目录)</source>
-            <translation>(follows source folder)</translation>
-        </message>
-        <message>
-            <location filename="../window.py" line="2352" />
+            <location filename="../window.py" line="2340" />
             <source>选择输出目录</source>
             <translation>Choose output folder</translation>
         </message>
         <message>
-            <location filename="../window.py" line="2359" />
+            <location filename="../window.py" line="2347" />
             <source>开始生成</source>
             <translation>Start</translation>
         </message>
         <message>
-            <location filename="../window.py" line="2613" />
+            <location filename="../window.py" line="2601" />
             <source>单张图片</source>
             <translation>Single image</translation>
         </message>
         <message>
-            <location filename="../window.py" line="2614" />
+            <location filename="../window.py" line="2602" />
             <source>批量目录</source>
             <translation>Batch folder</translation>
         </message>
         <message>
-            <location filename="../window.py" line="2627" />
+            <location filename="../window.py" line="2615" />
             <source>输入图片</source>
             <translation>Input image</translation>
         </message>
         <message>
-            <location filename="../window.py" line="2630" />
+            <location filename="../window.py" line="2618" />
             <source>未选择目录</source>
             <translation>No folder selected</translation>
         </message>
         <message>
-            <location filename="../window.py" line="2631" />
+            <location filename="../window.py" line="2619" />
             <source>图片目录</source>
             <translation>Image folder</translation>
         </message>
         <message>
-            <location filename="../window.py" line="2632" />
+            <location filename="../window.py" line="2620" />
             <source>选择文件夹</source>
             <translation>Choose folder</translation>
         </message>
         <message>
-            <location filename="../window.py" line="2635" />
+            <location filename="../window.py" line="2623" />
             <source>包含子文件夹</source>
             <translation>Include subfolders</translation>
         </message>
         <message>
-            <location filename="../window.py" line="2658" />
-            <source>临时美化名（本次生效）</source>
-            <translation>Temporary pretty name (this session only)</translation>
-        </message>
-        <message>
-            <location filename="../window.py" line="2659" />
-            <source>留空则用映射表；填了本次强制使用这个名字</source>
-            <translation>Empty: use the mapping table. Filled: force this name for this run</translation>
-        </message>
-        <message>
-            <location filename="../window.py" line="2661" />
+            <location filename="../window.py" line="2649" />
             <source>管理所有型号映射</source>
             <translation>Manage model mappings</translation>
         </message>
         <message>
-            <location filename="../window.py" line="2662" />
+            <location filename="../window.py" line="2650" />
             <source>美化型号</source>
             <translation>Pretty model</translation>
         </message>
         <message>
-            <location filename="../window.py" line="2670" />
+            <location filename="../window.py" line="2658" />
             <source>复制原始型号</source>
             <translation>Copy raw model</translation>
         </message>
         <message>
-            <location filename="../window.py" line="2705" />
+            <location filename="../window.py" line="2683" />
+            <source>水印将显示：{name}</source>
+            <translation>Shown in the watermark: {name}</translation>
+        </message>
+        <message>
+            <location filename="../window.py" line="2688" />
+            <source>复制识别到的型号到剪贴板</source>
+            <translation>Copy the detected model to the clipboard</translation>
+        </message>
+        <message>
+            <location filename="../window.py" line="2689" />
+            <location filename="../window.py" line="3346" />
+            <source>未识别到型号（请先选择图片）</source>
+            <translation>No model detected yet (select an image first)</translation>
+        </message>
+        <message>
+            <location filename="../window.py" line="2694" />
             <source>启用（启用后强制使用下列信息，忽略照片 EXIF）</source>
             <translation>Enable (force the values below, ignore the photo's EXIF)</translation>
         </message>
         <message>
-            <location filename="../window.py" line="2715" />
+            <location filename="../window.py" line="2704" />
             <source>品牌</source>
             <translation>Make</translation>
         </message>
         <message>
-            <location filename="../window.py" line="2716" />
+            <location filename="../window.py" line="2705" />
             <source>如 Canon</source>
             <translation>e.g. Canon</translation>
         </message>
         <message>
-            <location filename="../window.py" line="2717" />
-            <location filename="../window.py" line="2720" />
+            <location filename="../window.py" line="2706" />
+            <location filename="../window.py" line="2709" />
             <source>原样输出</source>
             <translation>Used as-is</translation>
         </message>
         <message>
-            <location filename="../window.py" line="2718" />
+            <location filename="../window.py" line="2707" />
             <source>型号</source>
             <translation>Model</translation>
         </message>
         <message>
-            <location filename="../window.py" line="2719" />
+            <location filename="../window.py" line="2708" />
             <source>如 EOS R5</source>
             <translation>e.g. EOS R5</translation>
         </message>
         <message>
-            <location filename="../window.py" line="2721" />
+            <location filename="../window.py" line="2710" />
             <source>快门</source>
             <translation>Shutter</translation>
         </message>
         <message>
-            <location filename="../window.py" line="2722" />
+            <location filename="../window.py" line="2711" />
             <source>如 1/125</source>
             <translation>e.g. 1/125</translation>
         </message>
         <message>
-            <location filename="../window.py" line="2723" />
-            <source>自动补 s 后缀</source>
-            <translation>Adds the "s" suffix</translation>
-        </message>
-        <message>
-            <location filename="../window.py" line="2724" />
+            <location filename="../window.py" line="2713" />
             <source>光圈</source>
             <translation>Aperture</translation>
         </message>
         <message>
-            <location filename="../window.py" line="2725" />
+            <location filename="../window.py" line="2714" />
             <source>如 2.8</source>
             <translation>e.g. 2.8</translation>
         </message>
         <message>
-            <location filename="../window.py" line="2726" />
-            <source>自动补 f/ 前缀</source>
-            <translation>Adds the "f/" prefix</translation>
-        </message>
-        <message>
-            <location filename="../window.py" line="2727" />
+            <location filename="../window.py" line="2716" />
             <source>如 100</source>
             <translation>e.g. 100</translation>
         </message>
         <message>
-            <location filename="../window.py" line="2728" />
-            <source>自动补 ISO 前缀</source>
-            <translation>Adds the "ISO" prefix</translation>
-        </message>
-        <message>
-            <location filename="../window.py" line="2754" />
+            <location filename="../window.py" line="2743" />
             <source>Logo 目录不可用：{err}</source>
             <translation>Logo folder unavailable: {err}</translation>
         </message>
         <message>
-            <location filename="../window.py" line="2758" />
+            <location filename="../window.py" line="2747" />
             <source>已打开 Logo 目录：{path}</source>
             <translation>Opened logo folder: {path}</translation>
         </message>
         <message>
-            <location filename="../window.py" line="2760" />
-            <source>打不开，Logo 目录是：{path}</source>
-            <translation>Could not open it. Logo folder: {path}</translation>
-        </message>
-        <message>
-            <location filename="../window.py" line="2779" />
+            <location filename="../window.py" line="2768" />
             <source>槽位 {slot}：{name}</source>
             <translation>Slot {slot}: {name}</translation>
         </message>
         <message>
-            <location filename="../window.py" line="2780" />
+            <location filename="../window.py" line="2769" />
             <source>— 空 —</source>
             <translation>— empty —</translation>
         </message>
         <message>
-            <location filename="../window.py" line="2790" />
+            <location filename="../window.py" line="2779" />
             <source>该槽位为空，无法加载</source>
             <translation>This slot is empty, nothing to load</translation>
         </message>
         <message>
-            <location filename="../window.py" line="2795" />
+            <location filename="../window.py" line="2784" />
             <source>加载预设</source>
             <translation>Load preset</translation>
         </message>
         <message>
-            <location filename="../window.py" line="2796" />
+            <location filename="../window.py" line="2785" />
             <source>将把当前所有参数覆盖为预设「{name}」的值。继续？</source>
             <translation>All parameters will be replaced with preset "{name}". Continue?</translation>
         </message>
         <message>
-            <location filename="../window.py" line="2803" />
+            <location filename="../window.py" line="2792" />
             <source>已加载预设：{name}</source>
             <translation>Preset loaded: {name}</translation>
         </message>
         <message>
-            <location filename="../window.py" line="2830" />
-            <source>请先输入方案名再保存</source>
-            <translation>Enter a preset name before saving</translation>
-        </message>
-        <message>
-            <location filename="../window.py" line="2836" />
+            <location filename="../window.py" line="2825" />
             <source>槽位 {slot} 已有方案「{name}」，保存会覆盖它。继续？</source>
             <translation>Slot {slot} already has preset "{name}"; saving will overwrite it. Continue?</translation>
         </message>
         <message>
-            <location filename="../window.py" line="2849" />
+            <location filename="../window.py" line="2838" />
             <source>已保存到槽位 {slot}：{name}</source>
             <translation>Saved to slot {slot}: {name}</translation>
         </message>
         <message>
-            <location filename="../window.py" line="2860" />
+            <location filename="../window.py" line="2849" />
             <source>该槽位为空，没有可导出的方案</source>
             <translation>This slot is empty, nothing to export</translation>
         </message>
         <message>
-            <location filename="../window.py" line="2866" />
+            <location filename="../window.py" line="2855" />
             <source>导出预设</source>
             <translation>Export preset</translation>
         </message>
         <message>
-            <location filename="../window.py" line="2867" />
+            <location filename="../window.py" line="2856" />
             <source>预设 (*.json)</source>
             <translation>Presets (*.json)</translation>
         </message>
         <message>
-            <location filename="../window.py" line="2876" />
+            <location filename="../window.py" line="2865" />
             <source>导出失败：{err}</source>
             <translation>Export failed: {err}</translation>
         </message>
         <message>
-            <location filename="../window.py" line="2880" />
+            <location filename="../window.py" line="2869" />
             <source>已导出方案「{name}」</source>
             <translation>Preset exported: "{name}"</translation>
         </message>
         <message>
-            <location filename="../window.py" line="2889" />
-            <location filename="../window.py" line="2897" />
-            <location filename="../window.py" line="2901" />
-            <location filename="../window.py" line="2906" />
-            <location filename="../window.py" line="2919" />
-            <location filename="../window.py" line="2927" />
+            <location filename="../window.py" line="2878" />
+            <location filename="../window.py" line="2886" />
+            <location filename="../window.py" line="2890" />
+            <location filename="../window.py" line="2895" />
+            <location filename="../window.py" line="2908" />
+            <location filename="../window.py" line="2916" />
             <source>导入预设</source>
             <translation>Import preset</translation>
         </message>
         <message>
-            <location filename="../window.py" line="2890" />
+            <location filename="../window.py" line="2879" />
             <source>预设 (*.json);;所有文件 (*)</source>
             <translation>Presets (*.json);;All files (*)</translation>
         </message>
         <message>
-            <location filename="../window.py" line="2898" />
-            <source>读不了这个文件：
+            <location filename="../window.py" line="2909" />
+            <source>槽位 {slot} 已有方案「{name}」，导入会覆盖它。继续？</source>
+            <translation>Slot {slot} already has preset "{name}"; importing will overwrite it. Continue?</translation>
+        </message>
+        <message>
+            <location filename="../window.py" line="2922" />
+            <source>已导入方案「{name}」到槽位 {slot}</source>
+            <translation>Preset "{name}" imported into slot {slot}</translation>
+        </message>
+        <message>
+            <location filename="../window.py" line="2927" />
+            <source>该槽位为空，无需删除</source>
+            <translation>This slot is empty, nothing to delete</translation>
+        </message>
+        <message>
+            <location filename="../window.py" line="2931" />
+            <location filename="../window.py" line="2938" />
+            <source>删除预设</source>
+            <translation>Delete preset</translation>
+        </message>
+        <message>
+            <location filename="../window.py" line="2932" />
+            <source>确定删除「{name}」？</source>
+            <translation>Delete "{name}"?</translation>
+        </message>
+        <message>
+            <location filename="../window.py" line="2942" />
+            <source>已删除槽位 {slot}：{name}</source>
+            <translation>Deleted slot {slot}: {name}</translation>
+        </message>
+        <message>
+            <location filename="../window.py" line="2983" />
+            <source>自动保存失败：{err}</source>
+            <translation>Auto-save failed: {err}</translation>
+        </message>
+        <message>
+            <location filename="../window.py" line="3027" />
+            <source>已恢复默认设置</source>
+            <translation>Restored to defaults</translation>
+        </message>
+        <message>
+            <location filename="../window.py" line="3079" />
+            <source>尚未载入图片</source>
+            <translation>No images loaded</translation>
+        </message>
+        <message>
+            <location filename="../window.py" line="3085" />
+            <source>选择图片文件夹</source>
+            <translation>Choose an image folder</translation>
+        </message>
+        <message>
+            <location filename="../window.py" line="3093" />
+            <source>所选目录里没有受支持的图片</source>
+            <translation>No supported images in that folder</translation>
+        </message>
+        <message>
+            <location filename="../window.py" line="3094" />
+            <source>（含子目录）</source>
+            <translation> (including subfolders)</translation>
+        </message>
+        <message>
+            <location filename="../window.py" line="3095" />
+            <source>（可勾选「包含子文件夹」）</source>
+            <translation> (tick "Include subfolders")</translation>
+        </message>
+        <message>
+            <location filename="../window.py" line="3123" />
+            <source>正在生成预览…</source>
+            <translation>Generating preview…</translation>
+        </message>
+        <message>
+            <location filename="../window.py" line="3137" />
+            <source>预览已生成</source>
+            <translation>Preview updated</translation>
+        </message>
+        <message>
+            <location filename="../window.py" line="3256" />
+            <source>预览失败：</source>
+            <translation>Preview failed: </translation>
+        </message>
+        <message>
+            <location filename="../window.py" line="3268" />
+            <source>渲染 {ms:.0f} ms · 请求→显示 {e2e:.0f} ms</source>
+            <translation>Render {ms:.0f} ms · request→shown {e2e:.0f} ms</translation>
+        </message>
+        <message>
+            <location filename="../window.py" line="3301" />
+            <source>渲染分段({tag}) 合计 {total:.0f}ms</source>
+            <translation>Render stages ({tag}), total {total:.0f} ms</translation>
+        </message>
+        <message>
+            <location filename="../window.py" line="3304" />
+            <source>参数指纹:</source>
+            <translation>Parameter fingerprint:</translation>
+        </message>
+        <message>
+            <location filename="../window.py" line="3325" />
+            <source>选择图片</source>
+            <translation>Choose an image</translation>
+        </message>
+        <message>
+            <location filename="../window.py" line="3326" />
+            <source>图片 (*.jpg *.jpeg *.png *.webp *.gif *.bmp *.tif *.tiff *.ico);;所有文件 (*)</source>
+            <translation>Images (*.jpg *.jpeg *.png *.webp *.gif *.bmp *.tif *.tiff *.ico);;All files (*)</translation>
+        </message>
+        <message>
+            <location filename="../window.py" line="3331" />
+            <source>选择导出文件夹</source>
+            <translation>Choose the output folder</translation>
+        </message>
+        <message>
+            <location filename="../window.py" line="3343" />
+            <source>已复制原始型号到剪贴板</source>
+            <translation>Raw model copied to clipboard</translation>
+        </message>
+        <message>
+            <location filename="../window.py" line="3355" />
+            <source>请拖入图片文件</source>
+            <translation>Please drop an image file</translation>
+        </message>
+        <message>
+            <location filename="../window.py" line="2681" />
+            <source>品牌：{brand}</source>
+            <translation>Make: {brand}</translation>
+        </message>
+        <message>
+            <location filename="../window.py" line="2196" />
+            <source>预设方案…</source>
+            <translation>Presets…</translation>
+        </message>
+        <message>
+            <location filename="../window.py" line="2824" />
+            <location filename="../window.py" line="2832" />
+            <source>保存预设</source>
+            <translation>Save preset</translation>
+        </message>
+        <message>
+            <location filename="../window.py" line="3381" />
+            <source>已选择：{name}</source>
+            <translation>Selected: {name}</translation>
+        </message>
+        <message>
+            <location filename="../window.py" line="3400" />
+            <source>未收到文件</source>
+            <translation>No file received</translation>
+        </message>
+        <message>
+            <location filename="../window.py" line="3420" />
+            <source>正在处理中，请稍候</source>
+            <translation>Already processing, please wait</translation>
+        </message>
+        <message>
+            <location filename="../window.py" line="3423" />
+            <source>请先选择导出目录</source>
+            <translation>Choose an output folder first</translation>
+        </message>
+        <message>
+            <location filename="../window.py" line="2265" />
+            <location filename="../window.py" line="3435" />
+            <source>请先选择图片</source>
+            <translation>Select an image first</translation>
+        </message>
+        <message>
+            <location filename="../window.py" line="1784" />
+            <source>镶 · 水印（Qt 版）</source>
+            <translation>ShuiYin · Watermark (Qt)</translation>
+        </message>
+        <message>
+            <location filename="../window.py" line="1832" />
+            <source>拖入图片即可开始</source>
+            <translation>Drop an image here to start</translation>
+        </message>
+        <message>
+            <location filename="../window.py" line="2712" />
+            <source>自动补充 s 后缀</source>
+            <translation>Adds the "s" suffix</translation>
+        </message>
+        <message>
+            <location filename="../window.py" line="2715" />
+            <source>自动补充 f/ 前缀</source>
+            <translation>Adds the "f/" prefix</translation>
+        </message>
+        <message>
+            <location filename="../window.py" line="2717" />
+            <source>自动补充 ISO 前缀</source>
+            <translation>Adds the "ISO" prefix</translation>
+        </message>
+        <message>
+            <location filename="../window.py" line="2749" />
+            <source>无法打开 Logo 目录：{path}</source>
+            <translation>Could not open the Logo folder: {path}</translation>
+        </message>
+        <message>
+            <location filename="../window.py" line="2819" />
+            <source>请先输入方案名后再保存</source>
+            <translation>Enter a preset name before saving</translation>
+        </message>
+        <message>
+            <location filename="../window.py" line="2887" />
+            <source>无法读取该文件：
 {err}</source>
             <translation>Could not read this file:
 {err}</translation>
         </message>
         <message>
-            <location filename="../window.py" line="2901" />
-            <source>这个文件里没有方案数据。</source>
+            <location filename="../window.py" line="2890" />
+            <source>该文件中没有方案数据。</source>
             <translation>This file contains no preset data.</translation>
         </message>
         <message>
-            <location filename="../window.py" line="2920" />
-            <source>槽位 {slot} 已有方案「{name}」，导入会覆盖它。继续？</source>
-            <translation>Slot {slot} already has preset "{name}"; importing will overwrite it. Continue?</translation>
+            <location filename="../window.py" line="2896" />
+            <source>该文件不是单个方案格式（可能是旧版 presets.json）。请先用「导出预设」导出单个方案文件，再导入。</source>
+            <translation>This file is not a single preset (it may be an old presets.json). Export a single preset file with "Export preset" first, then import it.</translation>
         </message>
         <message>
-            <location filename="../window.py" line="2933" />
-            <source>已导入方案「{name}」到槽位 {slot}</source>
-            <translation>Preset "{name}" imported into slot {slot}</translation>
+            <location filename="../window.py" line="3014" />
+            <source>将把当前所有参数恢复为出厂默认，现有调整会丢失。继续？</source>
+            <translation>All current parameters will be restored to factory defaults and your adjustments will be lost. Continue?</translation>
         </message>
         <message>
-            <location filename="../window.py" line="2938" />
-            <source>该槽位为空，无需删除</source>
-            <translation>This slot is empty, nothing to delete</translation>
-        </message>
-        <message>
-            <location filename="../window.py" line="2942" />
-            <location filename="../window.py" line="2949" />
-            <source>删除预设</source>
-            <translation>Delete preset</translation>
-        </message>
-        <message>
-            <location filename="../window.py" line="2943" />
-            <source>确定删除「{name}」？</source>
-            <translation>Delete "{name}"?</translation>
-        </message>
-        <message>
-            <location filename="../window.py" line="2953" />
-            <source>已删除槽位 {slot}：{name}</source>
-            <translation>Deleted slot {slot}: {name}</translation>
-        </message>
-        <message>
-            <location filename="../window.py" line="2994" />
-            <source>自动保存失败：{err}</source>
-            <translation>Auto-save failed: {err}</translation>
-        </message>
-        <message>
-            <location filename="../window.py" line="3025" />
-            <source>将把所有参数恢复为出厂默认，当前的调参会被覆盖。继续？</source>
-            <translation>All parameters will be restored to factory defaults; your current tweaks will be lost. Continue?</translation>
-        </message>
-        <message>
-            <location filename="../window.py" line="3038" />
-            <source>已恢复默认设置</source>
-            <translation>Restored to defaults</translation>
-        </message>
-        <message>
-            <location filename="../window.py" line="3077" />
-            <location filename="../window.py" line="3404" />
-            <location filename="../window.py" line="3409" />
-            <source>拖入图片，或点「打开图片」</source>
+            <location filename="../window.py" line="3066" />
+            <location filename="../window.py" line="3393" />
+            <location filename="../window.py" line="3398" />
+            <source>请拖入图片，或点击「打开图片」</source>
             <translation>Drop an image, or click "Open image"</translation>
         </message>
         <message>
-            <location filename="../window.py" line="3091" />
-            <source>已载入 {n} 张（预览与调参取样第一张）</source>
+            <location filename="../window.py" line="3076" />
+            <source>已载入 {n} 张（预览与调参取第一张）</source>
             <translation>{n} images loaded (the first one is used for preview and tweaking)</translation>
         </message>
         <message>
-            <location filename="../window.py" line="3094" />
-            <source>尚未载入图片</source>
-            <translation>No images loaded</translation>
+            <location filename="../window.py" line="3105" />
+            <source>已载入 {n} 张图片，可开始生成</source>
+            <translation>{n} images loaded; you can start generating now</translation>
         </message>
         <message>
-            <location filename="../window.py" line="3100" />
-            <source>选择图片文件夹</source>
-            <translation>Choose an image folder</translation>
-        </message>
-        <message>
-            <location filename="../window.py" line="3108" />
-            <source>所选目录里没有受支持的图片</source>
-            <translation>No supported images in that folder</translation>
-        </message>
-        <message>
-            <location filename="../window.py" line="3109" />
-            <source>（含子目录）</source>
-            <translation> (including subfolders)</translation>
-        </message>
-        <message>
-            <location filename="../window.py" line="3110" />
-            <source>（可勾选「包含子文件夹」）</source>
-            <translation> (tick "Include subfolders")</translation>
-        </message>
-        <message>
-            <location filename="../window.py" line="3120" />
-            <source>已载入 {n} 张图片，可点「开始生成」</source>
-            <translation>{n} images loaded — click "Start"</translation>
-        </message>
-        <message>
-            <location filename="../window.py" line="3134" />
-            <source>请先选择一张图片（也可直接拖入图片或文件夹）</source>
+            <location filename="../window.py" line="3119" />
+            <source>请先选择图片（也可直接拖入图片或文件夹）</source>
             <translation>Select an image first (or drop an image / folder here)</translation>
         </message>
         <message>
-            <location filename="../window.py" line="3138" />
-            <source>正在生成预览…</source>
-            <translation>Generating preview…</translation>
-        </message>
-        <message>
-            <location filename="../window.py" line="3152" />
-            <source>预览已生成</source>
-            <translation>Preview updated</translation>
-        </message>
-        <message>
-            <location filename="../window.py" line="3164" />
-            <source>立即按当前参数重渲一次预览</source>
+            <location filename="../window.py" line="3149" />
+            <source>按当前参数重新渲染预览</source>
             <translation>Re-render the preview with the current settings</translation>
         </message>
         <message>
-            <location filename="../window.py" line="3165" />
-            <source>先选择一张图片（或拖入图片）再刷新预览</source>
+            <location filename="../window.py" line="3150" />
+            <source>请先选择图片后再刷新预览</source>
             <translation>Select an image first (or drop one), then refresh</translation>
         </message>
         <message>
-            <location filename="../window.py" line="3267" />
-            <source>预览失败：</source>
-            <translation>Preview failed: </translation>
-        </message>
-        <message>
-            <location filename="../window.py" line="3279" />
-            <source>渲染 {ms:.0f} ms · 请求→显示 {e2e:.0f} ms</source>
-            <translation>Render {ms:.0f} ms · request→shown {e2e:.0f} ms</translation>
-        </message>
-        <message>
-            <location filename="../window.py" line="3312" />
-            <source>渲染分段({tag}) 合计 {total:.0f}ms</source>
-            <translation>Render stages ({tag}), total {total:.0f} ms</translation>
-        </message>
-        <message>
-            <location filename="../window.py" line="3315" />
-            <source>参数指纹:</source>
-            <translation>Parameter fingerprint:</translation>
-        </message>
-        <message>
-            <location filename="../window.py" line="3336" />
-            <source>选择图片</source>
-            <translation>Choose an image</translation>
-        </message>
-        <message>
             <location filename="../window.py" line="3337" />
-            <source>图片 (*.jpg *.jpeg *.png *.webp *.gif *.bmp *.tif *.tiff *.ico);;所有文件 (*)</source>
-            <translation>Images (*.jpg *.jpeg *.png *.webp *.gif *.bmp *.tif *.tiff *.ico);;All files (*)</translation>
-        </message>
-        <message>
-            <location filename="../window.py" line="3342" />
-            <source>选择导出文件夹</source>
-            <translation>Choose the output folder</translation>
-        </message>
-        <message>
-            <location filename="../window.py" line="3348" />
-            <source>(跟随原图) </source>
+            <source>（跟随原图） </source>
             <translation>(follows source) </translation>
         </message>
         <message>
-            <location filename="../window.py" line="3354" />
-            <source>已复制原始型号到剪贴板</source>
-            <translation>Raw model copied to clipboard</translation>
-        </message>
-        <message>
-            <location filename="../window.py" line="3366" />
-            <source>请拖入图片文件</source>
-            <translation>Please drop an image file</translation>
-        </message>
-        <message>
-            <location filename="../window.py" line="3369" />
-            <location filename="../window.py" line="3421" />
-            <source>不是受支持的图片格式</source>
+            <location filename="../window.py" line="3358" />
+            <location filename="../window.py" line="3410" />
+            <source>不支持的图片格式</source>
             <translation>Unsupported image format</translation>
         </message>
         <message>
-            <location filename="../window.py" line="2692" />
-            <source>品牌：{brand}</source>
-            <translation>Make: {brand}</translation>
-        </message>
-        <message>
-            <location filename="../window.py" line="2211" />
-            <source>预设方案…</source>
-            <translation>Presets…</translation>
-        </message>
-        <message>
-            <location filename="../window.py" line="2694" />
-            <source>水印里会显示：{name}</source>
-            <translation>Shown in the watermark: {name}</translation>
-        </message>
-        <message>
-            <location filename="../window.py" line="2699" />
-            <source>把识别到的型号复制到剪贴板</source>
-            <translation>Copy the detected model to the clipboard</translation>
-        </message>
-        <message>
-            <location filename="../window.py" line="2700" />
-            <location filename="../window.py" line="3357" />
-            <source>还没有识别到型号（先选一张图片）</source>
-            <translation>No model detected yet (select an image first)</translation>
-        </message>
-        <message>
-            <location filename="../window.py" line="2835" />
-            <location filename="../window.py" line="2843" />
-            <source>保存预设</source>
-            <translation>Save preset</translation>
-        </message>
-        <message>
-            <location filename="../window.py" line="2907" />
-            <source>这个文件里不像是单个方案（可能是老版的 presets.json）。请用「导出预设」得到单个方案文件后再导入。</source>
-            <translation>This file does not look like a single preset (it may be an old presets.json). Use "Export preset" to get a single-preset file first.</translation>
-        </message>
-        <message>
-            <location filename="../window.py" line="3392" />
-            <source>已选择：{name}</source>
-            <translation>Selected: {name}</translation>
-        </message>
-        <message>
-            <location filename="../window.py" line="3398" />
-            <source>松手以载入</source>
+            <location filename="../window.py" line="3387" />
+            <source>松开鼠标以载入</source>
             <translation>Release to load</translation>
         </message>
         <message>
-            <location filename="../window.py" line="3411" />
-            <source>未收到文件</source>
-            <translation>No file received</translation>
-        </message>
-        <message>
-            <location filename="../window.py" line="3431" />
-            <source>正在处理中，请稍候</source>
-            <translation>Already processing, please wait</translation>
-        </message>
-        <message>
-            <location filename="../window.py" line="3434" />
-            <source>请先选择导出目录</source>
-            <translation>Choose an output folder first</translation>
-        </message>
-        <message>
-            <location filename="../window.py" line="3446" />
-            <source>请先选择图片</source>
-            <translation>Select an image first</translation>
-        </message>
-        <message>
-            <location filename="../window.py" line="3452" />
+            <location filename="../window.py" line="3441" />
             <source>请先选择要批量处理的图片</source>
             <translation>Select the images to batch-process first</translation>
         </message>
         <message>
-            <location filename="../window.py" line="3457" />
+            <location filename="../window.py" line="3446" />
             <source>无法开始处理</source>
             <translation>Could not start processing</translation>
         </message>
         <message>
-            <location filename="../window.py" line="3464" />
+            <location filename="../window.py" line="3453" />
             <source>处理中…</source>
             <translation>Processing…</translation>
         </message>
         <message>
-            <location filename="../window.py" line="3475" />
+            <location filename="../window.py" line="3464" />
             <source>处理中 {done}/{total}：{name}</source>
             <translation>Processing {done}/{total}: {name}</translation>
         </message>
         <message>
-            <location filename="../window.py" line="3489" />
+            <location filename="../window.py" line="3478" />
             <source>已完成：{msg}</source>
             <translation>Done: {msg}</translation>
         </message>
         <message>
-            <location filename="../window.py" line="3493" />
+            <location filename="../window.py" line="3482" />
             <source>失败：</source>
             <translation>Failed: </translation>
         </message>
@@ -1034,60 +1000,60 @@ When redistributing, comply with PySide6s LGPLv3 (see README and THIRD_PARTY_LIC
     <context>
         <name>MapDialog</name>
         <message>
-            <location filename="../window.py" line="1665" />
-            <location filename="../window.py" line="1708" />
+            <location filename="../window.py" line="1650" />
+            <location filename="../window.py" line="1693" />
             <source>型号映射管理</source>
             <translation>Model mapping</translation>
         </message>
         <message>
-            <location filename="../window.py" line="1674" />
+            <location filename="../window.py" line="1659" />
             <source>识别到的原始型号 → 水印上显示的型号。左侧列表选中后可删除。</source>
             <translation>Detected raw model → the model shown in the watermark. Select an entry on the left to delete it.</translation>
         </message>
         <message>
-            <location filename="../window.py" line="1685" />
+            <location filename="../window.py" line="1670" />
             <source>原始</source>
             <translation>Raw</translation>
         </message>
         <message>
-            <location filename="../window.py" line="1687" />
+            <location filename="../window.py" line="1672" />
             <source>如 ILCE-7M4</source>
             <translation>e.g. ILCE-7M4</translation>
         </message>
         <message>
-            <location filename="../window.py" line="1689" />
+            <location filename="../window.py" line="1674" />
             <source>显示</source>
             <translation>Display</translation>
         </message>
         <message>
-            <location filename="../window.py" line="1691" />
+            <location filename="../window.py" line="1676" />
             <source>如 Sony A7M4</source>
             <translation>e.g. Sony A7M4</translation>
         </message>
         <message>
-            <location filename="../window.py" line="1699" />
+            <location filename="../window.py" line="1684" />
             <source>添加 / 修改</source>
             <translation>Add / update</translation>
         </message>
         <message>
-            <location filename="../window.py" line="1700" />
+            <location filename="../window.py" line="1685" />
             <source>删除选中</source>
             <translation>Delete selected</translation>
         </message>
         <message>
-            <location filename="../window.py" line="1757" />
+            <location filename="../window.py" line="1718" />
+            <source>请先填写「原始型号」</source>
+            <translation>Fill in the raw model first</translation>
+        </message>
+        <message>
+            <location filename="../window.py" line="1742" />
             <source>保存失败</source>
             <translation>Save failed</translation>
         </message>
         <message>
-            <location filename="../window.py" line="1733" />
+            <location filename="../window.py" line="1718" />
             <source>提示</source>
             <translation>Notice</translation>
-        </message>
-        <message>
-            <location filename="../window.py" line="1733" />
-            <source>请先填「原始型号」</source>
-            <translation>Fill in the raw model first</translation>
         </message>
     </context>
     <context>
@@ -1129,7 +1095,7 @@ When redistributing, comply with PySide6s LGPLv3 (see README and THIRD_PARTY_LIC
         </message>
         <message>
             <location filename="../window.py" line="126" />
-            <source>图片高度&lt;1500px 时 2 倍渲染</source>
+            <source>图片高度小于 1500px 时 2 倍渲染</source>
             <translation>2× supersampling when height &lt; 1500 px</translation>
         </message>
         <message>
@@ -1455,58 +1421,58 @@ When redistributing, comply with PySide6s LGPLv3 (see README and THIRD_PARTY_LIC
     <context>
         <name>PresetDialog</name>
         <message>
-            <location filename="../window.py" line="1167" />
-            <location filename="../window.py" line="1213" />
+            <location filename="../window.py" line="1150" />
+            <location filename="../window.py" line="1196" />
             <source>预设方案</source>
             <translation>Presets</translation>
         </message>
         <message>
-            <location filename="../window.py" line="1185" />
-            <source>一个槽位一个文件（presets1..10.json）；导入是按当前选中的槽位落地的。</source>
-            <translation>One file per slot (presets1..10.json); importing uses the slot currently selected.</translation>
+            <location filename="../window.py" line="1168" />
+            <source>一个槽位一个文件（presets1..10.json）；导入将保存到当前选中的槽位。</source>
+            <translation>One file per slot (presets1..10.json); importing saves to the currently selected slot.</translation>
         </message>
         <message>
-            <location filename="../window.py" line="1194" />
+            <location filename="../window.py" line="1177" />
             <source>方案名（保存时必填）</source>
             <translation>Preset name (required when saving)</translation>
         </message>
         <message>
-            <location filename="../window.py" line="1197" />
+            <location filename="../window.py" line="1180" />
             <source>加载</source>
             <translation>Load</translation>
         </message>
         <message>
-            <location filename="../window.py" line="1198" />
+            <location filename="../window.py" line="1181" />
             <source>保存</source>
             <translation>Save</translation>
         </message>
         <message>
-            <location filename="../window.py" line="1199" />
+            <location filename="../window.py" line="1182" />
             <source>删除</source>
             <translation>Delete</translation>
         </message>
         <message>
-            <location filename="../window.py" line="1206" />
+            <location filename="../window.py" line="1189" />
             <source>打开目录</source>
             <translation>Open folder</translation>
         </message>
         <message>
-            <location filename="../window.py" line="1207" />
+            <location filename="../window.py" line="1190" />
             <source>预设目录</source>
             <translation>Presets folder</translation>
         </message>
         <message>
-            <location filename="../window.py" line="1210" />
+            <location filename="../window.py" line="1193" />
             <source>导入…</source>
             <translation>Import…</translation>
         </message>
         <message>
-            <location filename="../window.py" line="1211" />
+            <location filename="../window.py" line="1194" />
             <source>导出…</source>
             <translation>Export…</translation>
         </message>
         <message>
-            <location filename="../window.py" line="1212" />
+            <location filename="../window.py" line="1195" />
             <source>关闭</source>
             <translation>Close</translation>
         </message>
@@ -1514,8 +1480,8 @@ When redistributing, comply with PySide6s LGPLv3 (see README and THIRD_PARTY_LIC
     <context>
         <name>PreviewBox</name>
         <message>
-            <location filename="../window.py" line="650" />
-            <source>拖入图片，或点「打开图片」</source>
+            <location filename="../window.py" line="651" />
+            <source>请拖入图片，或点击「打开图片」</source>
             <translation>Drop an image, or click "Open image"</translation>
         </message>
     </context>
@@ -1548,28 +1514,28 @@ When redistributing, comply with PySide6s LGPLv3 (see README and THIRD_PARTY_LIC
         </message>
         <message>
             <location filename="../window.py" line="283" />
-            <source>还没选图片（或取样图已清空）</source>
-            <translation>No image selected yet (or the sample image was cleared)</translation>
+            <source>未选择图片</source>
+            <translation>No image selected</translation>
         </message>
         <message>
             <location filename="../window.py" line="284" />
-            <source>已发出请求，正在渲染；拖动参数时多数时候停在这一态</source>
-            <translation>Request sent, rendering. This is the usual state while dragging a slider</translation>
+            <source>正在渲染，完成后自动更新</source>
+            <translation>Rendering; the preview updates automatically</translation>
         </message>
         <message>
             <location filename="../window.py" line="285" />
-            <source>屏幕上这张图对应此刻的全部参数（预览按缩略档渲染，看细节请用放大镜）</source>
-            <translation>This image was rendered with the settings you have now (the preview renders at reduced size; use the magnifier for detail)</translation>
+            <source>预览已与当前参数一致（缩略档渲染，细节请用放大镜查看）</source>
+            <translation>The preview matches the current settings (rendered at reduced size; use the magnifier for detail)</translation>
         </message>
         <message>
             <location filename="../window.py" line="286" />
-            <source>屏幕上这张图还是旧参数渲的，等这一轮渲染完成</source>
-            <translation>This image is still from older settings; waiting for the current render to finish</translation>
+            <source>预览尚未更新到当前参数，渲染完成后自动更新</source>
+            <translation>The preview has not been updated to the current settings yet; it refreshes when rendering finishes</translation>
         </message>
         <message>
             <location filename="../window.py" line="287" />
-            <source>上一次预览渲染失败，屏上留的是上一张成功的图</source>
-            <translation>The last preview render failed; the image shown is the previous successful one</translation>
+            <source>上次预览渲染失败，当前显示的是上一张成功的预览</source>
+            <translation>The last preview render failed; the preview shown is the previous successful one</translation>
         </message>
     </context>
     <context>
@@ -1590,17 +1556,12 @@ When redistributing, comply with PySide6s LGPLv3 (see README and THIRD_PARTY_LIC
         <name>main</name>
         <message>
             <location filename="../../../main.py" line="57" />
-            <source>镶·水印 (Qt 版)</source>
-            <translation>ShuiYin·Watermark (Qt)</translation>
+            <source>镶 · 水印（Qt 版）</source>
+            <translation>ShuiYin · Watermark (Qt)</translation>
         </message>
     </context>
     <context>
         <name>stats</name>
-        <message>
-            <location filename="../stats.py" line="111" />
-            <source>本次会话: 尚无预览</source>
-            <translation>This session: no preview yet</translation>
-        </message>
         <message>
             <location filename="../stats.py" line="112" />
             <source> · 生成 {gen}</source>
@@ -1617,11 +1578,6 @@ When redistributing, comply with PySide6s LGPLv3 (see README and THIRD_PARTY_LIC
             <translation> · layer cache {pct:.0f}% · queued {arrived}{gen_part}</translation>
         </message>
         <message>
-            <location filename="../stats.py" line="118" />
-            <source>本次会话: 预览 {n} 次</source>
-            <translation>This session: {n} previews</translation>
-        </message>
-        <message>
             <location filename="../stats.py" line="120" />
             <source>  渲染      p50 {r50:.0f}ms / p95 {r95:.0f}ms / max {rmax:.0f}ms</source>
             <translation>  render     p50 {r50:.0f}ms / p95 {r95:.0f}ms / max {rmax:.0f}ms</translation>
@@ -1632,8 +1588,18 @@ When redistributing, comply with PySide6s LGPLv3 (see README and THIRD_PARTY_LIC
             <translation>  queued     p50 {q50:.0f}ms / p95 {q95:.0f}ms / max {qmax:.0f}ms</translation>
         </message>
         <message>
+            <location filename="../stats.py" line="111" />
+            <source>本次会话：暂无预览</source>
+            <translation>This session: no preview yet</translation>
+        </message>
+        <message>
+            <location filename="../stats.py" line="118" />
+            <source>本次会话：预览 {n} 次</source>
+            <translation>This session: {n} previews</translation>
+        </message>
+        <message>
             <location filename="../stats.py" line="124" />
-            <source>   (渲染期间又到达 {n} 次请求)</source>
+            <source>   （渲染期间新增 {n} 次请求）</source>
             <translation>   ({n} more requests arrived while rendering)</translation>
         </message>
         <message>

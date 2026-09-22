@@ -26,7 +26,9 @@ import re
 from PySide6.QtCore import QT_TRANSLATE_NOOP, QCoreApplication, QTranslator
 
 # 可选语言(菜单里按这个列表生成); 第一项是源语言, 不需要 .qm
-LANGS = (("zh", "中文"), ("en", "English"))
+# 第三项是**跟在「语言」后面的语言码**(让不懂中文的人也知道那个入口是干嘛的, 见 _sync_lang_menu):
+# 刻意**不是** code.upper() —— zh 的大写是 "ZH"(ISO 639 的语言码), 没人认; 大家认的是 CN/EN。
+LANGS = (("zh", "中文", "CN"), ("en", "English", "EN"))
 DEFAULT_LANG = "zh"
 
 _QM_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "i18n")
