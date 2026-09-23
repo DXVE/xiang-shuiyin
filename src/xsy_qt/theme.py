@@ -91,7 +91,7 @@ QFrame#segbar {{
 }}
 QPushButton#seg {{
     background: transparent;
-    border: 1px solid transparent;
+    border: none;
     border-radius: {RADIUS_CTRL}px;
     padding: 0 18px;
     color: {TEXT};
@@ -99,7 +99,6 @@ QPushButton#seg {{
 QPushButton#seg:hover {{ background: #EFF3EF; }}
 QPushButton#seg:checked {{
     background: {ACCENT};
-    border-color: {ACCENT2};
     color: #fff;
     font-weight: bold;
 }}
@@ -140,41 +139,50 @@ QLabel#aboutVer {{ font-size: 13px; font-weight: bold; color: #334155; backgroun
 QLabel#aboutInfo {{ font-size: 12px; color: {MUTED}; background: transparent; }}
 QLabel#aboutNote {{ font-size: 11px; color: {MUTED}; background: transparent; }}
 
-/* ---------- 按钮 ---------- */
+/* ---------- 按钮 ----------
+   全部按钮无描边: 形状由圆角 + 底色画出。
+   中性按钮的底不能取 CARD(白) —— 白底按钮在白色卡片上会看不见; 取 #EAE3D3,
+   它比 CARD 暗 8.6 L*、比 BG 暗 4.5, 在卡片与顶栏底上都看得出是按钮。 */
 QPushButton {{
-    background: {CARD};
-    border: 1px solid {LINE};
+    background: #EAE3D3;
+    border: none;
     border-radius: {RADIUS_CTRL}px;
     padding: 0 14px;          /* 竖向不设 padding: 高度由 CTRL_H 定, 文字由按钮自身居中 */
     color: {TEXT};
 }}
-/* 悬停/按下: **不再描一圈绿边**(用户: "选中时的样式不美观") —— 改成底色微微变一下:
-   悬停取极浅的暖绿灰(#EEF2EC, 比卡片 #FDFCF9 深一点点), 按下再深一档。
-   焦点与悬停同一套: 点击后按钮留着焦点, 两态不一致会让它"卡"在某个样式上。 */
-QPushButton:hover, QPushButton:focus {{ background: #EEF2EC; }}
-QPushButton:pressed {{ background: #E2E9E1; }}
-QPushButton:disabled {{ color: #b9b3a8; background: #f6f3ec; border-color: {LINE}; }}
+/* 悬停与焦点同一档、按下再深一档 —— 焦点必须与悬停同档: 点过的按钮留着焦点,
+   两态不一致会让它"卡"在另一个样式上。 */
+QPushButton:hover, QPushButton:focus {{ background: #DFD7C4; }}
+QPushButton:pressed {{ background: #D4CBB6; }}
+QPushButton:disabled {{ color: #b9b3a8; background: #F2EEE5; }}
 /* 可勾选按钮当 pill 用(处理模式的「单张图片 / 批量目录」) */
 QPushButton:checked {{
     background: {ACCENT};
-    border-color: {ACCENT2};
     color: #fff;
     font-weight: bold;
 }}
 QPushButton:checked:hover, QPushButton:checked:focus {{ background: {ACCENT2}; }}
 QPushButton#primary {{
     background: {ACCENT};
-    border-color: {ACCENT2};
     color: #fff;
     font-weight: bold;
     padding: 0 20px;
 }}
 QPushButton#primary:hover, QPushButton#primary:focus {{ background: {ACCENT2}; }}
-QPushButton#primary:disabled {{ background: #b8c9bd; border-color: #a8b9ad; color: #f0f0f0; }}
+QPushButton#primary:disabled {{ background: #b8c9bd; color: #f0f0f0; }}
+/* 入口按钮(顶栏「打开图片」): 顶栏那一排都是中性小按钮, 需要一块实心底色把它标成入口。
+   底色 #c28b5e(用户手调, 取自参考色 #A4774F)。配白字对比度 2.94:1, 低于 AA(4.5):
+   要达标压到 #9d6b42(4.55:1) 即可。实心但不加粗 —— 加粗那一档留给 #primary(「开始生成」)。
+   悬停/按下各深一档。试过"参考色兑白"做浅底(26% / 45%): 去饱和后压在米色底上发灰发泥, 已弃用。 */
+QPushButton#entry {{ background: #c28b5e; color: #fff; }}
+QPushButton#entry:hover, QPushButton#entry:focus {{ background: #b57f54; }}
+QPushButton#entry:pressed {{ background: #a9754a; }}
+/* :disabled 必须单独写: #entry 带 ID, 特异性高于 `QPushButton:disabled`, 与 #ghost 那条同理 */
+QPushButton#entry:disabled {{ background: #F2EEE5; color: #b9b3a8; }}
 QPushButton#mini {{ padding: 0 8px; font-size: 11px; border-radius: {RADIUS_SMALL}px; color: {MUTED}; }}
-/* 迷你按钮(重置本组 / 复制 / ☰ / ℹ)悬停时略深一点, 与普通按钮同一套口径(都不描边) */
-QPushButton#mini:hover, QPushButton#mini:focus {{ background: #EEF2EC; color: {TEXT}; }}
-QPushButton#mini:pressed {{ background: #E2E9E1; }}
+/* 迷你按钮(重置本组 / 复制 / ☰ / ℹ): 悬停/按下继承上面那两档, 不在此另写 ——
+   中性底由白改暖米色之后, 旧的一档(#EEF2EC/#E2E9E1)比常态更浅, 悬停反而"变亮"。 */
+QPushButton#mini:hover, QPushButton#mini:focus {{ color: {TEXT}; }}
 /* 带菜单的按钮(QPushButton.setMenu)右下角会被 Qt 画一个下拉三角, 小图标按钮上看着就是多出
    一个小 "v"(顶栏 ☰ 上被用户报过) —— 这个按钮的语义是"点开菜单", 不需要那个三角, 关掉它 */
 QPushButton#mini::menu-indicator {{ image: none; width: 0px; height: 0px; }}

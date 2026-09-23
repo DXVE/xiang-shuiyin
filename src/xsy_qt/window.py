@@ -18,8 +18,8 @@ import os
 import time
 from datetime import datetime
 
-from PySide6.QtCore import (QAbstractAnimation, QEasingCurve, QParallelAnimationGroup, QPointF,
-                            QPropertyAnimation, QRectF, QSize, Qt,
+from PySide6.QtCore import (QAbstractAnimation, QEasingCurve, QEvent, QParallelAnimationGroup,
+                            QPoint, QPointF, QPropertyAnimation, QRectF, QSize, Qt,
                             QT_TRANSLATE_NOOP, QTimer, QUrl, Signal)
 from PySide6.QtGui import (QColor, QDesktopServices, QFont, QIcon, QImage, QKeySequence,
                            QPainter, QPainterPath, QPen, QPixmap, QShortcut)
@@ -27,7 +27,7 @@ from PySide6.QtWidgets import (
     QAbstractSpinBox, QApplication, QCheckBox, QColorDialog, QComboBox, QDialog,
     QFileDialog, QFrame, QGraphicsOpacityEffect, QGridLayout, QHBoxLayout, QLabel,
     QLineEdit, QListWidget, QMainWindow, QMenu, QMessageBox, QProgressBar, QPushButton,
-    QScrollArea, QSizePolicy, QSlider, QSpinBox, QSplitter, QStackedWidget,
+    QScrollArea, QSizePolicy, QSlider, QSpacerItem, QSpinBox, QSplitter, QStackedWidget,
     QVBoxLayout, QWidget,
 )
 
@@ -109,11 +109,17 @@ TABS = [("files", QT_TRANSLATE_NOOP("MainWindow", "文件与美化")),
 #       color(取色) / path(文件路径)
 # 取值范围与提示文案
 PARAM_SPECS = [
+    # ---------- 不在页签里平铺的行(收进弹窗) ----------
+    # 字体文件: 四条路径原来占掉「字体与画布」页签的第一张卡片, 而字体路径一年改一两次 ——
+    # 收进 ☰ →「字体文件…」的弹窗(见 FontDialog)。
+    # `tab=None` 让 _build_tab 跳过; 标签/提示/kind 仍留在本表里, 弹窗按 `dialog="fonts"` 取用,
+    # 免得同一份定义抄两遍(撤销步名也取自这里的 label, 见 _on_param)。
+    dict(tab=None, dialog="fonts", card=QT_TRANSLATE_NOOP("Card", "字体文件"), key="font_path", label=QT_TRANSLATE_NOOP("ParamRow", "常规字体"), kind="path"),
+    dict(tab=None, dialog="fonts", card=QT_TRANSLATE_NOOP("Card", "字体文件"), key="font_bold_path", label=QT_TRANSLATE_NOOP("ParamRow", "粗体字体"), kind="path"),
+    dict(tab=None, dialog="fonts", card=QT_TRANSLATE_NOOP("Card", "字体文件"), key="font_italic_path", label=QT_TRANSLATE_NOOP("ParamRow", "斜体字体"), kind="path"),
+    dict(tab=None, dialog="fonts", card=QT_TRANSLATE_NOOP("Card", "字体文件"), key="font_bold_italic_path", label=QT_TRANSLATE_NOOP("ParamRow", "粗斜体字体"), kind="path"),
+
     # ---------- 字体与画布 ----------
-    dict(tab="font", card=QT_TRANSLATE_NOOP("Card", "字体文件"), key="font_path", label=QT_TRANSLATE_NOOP("ParamRow", "常规字体"), kind="path"),
-    dict(tab="font", card=QT_TRANSLATE_NOOP("Card", "字体文件"), key="font_bold_path", label=QT_TRANSLATE_NOOP("ParamRow", "粗体字体"), kind="path"),
-    dict(tab="font", card=QT_TRANSLATE_NOOP("Card", "字体文件"), key="font_italic_path", label=QT_TRANSLATE_NOOP("ParamRow", "斜体字体"), kind="path"),
-    dict(tab="font", card=QT_TRANSLATE_NOOP("Card", "字体文件"), key="font_bold_italic_path", label=QT_TRANSLATE_NOOP("ParamRow", "粗斜体字体"), kind="path"),
 
     dict(tab="font", card=QT_TRANSLATE_NOOP("Card", "最小字号设置"), key="min_font_size", label=QT_TRANSLATE_NOOP("ParamRow", "最小字号"), kind="int",
          args=(0, 200), hint=QT_TRANSLATE_NOOP("ParamRow", "0~200px，默认 20")),
@@ -1050,19 +1056,18 @@ def _about_logo(size, dpr=1.0):
     return pm
 
 
-def _about_label(text, obj_name, spacing=0.0, selectable=False):
+def _about_label(text, obj_name, spacing=0.0):
     """关于框里的一行文字: 字号/字重/颜色全交给 QSS(见 theme 里 `QLabel#about*` 那段注释 ——
     全局 `QWidget {font-size:12px}` 会压过 setFont, 字号只能写 QSS)。
 
-    这里只做两件 QSS 做不到的事: **字距**(QSS 没有 letter-spacing)与**可选中**(路径要能复制)。
-    字距得等弹窗抛光之后再设一遍, 所以本函数只把想要的字距记在属性上, 由 AboutDialog 结尾统一施加。
+    这里只做两件 QSS 做不到的事: **字距**(QSS 没有 letter-spacing)与**可选中**。两件都不在本函数里
+    当场做, 都只把意图留下: 字距记在属性上, 由 AboutDialog 结尾(抛光之后)统一施加; 可选中是
+    **整框的性质**(那个框里所有文字都要能选中复制), 由 AboutDialog 建完所有标签后统一开。
     """
     lab = QLabel(text)
     lab.setObjectName(obj_name)
     lab.setProperty("letterSpacing", float(spacing))
     lab.setAlignment(Qt.AlignmentFlag.AlignCenter)
-    if selectable:
-        lab.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
     return lab
 
 
@@ -1118,13 +1123,14 @@ class AboutDialog(QDialog):
                                  "aboutInfo"))
         v.addSpacing(8)
         v.addWidget(_about_label(self.tr("数据目录：{path}").format(path=core.BASE_DIR),
-                                 "aboutInfo", selectable=True))
+                                 "aboutInfo"))
         v.addSpacing(4)
         v.addWidget(_about_label(self.tr("本次会话统计：{stats}").format(
-            stats=self._stats_text(parent)), "aboutInfo", selectable=True))
+            stats=self._stats_text(parent)), "aboutInfo"))
         v.addSpacing(16)
         note = _about_label(self.tr(
-            "分发时请遵守 PySide6 的 LGPLv3（详见仓库 README 与 THIRD_PARTY_LICENSES）。"),
+            "分发时请遵守 PySide6 的 LGPLv3 与内置字体的 SIL OFL 1.1"
+            "（详见仓库 THIRD_PARTY_LICENSES.md 与 assets/fonts/OFL.txt）。"),
             "aboutNote")             # 备注: 灰色小字
         note.setWordWrap(True)
         note.setMaximumWidth(420)
@@ -1137,6 +1143,17 @@ class AboutDialog(QDialog):
                               self.tr("项目仓库（GitHub）"), self))
         v.addSpacing(14)
         v.addLayout(dlg_button_row(dlg_button(self.tr("关闭"), self.accept, primary=True)))
+        # 可选中**必须在定尺寸之前开**: 开了它 Qt 才给标签建文本控件(QTextDocument), 标签的期望
+        # 尺寸随之变化(22px 行 22→26、13px 行 13→15、12px 行 14→12); 放到 csdify/adjustSize 之后
+        # 开, 尺寸已按旧期望定死, 多出的像素会被布局从别处抠掉(实测抠的是顶部 logo: 88px→82px, 图被裁)。
+        # 按"有文字的标签"统一开: 图标标签无文字(_IconLink), 挂文本交互只会多一个用不上的文本控件。
+        # 标题栏那行「关于」由下面 csdify 建, 本段在它之前跑, 天然不在其列 —— 也应如此: 它压在拖动
+        # 区上, 开了文本交互会吃掉鼠标按下, 标题就拖不动窗口。若把本段挪到 csdify 之后, 记得排除它。
+        # Qt 对"只允许鼠标选中"的标签给的是点击聚焦(不进 Tab 链), Tab 仍只停在两个按钮上。
+        for lab in self.findChildren(QLabel):
+            if lab.text():
+                lab.setTextInteractionFlags(lab.textInteractionFlags()
+                                            | Qt.TextInteractionFlag.TextSelectableByMouse)
         csdify(self, self.tr("关于"), _prep_dialog)
         # **字距放在最后设**: QSS 抛光会把 setFont 的字号压回 12px, 但**不影响字距**; 而若在
         # 抛光之前设, 那一次 setFont 会被整体覆盖掉。所以等 csdify/adjustSize 走完再逐行施加。
@@ -1792,7 +1809,8 @@ class MapDialog(QDialog):
             self._logo_dir = core.DEFAULT_LOGO_DIR
 
         v = QVBoxLayout(self)
-        tip = QLabel(self.tr("识别到的原始型号 → 水印上显示的型号。左侧列表选中后可删除。"))
+        tip = QLabel(self.tr("识别到的原始型号 → 水印上显示的型号。"
+                             "在列表里选中一条即可修改或删除（删除前会先确认）。"))
         tip.setObjectName("hint")
         tip.setWordWrap(True)
         v.addWidget(tip)
@@ -1813,12 +1831,14 @@ class MapDialog(QDialog):
         form.addWidget(self._nice, 1)
         v.addLayout(form)
 
-        # 只有两个动作, 且都是**即时生效**(点完立刻写盘): 所以不再有单独的「保存到映射表」——
-        # 列表上一秒就变了, 再要求"保存"一次反而是误导; 也不再有「关闭」(标题栏那个 ✕ 就是关)。
+        # 三个动作都即时生效(点完写盘), 所以没有单独的「保存到映射表」—— 列表当场就变了。
+        # 按钮次序: 删除在最左、关闭在右下角(与其它自绘弹窗一致: 关于/图片信息/取色/预设的右下角
+        # 都是「关闭」且是主色)。删除曾经落在右下角, 与"关闭"的位置习惯冲突, 容易误按。
         # NOOP 必须包在**字面量**上(lupdate 看不穿变量): 曾经包在 text 上, 结果整条漏译
         v.addLayout(dlg_button_row(
+            dlg_button(self.tr(QT_TRANSLATE_NOOP("MapDialog", "删除选中")), self._remove),
             dlg_button(self.tr(QT_TRANSLATE_NOOP("MapDialog", "添加 / 修改")), self._add),
-            dlg_button(self.tr(QT_TRANSLATE_NOOP("MapDialog", "删除选中")), self._remove)))
+            dlg_button(self.tr("关闭"), self.accept, primary=True)))
 
         self._list.currentItemChanged.connect(self._on_select)
         try:
@@ -1828,24 +1848,70 @@ class MapDialog(QDialog):
         self._reload()
         csdify(self, self.tr("型号映射管理"), _prep_dialog)   # 无边框 + 自绘标题栏
 
-    def _reload(self):
-        """把**内存里**这份映射表画进列表。
+    def _reload(self, select=None):
+        """把**内存里**这份映射表画进列表; `select` = 要选中的"原始型号"。
 
-        **不要在这里读文件**: 以前它每调一次就 load_model_map() 一次, 于是
-        「添加 / 修改」刚写进 self._data 的条目立刻被文件里的旧内容冲掉 —— 表现就是
-        "点添加没反应、列表始终是空的"(文件里本来就没有)。读盘只在 __init__ 里做一次,
-        写盘只在「保存到映射表」里做。
+        不在这里读文件: 每调一次就 load_model_map() 会把刚写进 self._data 的条目冲成文件里的旧内容
+        (表现为"点添加没反应、列表还是空的")。读盘只在 __init__, 写盘只在 _persist。
+
+        `select` 供"添加/修改之后"用: 整表重画会清掉选中状态(currentRow 回到 -1), 刚编辑的那条在
+        列表里就没有任何标记, 而表单里还留着它 —— 会出现"看不出当前是哪条、点删除删掉刚加的那条"。
+        选中它并滚到可见处。
         """
         self._list.clear()
         for k in sorted(self._data):
             self._list.addItem(f"{k}   →   {self._data[k]}")
+        if select is None:
+            return
+        for i in range(self._list.count()):
+            if self._item_key(self._list.item(i)) == select:
+                self._list.setCurrentRow(i)        # 会连带触发 _on_select(表单跟着这条)
+                self._list.scrollToItem(self._list.item(i))
+                break
+
+    @staticmethod
+    def _item_key(item):
+        """列表项文本 "原始   →   显示" 里取出原始型号。分隔符与上面拼串时**必须一致**。"""
+        return item.text().split("   →   ")[0]
 
     def _on_select(self, cur, _prev):
         if cur is None:
             return
-        key = cur.text().split("   →   ")[0]
+        key = self._item_key(cur)
         self._raw.setText(key)
         self._nice.setText(self._data.get(key, ""))
+
+    def _push_to_window(self):
+        """把表同步给主窗口那份 `_params["model_map"]`。
+
+        撤销的快照取的就是它(`_snapshot` 连 model_map 一起存), 改动后不对齐, 撤销栈里就看不到
+        这一步。顺带刷新「水印将显示：X」那行。主窗口不在时(测试里直接构造弹窗)只管自己。
+        """
+        win = self.parent()
+        if win is None or not hasattr(win, "_params"):
+            return
+        win._params["model_map"] = dict(self._data)
+        upd = getattr(win, "_update_effective_model", None)
+        if upd is not None:
+            upd()
+
+    def _apply_change(self, label, fn):
+        """做一次改动并**单独记一步撤销**(每次增 / 改 / 删各一步, 步名进撤销按钮的 tooltip)。
+
+        确认框由调用方在进事务**之前**弹: 它是嵌套事件循环, 放进事务里会让 600ms 的收尾定时器有机会
+        提前把这一步落定 —— 不致命, 但"一步"的边界变得不确定。
+        """
+        win = self.parent()
+        begin = getattr(win, "_begin_undo", None) if win is not None else None
+        commit = getattr(win, "_commit_undo", None) if win is not None else None
+        if begin is None or commit is None:          # 没有主窗口: 退化成"只干活"
+            fn()
+            return
+        begin("__model_map__", label)
+        try:
+            fn()
+        finally:
+            commit()
 
     def _add(self):
         raw = self._raw.text().strip()
@@ -1853,18 +1919,43 @@ class MapDialog(QDialog):
         if not raw:
             _message(self, QMessageBox.Icon.Information, self.tr("提示"), self.tr("请先填写「原始型号」"))
             return
-        self._data[raw] = nice          # 允许把显示名清空
-        self._reload()
-        self._persist()
+        existed = raw in self._data
+        label = (self.tr("修改映射「{raw}」") if existed
+                 else self.tr("新增映射「{raw}」")).format(raw=raw)
+
+        def _do():
+            self._data[raw] = nice      # 允许把显示名清空
+            self._persist()             # 先落盘(失败会回滚 _data), 再把当前结果给窗口
+            self._push_to_window()
+            self._reload(select=raw)    # 选中它: 刚编辑的是哪条要看得见(见 _reload)
+
+        self._apply_change(label, _do)
 
     def _remove(self):
+        """删掉表单里那条。先确认一次: 这是即时写盘的破坏性动作, 且按钮紧邻「添加 / 修改」。"""
         raw = self._raw.text().strip()
-        if raw in self._data:
+        if raw not in self._data:
+            # 不静默返回: 否则用户以为"点了没反应、条目还在"(旧版还会把表单清空)
+            _message(self, QMessageBox.Icon.Information, self.tr("提示"),
+                     self.tr("「原始型号」里现在这条不在映射表里，请先在列表里选中要删除的条目。"))
+            return
+        nice = self._data.get(raw) or ""
+        if _message(self, QMessageBox.Icon.Question, self.tr("删除型号映射"),
+                    self.tr("确定删除「{raw}」→「{nice}」这条映射？").format(
+                        raw=raw, nice=nice or self.tr("（显示为空）")),
+                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                    QMessageBox.StandardButton.No) != QMessageBox.StandardButton.Yes:
+            return
+
+        def _do():
             del self._data[raw]
-            self._reload()
             self._persist()
-        self._raw.clear()
-        self._nice.clear()
+            self._push_to_window()
+            self._reload()
+            self._raw.clear()
+            self._nice.clear()
+
+        self._apply_change(self.tr("删除映射「{raw}」").format(raw=raw), _do)
 
     def _persist(self):
         """立刻写盘 —— 两个动作都是即时生效, 不再有单独的「保存到映射表」按钮。
@@ -1881,6 +1972,75 @@ class MapDialog(QDialog):
             except Exception:                       # noqa: BLE001
                 self._data = {}
             self._reload()
+
+
+class FontDialog(QDialog):
+    """「字体文件」的管理弹窗(☰ →「字体文件…」)。
+
+    四种字重各一个字体文件, 原来平铺在「字体与画布」页签的第一张卡片里 —— 占一整张卡的高度, 而字体
+    路径一年改一两次, 所以收进菜单。形态与「预设方案…」一致: 改动即时生效, 右下角是「关闭」。
+
+    行复用参数行(`ParamRow` 的 path 型): 标签/提示/「选择字体」按钮与原先卡片里一致; 改动走
+    `_on_param` —— 撤销(步名即该行标签)、写设置、重渲预览三条链路不变。
+    """
+
+    def __init__(self, state, parent=None):
+        super().__init__(parent)
+        go_frameless(self)                         # 必须在建窗之前(见 dialog.py)
+        self.setWindowTitle(self.tr("字体文件"))
+        # 给路径框留出可读宽度(放不下也能横向滚); adjustSize 不会压到最小宽度以下
+        self.setMinimumWidth(560)
+
+        v = QVBoxLayout(self)
+        tip = QLabel(self.tr("四种字重各一个字体文件（常规 / 粗体 / 斜体 / 粗斜体）；改完立即生效。"))
+        tip.setObjectName("hint")
+        tip.setWordWrap(True)
+        v.addWidget(tip)
+
+        self._rows = {}
+        for s in [s for s in PARAM_SPECS if s.get("dialog") == "fonts"]:
+            init = parent._params.get(s["key"]) if parent is not None else None
+            row = ParamRow(s, init)
+            if parent is not None:
+                row.changed.connect(parent._on_param)
+            self._rows[s["key"]] = row
+            v.addWidget(row)
+
+        v.addSpacing(6)
+        # 等价于卡片自带的「重置本组」—— 否则只剩「恢复默认设置」那条会重置全部参数的路
+        v.addLayout(dlg_button_row(
+            dlg_button(self.tr("恢复默认字体"), self._reset),
+            dlg_button(self.tr("关闭"), self.accept, primary=True)))
+        csdify(self, self.tr("字体文件"), _prep_dialog)
+
+    def _reset(self):
+        """四个路径恢复出厂默认, 整批算撤销里的一步。
+
+        按 `_reset_card` 的写法直接改 `_params` 并回填控件, 不走 `_on_param` —— 后者自己会开一次撤销
+        事务, 会把"整批一步"拆成四步。
+        """
+        win = self.parent()
+        defaults = core.default_params()
+        keys = list(self._rows)
+
+        def _do():
+            for key in keys:
+                if key not in defaults:
+                    continue
+                if win is not None:
+                    win._params[key] = defaults[key]
+                self._rows[key].set_value(defaults[key])
+            if win is not None and hasattr(win, "_touch"):
+                win._touch()
+
+        step = getattr(win, "_undo_step", None) if win is not None else None
+        if step is None:                           # 没有主窗口(测试里直接构造)时只管自己
+            _do()
+        else:
+            step("__reset_fonts__", self.tr("重置「字体文件」"), _do)
+        notify = getattr(win, "_notify", None) if win is not None else None
+        if notify is not None:
+            notify(self.tr("已重置「{title}」为默认值").format(title=self.tr("字体文件")))
 
 
 # ---------- 吐司(一次性提示) ----------
@@ -2202,9 +2362,9 @@ class MainWindow(QMainWindow):
     def _restore(self, snap):
         """把一份快照铺回去。
 
-        `_apply_params` 已经会处理镜像行、显隐联动、Logo 标签, 并触发保存与预览; `model_map`
-        也在 `_params` 里, 所以它会跟着回去 —— **不要**再调 `_reload_model_map()`(那是从磁盘重读,
-        会把快照里的那份覆盖掉)。
+        `_apply_params` 已处理镜像行、显隐联动、模型映射表与「水印将显示」那行, 并触发保存与预览;
+        `model_map` 在 `_params` 里, 会跟着回去(并写回 model_map.json, 见 `_persist_model_map`)。
+        不要再调 `_reload_model_map()`: 从磁盘重读会盖掉快照里那份, 等于把刚撤回的改动装回来。
         """
         self._apply_params(snap)
 
@@ -2242,12 +2402,23 @@ class MainWindow(QMainWindow):
         self._redo_btn.setToolTip(self.tr("重做：{label}（Ctrl+Shift+Z）").format(label=nr)
                                     if nr else self.tr("重做（Ctrl+Shift+Z）"))
 
-    def _sync_visibility(self):
-        """按 only_if / only_if_not 显隐参数行。
+    def _vis_rule(self, widget, predicate):
+        """给"不在参数表里的行"登记显隐条件(目前只有「单张 / 批量」那几行)。
 
-        一整批改完再放开重绘: 逐个 setVisible 会触发多次布局, 而卡片带 QGraphicsDropShadowEffect
-        (渲染到离屏图), 尺寸一变就可能先贴出旧尺寸的图 —— 实测表现就是"先跳一下, 再闪现出子选项"。
-        这里关掉更新期间的重绘、并在放开前强制走完一次布局。
+        它们随的是"当前模式"这类状态、不是某个参数, 用不了 only_if。但改显隐必须走同一个出口:
+        各自 setVisible 会绕过"冻结重绘 + 容器当场定高度"这两步, 点「单张 / 批量」就会像点联动
+        开关那样抽一下。登记到 _vis_rules 后与参数行一起在 _sync_visibility 里算。
+        """
+        self._vis_rules.append((widget, predicate))
+
+    def _sync_visibility(self):
+        """**唯一改显隐的地方**: 参数行按 only_if / only_if_not, 手写行按 _vis_rules。
+
+        整批改完再放开重绘: 逐个 setVisible 会触发多次布局, 而卡片带 QGraphicsDropShadowEffect
+        (渲染到离屏图), 尺寸一变会先贴出旧尺寸的图 —— 表现为"先跳一下再闪现出子选项"。
+
+        只冻结重绘不够: 布局与几何的传播要等下一轮事件, 冻结跨不过那一轮, 收尾必须把该传播的当场
+        传播完(见 finally), 否则下一轮照样画出中间态。
         """
         area = self._stack.currentWidget()
         host = area.widget() if area is not None else None
@@ -2259,11 +2430,23 @@ class MainWindow(QMainWindow):
                 ncond = self._only_if_not.get(key)
                 show = (cond is None or self._params.get(cond[0]) in cond[1]) and                        (ncond is None or self._params.get(ncond[0]) not in ncond[1])
                 row.setVisible(show)
+            for widget, predicate in self._vis_rules:
+                widget.setVisible(bool(predicate()))
         finally:
             if host is not None:
                 lay = host.layout()
                 if lay is not None:
                     lay.activate()          # 先算完终态布局, 再放开重绘, 避免中间态被画出来
+                # 收尾这两步缺一不可:
+                #  ① 当场消化挂起的布局请求 —— 隐藏子控件不会立刻让布局缓存失效, 期望高度与最小高度
+                #     要等下一轮那次布局请求才更新(收起「文字投影」5 个子行后容器期望仍是 1220,
+                #     派发完才变 1050)。
+                #  ② 容器当场取下这个高度 —— 容器高度归滚动区管, 同样要等下一轮, 而下一轮在冻结之外。
+                #     宽度不动(widgetResizable 会在同步事件里改回去)。
+                # 试过让容器高度自己跟着内容走(尺寸约束): 约束把容器最小高度钉在旧值上, "变矮"时
+                # resize 被夹回旧高度 —— 只有"变高"不抽、"变矮"照抽, 已弃用。
+                QApplication.sendPostedEvents(None, QEvent.LayoutRequest)
+                host.resize(host.width(), host.sizeHint().height())
                 host.setUpdatesEnabled(True)
 
     def _sync_mirror_rows(self, changed):
@@ -2327,8 +2510,10 @@ class MainWindow(QMainWindow):
         """把左右列按 _SPLIT_LEFT 重排(窗口缩放时保持比例); 用户手动拖过后本次会话不再干预。
 
         分母用 sum(sizes()): 它就是分隔条真正可分配的宽度, 与 handle 宽度(8px)无关, 不必手扣。
-        窗口极窄时(最小 674 宽 -> 40% = 270 < 左列最小 293) QSplitter 会自动钳到各自最小值,
-        比例优雅退让, 不会挤坏布局。"""
+        窗口极窄时 QSplitter 会自动钳到各自最小值, 比例优雅退让, 不会挤坏布局。
+        实测: 左列最小 415、窗口最小宽 801 —— 40% = 320 < 415, 所以在最小宽度下比例让位给
+        各列最小值(该最小宽度的来历见 _build_ui)。
+        """
         sp = getattr(self, "_split", None)
         if sp is None or self._split_user_set:
             return
@@ -2337,13 +2522,18 @@ class MainWindow(QMainWindow):
             return
         left = int(total * _SPLIT_LEFT)
         sp.setSizes([left, total - left])
+        self._sync_bottom_lead()        # 底栏那组跟着分栏走(见 _sync_bottom_lead)
 
     def _on_split_moved(self, *_pos):
         self._split_user_set = True
+        self._sync_bottom_lead()        # 用户拖过分隔条: 底栏那组也要跟着
 
     def resizeEvent(self, e):
         super().resizeEvent(e)
         self._apply_split_ratio()
+        # 用户拖过分隔条后 _apply_split_ratio 会直接返回(不再自动分配比例), 但"分隔条占宽 =
+        # 分隔条宽度 − sizes 之和"会随窗口尺寸变 —— 底栏那段留白得跟着重算。
+        self._sync_bottom_lead()
         # 吐司是绝对定位的浮层, 窗口一改尺寸就得重算(在它显示的那 3.2 秒里窗口可能被拖过)
         if getattr(self, "_toast", None) is not None and self._toast.isVisible():
             self._toast.reflow()
@@ -2362,6 +2552,10 @@ class MainWindow(QMainWindow):
                 if (w, h) != (self.width(), self.height()):
                     self.resize(w, h)
             self._apply_split_ratio()
+            # 底栏那段留白: 首帧算一次, 再补一次 —— 首帧窗口尚未映射, 拿不到分栏面板的最终坐标
+            # (显式 activate() 也一样, 实测差 1px), 延到下一轮事件循环才准。
+            self._sync_bottom_lead()
+            QTimer.singleShot(0, self, self._sync_bottom_lead)
 
     # ---------- 构建 ----------
     def _build_ui(self):
@@ -2371,6 +2565,8 @@ class MainWindow(QMainWindow):
         self._only_if_not = {s["key"]: s["only_if_not"] for s in PARAM_SPECS if s.get("only_if_not")}
         self._spec_by_key = {s["key"]: s for s in PARAM_SPECS if s.get("key")}
         self._controllers = {c[0] for c in list(self._only_if.values()) + list(self._only_if_not.values())}
+        # 不在参数表里的行的显隐条件: [(控件, 判据)] —— 随的是状态而不是某个参数(见 _vis_rule)
+        self._vis_rules = []
 
         root = QWidget()
         self.setCentralWidget(root)
@@ -2393,6 +2589,13 @@ class MainWindow(QMainWindow):
         for tab_id, _title in TABS:
             self._stack.addWidget(self._build_tab(tab_id))
         lv.addWidget(self._stack, 1)
+        # 左列的最小宽度取"三个页签宿主的期望最小宽度里最大的那个 + 竖向滚动条 + 两侧 INSET_COL"。
+        # 不能改由页签行决定: 滚动区可滚、报出的最小宽度很小, 左列会被压到"页签行那么窄", 而参数卡
+        # 有硬下限(定宽标签 + 滑块 + 数值框) —— 压过头时参数宿主比视口宽, 卡片右边缘与页签卡不再
+        # 对齐、还会冒出横向滚动条(实测宿主 386 > 视口 336)。
+        min_host = max(t.widget().minimumSizeHint().width()
+                       for t in (self._stack.widget(i) for i in range(self._stack.count())))
+        left.setMinimumWidth(min_host + _SB_W + 2 * theme.INSET_COL)
         split.addWidget(left)
         split.addWidget(self._build_preview_pane())
         # 左右按 _SPLIT_LEFT 的比例排布(见 _apply_split_ratio)。**不要**设 setStretchFactor:
@@ -2432,6 +2635,8 @@ class MainWindow(QMainWindow):
         self._menu_btn.setMenu(self._build_menu())
         t.addWidget(self._menu_btn)
         self._open_btn = QPushButton(self.tr("打开图片"))
+        # 「入口」按钮: 顶栏这一排都是中性小按钮, 白底的它不显眼(见 theme 里 #entry 那段注释)
+        self._open_btn.setObjectName("entry")
         self._open_btn.clicked.connect(self._pick_image)
         t.addWidget(self._open_btn)
         self._input_label = QLabel(self.tr("未选择图片"))
@@ -2440,13 +2645,25 @@ class MainWindow(QMainWindow):
         t.addWidget(self._input_label, 1)
         # 「识别型号」不再放顶栏: 它和「型号美化」卡里的那一行显示的是同一件事, 两处重复
         # (用户报"功能上冲突"), 现在统一到卡片里(见 _build_model_card)。
-        # ℹ 图片信息: 没图可看时置灰, 见 _sync_info_btn
-        self._info_btn = QPushButton("ℹ")
+        # 撤销 / 重做放在顶栏、「EXIF信息」左侧。原先在左列页签卡内部的右端(那里有 addStretch,
+        # 不破坏"页签卡与参数卡等宽"这条不变量); 但那一处离被撤销的参数卡隔着半屏, 而且带上标题
+        # 文字后页签卡放不下 —— 移到顶栏后与「EXIF信息」「恢复默认设置」并排, 宽度由文字决定。
+        self._undo_btn = QPushButton(self.tr("↶ 撤销"))
+        self._redo_btn = QPushButton(self.tr("↷ 重做"))
+        for b, slot in ((self._undo_btn, self.undo), (self._redo_btn, self.redo)):
+            b.setObjectName("mini")
+            b.setEnabled(False)                  # 栈空时置灰, 见 _sync_undo_btns
+            b.setCursor(Qt.PointingHandCursor)
+            b.clicked.connect(slot)
+            t.addWidget(b)
+        self._sync_undo_btns()
+        # ℹ 图片信息: 没图可看时置灰(见 _sync_info_btn)。带标题文字 —— 单独的 ℹ 认不出是什么,
+        # 与旁边「↶ 撤销 / ↷ 重做」是同一套观感。
+        self._info_btn = QPushButton(self.tr("ℹ EXIF信息"))
         self._info_btn.setObjectName("mini")
-        self._info_btn.setFixedWidth(32)
         self._info_btn.setCursor(Qt.PointingHandCursor)
         self._info_btn.setToolTip(self.tr("查看照片 EXIF 与文件信息"))
-        self._info_btn.setAccessibleName(self.tr("图片信息"))
+        self._info_btn.setAccessibleName(self.tr("EXIF信息"))
         self._info_btn.clicked.connect(self._show_image_info)
         t.addWidget(self._info_btn)
         reset = QPushButton(self.tr("恢复默认设置"))
@@ -2463,6 +2680,8 @@ class MainWindow(QMainWindow):
         m.addAction(self.tr("关于"), self._show_about)
         m.addSeparator()
         m.addAction(self.tr("预设方案…"), self._open_preset_dialog)
+        # 与「预设方案…」并列: 都是"偶尔才动一次"的东西, 收进菜单不占页签的高度
+        m.addAction(self.tr("字体文件…"), self._open_font_dialog)
         m.addSeparator()
         m.setToolTipsVisible(True)       # 菜单项也带 tooltip —— 每个入口指向哪个目录一目了然
         a = m.addAction(self.tr("打开日志目录"), self._open_log_dir)
@@ -2619,8 +2838,17 @@ class MainWindow(QMainWindow):
     def _build_bottombar(self):
         bottom = QFrame()
         b = QHBoxLayout(bottom)
-        b.setContentsMargins(theme.INSET_BAR, 0, 0, 0)   # 与顶栏、状态栏同一条左对齐线
+        b.setContentsMargins(theme.INSET_BAR, 0, 0, 0)   # 与顶栏、页签行同一条左对齐线
         b.setSpacing(8)
+        # 「导出到 …」这一组(导出到 / 路径 / 选择输出目录)与**预览框左缘对齐**: 这几件说的都是
+        # "输出到哪", 与右侧预览/生成同属一列; 左列下方那段留白是有意的。宽度随分栏走, 由
+        # _sync_bottom_lead 算。
+        # 用忽略型间距项、不用固定宽度的控件: 固定宽度会算进布局的最小宽度 —— 生成时那条 200px
+        # 进度条一出现, 底栏最小宽会顶到 994 > 窗口最小宽 802, 窗口自己变宽; 忽略型的最小贡献是 0。
+        # (底栏控件的引用叫 _bottombar, 由 _build_ui 赋值 —— 吐司要浮在它之上, 见 Toast._place)
+        self._bottom_lead = QSpacerItem(0, 0, QSizePolicy.Policy.Ignored,
+                                        QSizePolicy.Policy.Minimum)
+        b.addSpacerItem(self._bottom_lead)
         b.addWidget(QLabel(self.tr("导出到")))
         self._out_label = ElidedLabel(self.tr("（跟随原图目录）"))
         self._out_label.setObjectName("muted")
@@ -2639,8 +2867,31 @@ class MainWindow(QMainWindow):
         b.addWidget(self._gen_btn)
         return bottom
 
+    def _sync_bottom_lead(self):
+        """底栏那段留白 = 预览框左缘 − 底栏内容左缘, 把「导出到」推到预览框左缘上。
+
+        用坐标实测, 不用推算: 预览框左缘与底栏内容左缘都换算到根控件同一坐标系再相减。
+        (按分栏推算过一版 —— 左列宽 + 分隔条占宽 + INSET_COL − INSET_BAR, 其中"分隔条占宽"要用
+        `sizes() 之和与分隔条宽度之差` 反推, 实测在 0 与 −1 之间抖, 会差 1px。)
+        调用点都在分栏/窗口刚定完之后(setSizes 后、拖分隔条后、resizeEvent、首帧); 底栏在根布局里,
+        与分栏互不影响。挤不下时间距项让路(整组左移), 不影响窗口最小宽度。
+        """
+        lead = getattr(self, "_bottom_lead", None)
+        bar = getattr(self, "_bottombar", None)
+        if lead is None or bar is None or getattr(self, "_preview", None) is None:
+            return
+        host = self.centralWidget()
+        if host is None:
+            return
+        want = (self._preview.mapTo(host, QPoint(0, 0)).x()
+                - bar.mapTo(host, QPoint(0, 0)).x() - theme.INSET_BAR)
+        lead.changeSize(max(0, want), 0, QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Minimum)
+        if bar.layout() is not None:
+            bar.layout().invalidate()           # changeSize 只是改了数据, 得让布局重算一次
+
     def _build_tab(self, tab_id):
-        specs = [s for s in PARAM_SPECS if s["tab"] == tab_id]
+        # s.get("tab"): 有些行不在任何页签里(它们收进了弹窗, 见 PARAM_SPECS 开头那几条)
+        specs = [s for s in PARAM_SPECS if s.get("tab") == tab_id]
         area = QScrollArea()
         area.setWidgetResizable(True)
         # 滚动条常驻: 内容不满一屏时也保留占位, 卡片宽度不会跳(_segbar_row 按同一宽度对齐)。
@@ -2787,18 +3038,9 @@ class MainWindow(QMainWindow):
             h.addWidget(b)
             self._tab_btns.append(b)
         h.addStretch(1)
-        # 撤销 / 重做: 放在页签卡**内部**的右端(那里本来就有一个 addStretch) —— 卡宽与行高都不变,
-        # 页签卡与下方参数卡依旧严格等宽(README 里那条不变量)
-        self._undo_btn = QPushButton("↶")
-        self._redo_btn = QPushButton("↷")
-        for b, slot in ((self._undo_btn, self.undo), (self._redo_btn, self.redo)):
-            b.setObjectName("mini")
-            b.setFixedWidth(28)
-            b.setEnabled(False)
-            b.setCursor(Qt.PointingHandCursor)
-            b.clicked.connect(slot)
-            h.addWidget(b)
-        self._sync_undo_btns()
+        # (撤销 / 重做**不在**这里: 它们已移到顶栏「EXIF信息」左边, 见 _build_topbar —— 那个位置
+        #  离被撤销的参数卡更近, 也放得下标题文字。页签卡右端只剩这条 addStretch, 卡宽与下方参数卡
+        #  仍然严格等宽, 那条不变量不受影响。)
         return wrap
 
     # 供外部(截图工具/测试)使用的页签接口, 替代原先的 QTabWidget API
@@ -2934,6 +3176,11 @@ class MainWindow(QMainWindow):
         self._batch_count = QLabel("")
         self._batch_count.setObjectName("hint")
         card.body.addWidget(self._batch_count)
+
+        # 这四行的显隐随「单张 / 批量」而变 —— 注册进统一出口, 不在这里自己 setVisible(见 _vis_rule)
+        self._vis_rule(self._row_single, lambda: self._mode == "single")
+        for w in (self._row_batch, self._row_batch_rec, self._batch_count):
+            self._vis_rule(w, lambda: self._mode != "single")
         return card
 
     def _btn(self, text, slot, mini=False):
@@ -3141,7 +3388,7 @@ class MainWindow(QMainWindow):
         """把当前选中的预设导出成一个 .json(给别人用)。
 
         导出的是**剥掉机器路径**的那份: logo_dir 与 4 个字体路径换台机器就是死链, 带出去只会
-        让对方拿到一个静默降级的方案(品牌 logo 变文字、字体变内置 Roboto)。
+        让对方拿到一个静默降级的方案(品牌 logo 变文字、字体回落到内置字体)。
         """
         key = view.current_slot()
         rec = self._preset_data.get(key) if key else None
@@ -3241,11 +3488,12 @@ class MainWindow(QMainWindow):
         self._notify(self.tr("已删除槽位 {slot}：{name}").format(slot=key, name=name))
 
     def _apply_params(self, src):
-        """把一整份参数铺回(加载预设 / 恢复默认用)。只吃已知键, 未知键忽略。
+        """把一整份参数铺回(加载预设 / 恢复默认 / 撤销重做用)。只吃已知键, 未知键忽略。
 
         **按参数遍历, 不是按控件遍历**: 有些参数没有控件(如 gap_image_top/gap_top, 它们
         只由上下分离下的镜像行代写), 按控件遍历会把它们漏掉 —— 表现为"加载预设后某些间距
         """
+        map_before = dict(self._params.get("model_map") or {})
         changed = set()
         for key, val in src.items():
             if key not in self._params:            # 未知键(如预设里的 _preset_name)忽略
@@ -3257,7 +3505,26 @@ class MainWindow(QMainWindow):
                 row.set_value(val)
         self._sync_mirror_rows(changed)
         self._sync_visibility()
+        self._persist_model_map(map_before)
+        self._update_effective_model()      # 「水印将显示：X」依赖映射表, 跟着刷一次
         self._touch()
+
+    def _persist_model_map(self, before):
+        """整批铺参数改动过映射表时, 把内存那份写回 model_map.json。
+
+        映射表的家在 logo 目录下的 model_map.json, `_params["model_map"]` 只是内存里的副本。只改内存
+        不写文件的话, 撤销"看着生效"(预览里水印变回旧名), 但一重开映射弹窗(读文件)改动又回来了。
+        写盘与弹窗里的 `_persist()` 是同一份文件、同一套函数。
+        只在真的变了时写: 「恢复默认设置」与不含映射表的预设都不动这个文件。
+        """
+        cur = dict(self._params.get("model_map") or {})
+        if cur == before:
+            return
+        try:
+            core.save_model_map(self._params.get("logo_dir") or core.DEFAULT_LOGO_DIR, cur)
+        except Exception as e:                      # noqa: BLE001
+            logging.warning(f"[映射] 撤销/铺参数后写盘失败: {e}")
+            self._notify(self.tr("映射表没能写回文件：{err}").format(err=e))
 
     # ---------- 参数持久化 ----------
     def _collect_settings(self):
@@ -3291,16 +3558,20 @@ class MainWindow(QMainWindow):
         dlg.exec()
         self.request_preview()
 
+    def _open_font_dialog(self):
+        """☰ →「字体文件…」: 字体文件收进弹窗管理(见 FontDialog)。
+
+        不需要收尾: 弹窗里每次改文件都走 `_on_param`(进撤销、写设置、重渲预览), 已是即时生效。
+        """
+        FontDialog(self.state, self).exec()
+
     def _open_map_dialog(self):
         dlg = MapDialog(self.state, self)
         dlg.exec()
-        # 映射改过之后, 用新表重算美化型号
-        def _do():
-            self._reload_model_map()
-            self._touch()
-
-        # 映射表也进撤销(它就在 _params["model_map"] 里); 整批算一步
-        self._undo_step("__model_map__", "型号映射表", _do)
+        # 撤销由弹窗逐步记(见 MapDialog._apply_change), 这里只收尾: 内存与文件对齐一次
+        # (写盘失败时弹窗会回滚内存, 那份要以文件为准), 并重渲预览。
+        self._reload_model_map()
+        self._touch()
 
     def _reset_settings(self):
         """
@@ -3337,6 +3608,8 @@ class MainWindow(QMainWindow):
         for k, b in self._mode_btns.items():
             b.setChecked(k == mode)
         self._sync_files_ui()
+        # 「单张 / 批量」那四行的显隐走统一出口(冻结重绘 + 容器当场定高度), 见 _vis_rule
+        self._sync_visibility()
         if self._sync_preview_source():
             self.request_preview()
 
@@ -3363,11 +3636,12 @@ class MainWindow(QMainWindow):
         return True
 
     def _sync_files_ui(self):
+        """「文件与美化」页签里随处理模式变化的文案。
+
+        只刷文案, 不管显隐 —— 那四行注册在 _vis_rules(见 _vis_rule), 由 _set_mode 走统一的
+        _sync_visibility。
+        """
         single = self._mode == "single"
-        self._row_single.setVisible(single)
-        self._row_batch.setVisible(not single)
-        self._row_batch_rec.setVisible(not single)
-        self._batch_count.setVisible(not single)
         if not single and self._batch_files:
             self._batch_count.setText(self.tr("已载入 {n} 张（预览与调参取第一张）")
                                       .format(n=len(self._batch_files)))

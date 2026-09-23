@@ -106,14 +106,15 @@ def preset_path(slot):
 
 
 # ---------- 默认字体路径 ----------
-# 脚本同目录: 内置资源目录 assets/fonts(Roboto 四变体, 随程序分发, SIL OFL 协议)
+# 脚本同目录: 内置资源目录 assets/fonts(Sarasa Gothic SC 四变体 —— 更纱黑体的**子集**,
+# 名称与版权原样保留, 随程序分发, SIL OFL 1.1; 来源/改动/许可见 assets/fonts/NOTICE.txt 与 OFL.txt)
 # 打包(PyInstaller onefile)后, __file__ 指向 PYZ 内的虚拟路径, 不能直接靠它找 assets;
 # 用 _MEIPASS 兜底。
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 ASSETS_DIR = os.path.join(getattr(sys, "_MEIPASS", SCRIPT_DIR), "assets")
 BUNDLED_FONT_DIR = os.path.join(ASSETS_DIR, "fonts")
 
-# 系统字体目录列表(按平台惯例; 仅作最后兜底——内置 Roboto 已在持久/打包目录命中,
+# 系统字体目录列表(按平台惯例; 仅作最后兜底——内置字体已在持久/打包目录命中,
 # 系统目录在非 Windows 上几乎不触发, 但消除硬编码的 C:\Windows\Fonts)
 def _system_font_dirs():
     if os.name == 'nt':
@@ -202,10 +203,10 @@ def save_settings(settings):
 # 资源目录重组后(如 fonts -> assets/fonts), settings 里持久化的绝对路径可能失效;
 # 启动时校验 4 个字体路径, 不存在则回退内置默认并写回 settings, 避免绑定死目录
 FONT_SETTING_MAP = (
-    ("font_path", "Roboto-Regular.ttf"),
-    ("font_bold_path", "Roboto-Bold.ttf"),
-    ("font_italic_path", "Roboto-Italic.ttf"),
-    ("font_bold_italic_path", "Roboto-BoldItalic.ttf"),
+    ("font_path", "SarasaGothicSC-Regular.ttf"),
+    ("font_bold_path", "SarasaGothicSC-Bold.ttf"),
+    ("font_italic_path", "SarasaGothicSC-Italic.ttf"),
+    ("font_bold_italic_path", "SarasaGothicSC-BoldItalic.ttf"),
 )
 
 # 内置字体持久化目录: 打包后 _MEI 临时目录每次启动会变, 把内置字体复制到数据目录
@@ -825,18 +826,18 @@ def _load_font(size, bold, italic,
     # 避免 fallback 到 ImageFont.load_default() 位图默认字体导致字号缩放失效.
     if not paths:
         if bold and italic:
-            p = _default_font_path("Roboto-BoldItalic.ttf")
+            p = _default_font_path("SarasaGothicSC-BoldItalic.ttf")
             if p:
                 paths.append(p)
         if bold:
-            p = _default_font_path("Roboto-Bold.ttf")
+            p = _default_font_path("SarasaGothicSC-Bold.ttf")
             if p:
                 paths.append(p)
         if italic:
-            p = _default_font_path("Roboto-Italic.ttf")
+            p = _default_font_path("SarasaGothicSC-Italic.ttf")
             if p:
                 paths.append(p)
-        p = _default_font_path("Roboto-Regular.ttf")
+        p = _default_font_path("SarasaGothicSC-Regular.ttf")
         if p:
             paths.append(p)
     if not paths:
@@ -1657,10 +1658,10 @@ def _format_manual_exif(manual_exif):
 def default_params():
     return {
         "logo_dir": DEFAULT_LOGO_DIR,
-        "font_path": _default_font_path("Roboto-Regular.ttf"),
-        "font_bold_path": _default_font_path("Roboto-Bold.ttf"),
-        "font_italic_path": _default_font_path("Roboto-Italic.ttf"),
-        "font_bold_italic_path": _default_font_path("Roboto-BoldItalic.ttf"),
+        "font_path": _default_font_path("SarasaGothicSC-Regular.ttf"),
+        "font_bold_path": _default_font_path("SarasaGothicSC-Bold.ttf"),
+        "font_italic_path": _default_font_path("SarasaGothicSC-Italic.ttf"),
+        "font_bold_italic_path": _default_font_path("SarasaGothicSC-BoldItalic.ttf"),
         "canvas_ratio_mode": "original",
         "gap_image_top": 0.04,
         "gap_image_bottom": 0.04,
