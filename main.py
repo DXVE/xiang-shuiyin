@@ -3,10 +3,10 @@
 
 用法: .venv\\Scripts\\python.exe main.py
 
-必须在导入核心之前设置两个环境变量: 核心在 import 阶段就会按 BASE_DIR 建日志目录、轮转旧日志
-(`_cleanup_old_logs` 只保留最近 3 份) 并清理 `*.tmp*` 残留, 所以这两个目录要先定下来。
-这里是**本程序自己的固定位置**(Windows: %LOCALAPPDATA%\\XiangShuiyin-QT6 + 临时预览目录),
-与任何其它程序无关; 用 setdefault 是为了让工具脚本能注入自己的临时目录(见 tools/)。
+两个目录环境变量必须在导入核心之前设置: 核心在 import 阶段即按 BASE_DIR 建日志目录、
+轮转旧日志(_cleanup_old_logs 只保留最近 3 份)并清理 `*.tmp*` 残留。
+回退值固定为本程序自己的位置(Windows: %LOCALAPPDATA%\\XiangShuiyin-QT6 与临时预览目录),
+不得指向其它程序的目录; 使用 setdefault 是为了让工具脚本能注入自己的临时目录。
 """
 import logging
 import os
@@ -32,10 +32,22 @@ os.environ.setdefault("XSY_BASE_DIR", os.path.join(_data_root(), "XiangShuiyin-Q
 os.environ.setdefault("XSY_PREVIEW_DIR",
                       os.path.join(tempfile.gettempdir(), "XiangShuiyin_preview_qt"))
 
-from xiangshuiyin import __version__ as app_version   # noqa: E402
-from xiangshuiyin import app as core          # noqa: E402 - 必须晚于上面的环境变量
-from xsy_qt import theme                      # noqa: E402
-from xsy_qt.window import MainWindow, _SLOW_RENDER_MS   # noqa: E402
+from core import __version__ as app_version   # noqa: E402
+from core import app as core          # noqa: E402 - 必须晚于上面的环境变量
+from ui import theme                      # noqa: E402
+from ui.window import MainWindow, _SLOW_RENDER_MS   # noqa: E402
+
+
+def _say(text):
+    """向控制台输出一行。
+
+    以无控制台方式打包(--windowed)时 `sys.stdout` 为 None, 直接 print 会抛出
+    AttributeError 并中断启动, 因此输出失败一律静默。
+    """
+    try:
+        print(text)
+    except Exception:                     # noqa: BLE001 - 没有控制台就静默
+        pass
 
 
 def main():
@@ -43,44 +55,44 @@ def main():
     from PySide6.QtGui import QIcon
     from PySide6.QtWidgets import QApplication
 
-    from xsy_qt import i18n, single
+    from ui import i18n, single
 
     app = QApplication(sys.argv)
-    # 单实例闸门**必须早于 AppState**: AppState 一构造就读设置、清预览残留, 而"两个进程各写一份
-    # settings.json、后写的那份盖掉先写的"正是单实例要防的事(见 xsy_qt/single.py)。
-    # 已有实例时: 通知它激活窗口(由本进程去抢前台 —— 它持有前台权限), 然后本进程退出。
+    # 单实例闸门必须先于 AppState: AppState 构造时会读写设置并清理预览残留,
+    # 两个进程并发运行会各写一份 settings.json 而互相覆盖(见 ui/single.py)。
+    # 已有实例时通知其激活窗口, 本进程退出。
     keep, srv = single.claim(single.server_name())
     if not keep:
-        print("[启动] 程序已在运行，已激活已有窗口；本次启动退出")
+        _say("[启动] 程序已在运行，已激活已有窗口；本次启动退出")
         return 0
 
     app.setApplicationName(QCoreApplication.translate("main", "镶 · 水印（Qt 版）"))
     theme.apply_font(app)
-    theme.apply_palette(app)          # 应用主题配色与字体
-    icon = os.path.join(core.ASSETS_DIR, "exif-watermark-icon.ico")
+    theme.apply_palette(app)          # 主题与调色板定义见 ui/theme.py
+    icon = os.path.join(core.ICONS_DIR, "exif-watermark-icon.ico")
     if os.path.isfile(icon):
         app.setWindowIcon(QIcon(icon))
 
     state = core.AppState()
-    # 界面语言: **必须在建窗口之前装翻译器** —— 窗口里的文案是构造时 tr() 的
+    # 翻译器必须在建窗口之前安装: 窗口文案在构造时即通过 tr() 取译文
     i18n.install(app, state.settings.get("lang") or i18n.DEFAULT_LANG)
     win = MainWindow(state)
     win.show()
-    single.wire(srv, win)             # 此后再有实例启动, 就把这个窗口提到前台
-    print(f"[启动] 数据目录: {core.BASE_DIR}")
-    print(f"[启动] 预览目录: {core.PREVIEW_DIR}")
-    print(f"[启动] 日志:     {os.path.join(core.LOG_DIR, 'log-' + core.LOG_TIMESTAMP + '.log')}")
+    single.wire(srv, win)             # 此后新实例启动时由此把窗口提到前台
+    _say(f"[启动] 数据目录: {core.BASE_DIR}")
+    _say(f"[启动] 预览目录: {core.PREVIEW_DIR}")
+    _say(f"[启动] 日志:     {os.path.join(core.LOG_DIR, 'log-' + core.LOG_TIMESTAMP + '.log')}")
     if not os.path.exists(core.SETTINGS_FILE):
-        print("[启动] 未找到设置文件, 使用出厂默认参数")
+        _say("[启动] 未找到设置文件, 使用出厂默认参数")
     _log_environment(win)
     return app.exec()
 
 
 def _log_environment(win):
-    """把"这次跑在什么环境"一次写进日志。
+    """把本次运行的环境信息一次写入日志。
 
-    以前这些数字每次排查都要现写探针去量(DPI/可用区/窗口尺寸/档位), 现在启动即可见 ——
-    "发虚/顶出屏幕/预览慢"这类问题第一眼就能排除环境因素。
+    含版本、屏幕与 devicePixelRatio、可用区、窗口与分栏尺寸、数据目录、预览档位与缓存预算,
+    便于在日志中直接排除 DPI/屏幕/窗口尺寸这类环境因素。
     """
     import platform
 
@@ -88,6 +100,8 @@ def _log_environment(win):
 
     logging.info(f"[环境] 版本 {app_version} | Python {platform.python_version()} | "
                  f"PySide6 {pyside_version} | {platform.system()}-{platform.release()}-{platform.version()}")
+    # 实现版本标记行: 用于确认当前运行的是哪一份行为(见 README「已知事项」)
+    logging.info("[环境] 悬停判据=光标位置复核(ParamRow) | 界面图标=SVG")
     scr = win.screen()
     if scr is not None:
         geo, avail = scr.geometry(), scr.availableGeometry()

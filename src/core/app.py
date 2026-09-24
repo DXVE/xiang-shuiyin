@@ -1,15 +1,11 @@
 # -*- coding: utf-8 -*-
-"""
-镶·水印 · 渲染内核
-==========================
-参数、EXIF、图像处理、`process_single`、`AppState`(预览/生成/预设/型号映射/配置)。
-调用方是同进程的 Qt 界面(`src/xsy_qt/`)与 `main.py`, 不存在跨进程/桥通讯。
+"""模块职责: 参数、EXIF 读取、图像处理、process_single 渲染流水线与 AppState
+(预览/生成/预设/型号映射/配置)。无跨进程通讯, 调用方为同进程的 Qt 界面层与 main.py。
 
-- 核心: 6 间距参数的三布局水印渲染(unified / split_top_bottom / split_left_right)
-- 预览: 缩略图快速渲染 + 放大镜确认细节, 间距段几何经 `geom_out` 回传界面叠加高亮,
-  画布 PIL 图经 `image_out` 直接回给调用方(不落盘)
-- 持久化: 参数/预设/型号映射/settings 统一写入本程序自己的数据目录, 见「目录常量」
-  (Windows: %LOCALAPPDATA%\\XiangShuiyin-QT6, macOS/Linux 同理; 可用 XSY_BASE_DIR 覆盖)
+- 渲染: 6 个间距参数的三布局水印(unified / split_top_bottom / split_left_right)
+- 预览: 缩略图快速渲染; 间距段几何经 geom_out 回传界面叠加高亮,
+  画布 PIL 图经 image_out 直接回给调用方(不落盘)
+- 持久化: 参数/预设/型号映射/settings 统一写入本程序数据目录, 见「目录常量」
 
 依赖: Pillow, exifread
 """
@@ -20,7 +16,6 @@ import logging
 import math
 import os
 import queue
-import re
 import shutil
 import subprocess
 import sys
@@ -34,102 +29,83 @@ import exifread
 from PIL import Image
 from PIL import ImageDraw, ImageEnhance, ImageFont, ImageFilter, ImageOps
 
-# 控制台/管道输出以中文为主, 统一 UTF-8 编码避免重定向后乱码(Windows 默认 GBK)
+# Windows 控制台默认编码为 GBK, 重定向后中文输出会乱码, 故统一改为 UTF-8。
 if hasattr(sys.stdout, 'reconfigure'):
     sys.stdout.reconfigure(encoding='utf-8')
 
-# 预览/上传临时目录(程序退出时清理)
-# 由 main.py 的 XSY_PREVIEW_DIR 指定; 这里的回退值也用本程序自己的名字 —— 导入本模块只读不写
-# 这个目录, 但共用一个临时目录时, 任一版退出时的 cleanup() 会把对方正在显示的预览文件删掉。
+# 预览/上传临时文件目录, 由 main.py 通过 XSY_PREVIEW_DIR 指定, 程序退出时清理。
+# 回退值须为本程序专有目录名: 若与其它程序共用同一临时目录, 任一方的 cleanup()
+# 会删除对方正在显示的预览文件。
 PREVIEW_DIR = os.environ.get("XSY_PREVIEW_DIR") or os.path.join(tempfile.gettempdir(), "XiangShuiyin_preview_qt")
 
-# 实时预览缩略渲染的最大边长(低分辨率快速通道, 高清预览供放大镜确认细节)
-#   3400 = 常态档: 输入图先缩到 3400 再渲染(渲染快, 上屏前再由 PreviewBox 缩一次)
-#   0    = **全量加载**: 不缩图, 画布/字号/圆角/模糊半径全按原图尺寸算。仅用于画质排查 ——
-#          2026-09-20 实测(4000x3000 纯色底): 全量每次调参 275~284ms, 缩略档命中缩略图缓存后
-#          110ms(首次要多花 ~230ms 建 psrc 缩略图); **上屏那步的画质各档一致**(锐度来自
-#          PreviewBox 按设备像素上屏, 不是画布大小)。
-#   **为什么从 2500 提到 3400(2026-09-22)**: 上屏画质虽然与档位无关, 但**放大镜的清晰度完全
-#   取决于它**——放大镜取的是这一档渲出来的位图, 而它要填满 240x160 逻辑(设备 360x240)的窗口:
-#   需要的源区 = 240*档位/(显示宽度*3), 这个值 < 360 就是在**插值放大**(发虚)。按本机窗口(预览
-#   区里图像显示宽度 734)算, 档位要到 ~3250 才不再上采样 —— 2500 时是 1.29 倍(实测), 3400 时
-#   0.95 倍(= 截取)。实测 24.7MP 图(在程序里量, 含缩略图与上屏): 每次调参 2500 档约 130ms →
-#   3400 档约 196ms; 第一次载入这张图 1100ms → 1336ms(大头是建 3400 的 psrc 缩略图);
-#   一帧位图 18MB → 32MB。**再往上要谨慎**: 5000 档的单层像素(23.8MP)越过 _LAYER_CACHE_MAX_PX
-#   (16MP), 那几层中间缓存整批失效, 时间从 ~240ms 跳到 ~820ms; 全量档 ~1270ms, 只适合按需重渲。
+# 实时预览缩略渲染的最大边长(px): 输入图先缩到该边长再渲染, 上屏前由调用方再缩放一次。
+# 0 表示全量加载(不缩图, 画布/字号/圆角/模糊半径均按原图尺寸计算), 仅用于画质排查。
+# 该值同时决定放大镜源位图的清晰度, 取值偏小会插值放大发虚; 增大则耗时与单帧内存上升。
 PREVIEW_MAX_SIDE = 3400
-# 先导帧边长: 大图先按这一档渲一帧立即显示(感知延迟取决于它), 全帧随后覆盖。
-# **先导帧必须用小图档做渲染输入** —— 画布尺寸由输入图决定, 若仍喂 2500 的缩略图, 先导帧画布
-# 与全帧同大(同样耗时)且模糊/圆角的相对缩放不同, 两帧会"模糊度跳动"(原项目 2026-09-20 实测)。
-PREVIEW_FAST_MAX_SIDE = 1200
 
 
-# 背景模糊工作图最小边长(px): 降采样优化用, 工作图边长 = 画布的 1/4(面积 1/16),
-# 模糊/噪声/增强都在小图上做, 最后放大回画布; 下限防止小图时画质过度损失
+# 背景模糊工作图的最小边长(px): 工作图边长为画布的 1/4(面积 1/16), 模糊/噪声/增强
+# 均在小图上完成后再放大回画布; 设置下限以避免小画布下画质损失过大。
 BLUR_WORK_MIN_SIDE = 400
 
-# 配置管理：目录常量、默认字体路径、设置文件的读写、型号映射文件的读写等
-# ---------- 目录常量 ----------
-# 配置数据目录: 按平台惯例选择——Windows: LOCALAPPDATA; macOS: ~/Library/Application Support;
-# Linux: $XDG_DATA_HOME 或 ~/.local/share。均在其下建 XiangShuiyin-QT6 子目录。
-# Windows 使用 LOCALAPPDATA, 目录名归本程序所有, 配置与日志互不干扰。
+# 配置管理: 目录常量、默认字体路径、设置文件读写、型号映射文件读写。
 if os.name == 'nt':
     _data_root = os.environ.get('LOCALAPPDATA') or os.path.join(os.path.expanduser('~'), 'AppData', 'Local')
 elif sys.platform == 'darwin':
     _data_root = os.path.join(os.path.expanduser('~'), 'Library', 'Application Support')
 else:
     _data_root = os.environ.get('XDG_DATA_HOME') or os.path.join(os.path.expanduser('~'), '.local', 'share')
-# 数据目录: 正常由 main.py 通过 XSY_BASE_DIR 指定; **回退值也必须是本程序自己的目录** ——
-# 导入本模块会立刻按 BASE_DIR 建日志目录、轮转旧日志(_cleanup_old_logs 只留最近 3 份)并清理
-# DATA_DIR 下的 *.tmp* 残留, 回退到别的程序的目录就等于去创建/删除别人的文件。
+# 数据目录: 由 main.py 通过 XSY_BASE_DIR 指定。回退值必须为本程序专有目录 ——
+# 导入本模块即会创建日志目录、轮转旧日志(_cleanup_old_logs 仅保留最近 3 份)并清理
+# DATA_DIR 下的 *.tmp* 残留, 回退到其它程序的目录会创建/删除他人文件。
 BASE_DIR = os.environ.get("XSY_BASE_DIR") or os.path.join(_data_root, "XiangShuiyin-QT6")
 DATA_DIR = os.path.join(BASE_DIR, "watermark_data")
 SETTINGS_FILE = os.path.join(DATA_DIR, "settings.json")
-# 预设: 10 个固定槽位, 一个槽一个文件(presets1.json .. presets10.json, 见 preset_path)。
-# 导出/导入就是"单个文件进、单个文件出", 又不必拿预设名去当文件名。
+# 预设目录: 10 个固定槽位, 每槽一个文件(presets1.json .. presets10.json, 见 preset_path), 便于单个预设的导出与导入。
 PRESETS_DIR = os.path.join(DATA_DIR, "presets")
-PRESETS_FILE = os.path.join(DATA_DIR, "presets.json")   # 老文件(旧的整份格式): 只用于一次性迁移
+PRESETS_FILE = os.path.join(DATA_DIR, "presets.json")   # 旧整份格式文件, 仅供一次性迁移使用。
 DEFAULT_LOGO_DIR = os.path.join(DATA_DIR, "logos")
-DEFAULT_SPECIAL_DIR = os.path.join(DEFAULT_LOGO_DIR, "special")
 
 # ---------- 预设文件名规则 ----------
-# ---------- 预设落盘 ----------
-# **槽位 -> 固定文件名**: presets1.json .. presets10.json。文件名**不承载预设名** ——
-# 一旦"预设名 = 文件名", 就得处理非法字符、保留设备名(CON/NUL)、尾点、重名、超长……
-# 全是自找的薄弱点(用户的原话: "少一道程序薄弱点"); 预设名只存在文件内容里。
+# 槽位 -> 固定文件名(presets1.json .. presets10.json)。文件名不承载预设名:
+# 若以预设名作文件名, 需处理非法字符、保留设备名(CON/NUL)、尾点、重名与超长等问题。
 MAX_PRESET_SLOTS = 10
 
 
 def preset_path(slot):
-    """槽位(1..10) -> 预设文件路径。"""
+    """返回槽位(1..10)对应的预设文件路径。
+    """
     return os.path.join(PRESETS_DIR, f"presets{int(slot)}.json")
 
 
-# ---------- 默认字体路径 ----------
-# 脚本同目录: 内置资源目录 assets/fonts(Sarasa Gothic SC 四变体 —— 更纱黑体的**子集**,
-# 名称与版权原样保留, 随程序分发, SIL OFL 1.1; 来源/改动/许可见 assets/fonts/NOTICE.txt 与 OFL.txt)
-# 打包(PyInstaller onefile)后, __file__ 指向 PYZ 内的虚拟路径, 不能直接靠它找 assets;
-# 用 _MEIPASS 兜底。
+# ---------- 资源目录 ----------
+# 资源不在包内, 位于包目录的上一级 src/assets/(与 core、ui 平级):
+#   assets/fonts/  内置字体 Sarasa Gothic SC 四变体(子集, 随程序分发, SIL OFL 1.1;
+#                  来源与许可见 assets/fonts/NOTICE.txt、OFL.txt)
+#   assets/icons/  界面图标(SVG / ico / logo)
+# 冻结(PyInstaller onefile)后 __file__ 指向 PYZ 内的虚拟路径, 不能用于定位资源;
+# 打包时将 src/assets 置于包根目录, 此处以 _MEIPASS 兜底。
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-ASSETS_DIR = os.path.join(getattr(sys, "_MEIPASS", SCRIPT_DIR), "assets")
+_BUNDLE_ROOT = getattr(sys, "_MEIPASS", None)
+ASSETS_DIR = (os.path.join(_BUNDLE_ROOT, "assets") if _BUNDLE_ROOT
+              else os.path.join(os.path.dirname(SCRIPT_DIR), "assets"))
 BUNDLED_FONT_DIR = os.path.join(ASSETS_DIR, "fonts")
+ICONS_DIR = os.path.join(ASSETS_DIR, "icons")
 
-# 系统字体目录列表(按平台惯例; 仅作最后兜底——内置字体已在持久/打包目录命中,
-# 系统目录在非 Windows 上几乎不触发, 但消除硬编码的 C:\Windows\Fonts)
+# 系统字体目录列表(按平台惯例), 仅作最后兜底: 内置字体通常已在持久化目录或打包资源目录命中。
 def _system_font_dirs():
     if os.name == 'nt':
         return [r"C:\Windows\Fonts"]
     if sys.platform == 'darwin':
         return ["/System/Library/Fonts", "/Library/Fonts",
                 os.path.join(os.path.expanduser('~'), 'Library', 'Fonts')]
-    # Linux/其它: XDG 用户字体目录 + 传统 ~/.fonts + 系统字体目录
+
     xdg_root = os.environ.get('XDG_DATA_HOME') or os.path.join(os.path.expanduser('~'), '.local', 'share')
     return [os.path.join(xdg_root, 'fonts'),
             os.path.join(os.path.expanduser('~'), '.fonts'),
             "/usr/share/fonts", "/usr/local/share/fonts"]
 
-# 优先加载已持久化的内置字体, 其次当前打包资源目录, 最后系统字体;
-# 都没有返回空串(调用方回退默认字体).
+# 依次在持久化内置字体目录、打包资源目录、系统字体目录中查找; 均未命中时返回空串, 由调用方回退默认字体。
 def _default_font_path(filename):
     for base in (PERSISTENT_FONT_DIR, BUNDLED_FONT_DIR) + tuple(_system_font_dirs()):
         p = os.path.join(base, filename)
@@ -143,7 +119,8 @@ def ensure_dir(path):
     os.makedirs(path, exist_ok=True)
 
 def open_path(path):
-    """跨平台打开目录/文件: Windows 资源管理器, macOS Finder, Linux xdg-open"""
+    """跨平台打开目录/文件: Windows 使用资源管理器, macOS 使用 Finder, Linux 使用 xdg-open。
+    """
     if os.name == 'nt':
         os.startfile(path)
     elif sys.platform == 'darwin':
@@ -166,9 +143,9 @@ def _load_json(path, check_file=False, log_func=None, fail_prefix="加载JSON文
             log_func(f"{fail_prefix} ({path}): {e}")
         return {}
 
-# 写入 JSON 文件(自动创建父目录); 原子替换写 tmp → os.replace, 同分区下 OS 串行化保证
-# 文件始终是合法 JSON(并发写最后一个赢). tmp 文件名带 pid+uuid 防多进程写交错.
-# 失败时降级裸 open(path,'w')(最后一道防线); 不 fsync——写频率低, 可接受应用崩溃丢最后 1 次.
+# 写入 JSON 文件(自动创建父目录)。先写带 pid 与 uuid 的临时文件, 再用 os.replace
+# 原子替换, 保证文件始终为合法 JSON, 并发写以最后一次为准。
+# 不做 fsync: 写频率低, 可接受进程崩溃时丢失最后一次写入。
 def _save_json(path, obj, ensure_path=None):
     if ensure_path:
         ensure_dir(ensure_path)
@@ -179,7 +156,7 @@ def _save_json(path, obj, ensure_path=None):
             f.flush()
         os.replace(tmp_path, path)
     except Exception:
-        # 主路径异常(tmp 写失败/权限/跨分区等): 清理残留 tmp, 退回裸写
+        # 原子替换失败时(临时文件写失败/权限/跨分区): 清理残留临时文件并降级为直接写入。
         try:
             if os.path.exists(tmp_path):
                 try:
@@ -191,17 +168,17 @@ def _save_json(path, obj, ensure_path=None):
         except Exception:
             pass
 
-# 从 JSON 设置文件加载配置，若文件不存在则返回空字典
+# 加载设置文件; 文件不存在或解析失败时返回空字典。
 def load_settings():
     return _load_json(SETTINGS_FILE, log_func=logging.error, fail_prefix="加载设置文件失败")
 
-# 保存设置字典到 JSON 文件(自动创建目录)
+# 保存设置字典到 JSON 文件。
 def save_settings(settings):
     _save_json(SETTINGS_FILE, settings, ensure_path=DATA_DIR)
 
-# ---------- 字体路径失效迁移 ----------
-# 资源目录重组后(如 fonts -> assets/fonts), settings 里持久化的绝对路径可能失效;
-# 启动时校验 4 个字体路径, 不存在则回退内置默认并写回 settings, 避免绑定死目录
+# ---------- 字体路径失效修复 ----------
+# settings 中持久化的 4 个字体路径可能已失效; 启动时校验, 缺失则回退内置默认字体
+# 并写回 settings, 避免路径绑定到已不存在的目录。
 FONT_SETTING_MAP = (
     ("font_path", "SarasaGothicSC-Regular.ttf"),
     ("font_bold_path", "SarasaGothicSC-Bold.ttf"),
@@ -209,13 +186,13 @@ FONT_SETTING_MAP = (
     ("font_bold_italic_path", "SarasaGothicSC-BoldItalic.ttf"),
 )
 
-# 内置字体持久化目录: 打包后 _MEI 临时目录每次启动会变, 把内置字体复制到数据目录
-# 使 settings/presets 保存的字体路径长期有效.
+# 内置字体持久化目录: 打包后 _MEIPASS 临时目录每次启动都会变化, 将内置字体复制到数据目录, 使 settings/presets 中保存的字体路径长期有效。
 PERSISTENT_FONT_DIR = os.path.join(DATA_DIR, "fonts", "bundled")
 
 def _ensure_persistent_fonts():
-    """把 BUNDLED_FONT_DIR 下的内置字体复制到 PERSISTENT_FONT_DIR, 按大小判断更新.
-    返回是否成功确保至少一个字体存在."""
+    """将 BUNDLED_FONT_DIR 下的内置字体复制到 PERSISTENT_FONT_DIR(按文件大小判断是否需要更新)。
+    返回是否至少确保了一个字体存在。
+    """
     if not os.path.isdir(BUNDLED_FONT_DIR):
         return False
     ensure_dir(PERSISTENT_FONT_DIR)
@@ -238,7 +215,7 @@ def _ensure_persistent_fonts():
     return ok
 
 def _repair_font_paths(settings):
-    # 先确保内置字体已落到持久目录, 后续修复才能指向稳定路径
+    # 先确保内置字体已落到持久化目录, 使后续修复指向稳定路径。
     _ensure_persistent_fonts()
     changed = False
     for key, fname in FONT_SETTING_MAP:
@@ -253,23 +230,23 @@ def _repair_font_paths(settings):
         logging.info("settings 字体路径已迁移到持久目录: " + PERSISTENT_FONT_DIR)
     return settings
 
-# 加载指定 Logo 目录下的型号映射文件(model_map.json)
+# 加载指定 Logo 目录下的型号映射文件 model_map.json; 文件不存在或解析失败时返回空字典。
 def load_model_map(logo_dir):
     map_path = os.path.join(logo_dir, "model_map.json")
     return _load_json(map_path, check_file=True, log_func=logging.warning,
                       fail_prefix="加载型号映射文件失败")
 
-# 保存型号映射字典到指定 Logo 目录下的 model_map.json
+# 保存型号映射字典到指定 Logo 目录下的 model_map.json。
 def save_model_map(logo_dir, map_dict):
     _save_json(os.path.join(logo_dir, "model_map.json"), map_dict, ensure_path=logo_dir)
 
-# 核心算法及处理：EXIF读取、图像处理、水印生成等
+# ---------- 核心处理: EXIF 读取、图像处理、水印生成 ----------
 
-# 将 EXIF 中的有理数字符串解析为 (分子, 分母, 浮点值)
+
 def _parse_ratio(value):
-    """
-    将可能的有理数转换为 (num, den, float)
-    统一使用字符串解析，避免类型判断问题
+    """将 EXIF 有理数解析为 (分子, 分母, 浮点值)。
+    统一按字符串解析以避免类型判断问题; 非分数形式返回 (None, None, float),
+    无法解析时返回 (None, None, None)。
     """
     s = str(value).strip()
     if '/' in s:
@@ -288,7 +265,7 @@ def _parse_ratio(value):
     except Exception:
         return None, None, None
 
-# 用 exifread 解析品牌/型号/快门/光圈/ISO, 结果原地写入 result
+# 用 exifread 解析品牌/型号/快门/光圈/ISO, 结果原地写入 result 字典。
 def _read_exif_exifread(image_path, result, debug=False):
     try:
         with open(image_path, 'rb') as f:
@@ -298,13 +275,13 @@ def _read_exif_exifread(image_path, result, debug=False):
             for tag in sorted(tags.keys()):
                 print(f"{tag}: {tags[tag]}")
 
-        # 品牌、型号
+
         if 'Image Make' in tags:
             result['make'] = str(tags['Image Make']).strip()
         if 'Image Model' in tags:
             result['model'] = str(tags['Image Model']).strip()
 
-        # 光圈 FNumber
+
         if 'EXIF FNumber' in tags:
             num, den, fl = _parse_ratio(tags['EXIF FNumber'])
             if fl is not None:
@@ -312,7 +289,7 @@ def _read_exif_exifread(image_path, result, debug=False):
                 if debug:
                     print(f"FNumber: {fl}")
 
-        # ---- 优先使用 ShutterSpeedValue 计算快门(最精确)----
+        # 优先采用 ShutterSpeedValue(APEX 值)换算快门, 精度最高。
         if 'EXIF ShutterSpeedValue' in tags:
             _, _, apex = _parse_ratio(tags['EXIF ShutterSpeedValue'])
             if apex is not None and apex != 0:
@@ -321,7 +298,7 @@ def _read_exif_exifread(image_path, result, debug=False):
                 if debug:
                     print(f"ShutterSpeedValue -> {exp_time} ({1/exp_time:.1f})")
 
-        # ---- 如果没有 ShutterSpeedValue 则回退到 ExposureTime ----
+        # 无 ShutterSpeedValue 时回退到 ExposureTime。
         if result['exposure_time'] is None and 'EXIF ExposureTime' in tags:
             num, den, fl = _parse_ratio(tags['EXIF ExposureTime'])
             if fl is not None:
@@ -332,7 +309,7 @@ def _read_exif_exifread(image_path, result, debug=False):
                 if debug:
                     print(f"ExposureTime: {fl} ({num}/{den})")
 
-        # ISO
+
         if 'EXIF ISOSpeedRatings' in tags:
             try:
                 result['iso'] = int(float(str(tags['EXIF ISOSpeedRatings'])))
@@ -343,13 +320,12 @@ def _read_exif_exifread(image_path, result, debug=False):
 
         if debug:
             print("=== exifread extracted ===", result)
-        # L2: 不提前 return, 始终执行下方 Pillow 回退补漏,
-        # 避免 exifread 部分成功(缺光圈/ISO等)时字段丢失
+        # 此处不提前返回: 始终继续执行下文的 Pillow 补漏, 避免 exifread 部分成功(缺光圈/ISO 等)时字段丢失。
     except Exception as e:
-        # 落日志而不是 print: 之前这两个错在日志文件里完全看不到(EXIF 读失败会静默变成 unknown)
+        # 须记录到日志而非 print: 否则 EXIF 读取失败时错误信息不可见, 相应字段会静默保持 unknown。
         logging.warning(f"EXIF: exifread 读取失败({type(e).__name__}: {e}), 走 Pillow 回退")
 
-# 用 Pillow 补漏 exifread 缺失的字段(仅填 None 处, 不覆盖已有值)
+# Pillow 兜底补全: 仅填 None, 不覆盖已有值
 def _read_exif_pillow(image_path, result):
     try:
         with Image.open(image_path) as img:
@@ -373,7 +349,6 @@ def _read_exif_pillow(image_path, result):
     except Exception as e:
         logging.warning(f"EXIF: Pillow 回退补漏失败({type(e).__name__}: {e})")
 
-# 从图片文件路径读取 EXIF 信息(品牌、型号、快门、光圈、ISO)
 def get_exif_data_from_path(image_path, debug=False):
     result = {
         "make": None, "model": None,
@@ -386,7 +361,7 @@ def get_exif_data_from_path(image_path, debug=False):
         print("=== After fallback ===", result)
     return result
 
-# 将 EXIF 字节或字符串安全转换为可读字符串
+# 解码 bytes 并剔除不可打印字符; 其它类型返回 None
 def _str(val):
     if isinstance(val, bytes):
         s = val.decode("utf-8", errors="ignore")
@@ -397,7 +372,7 @@ def _str(val):
         return s.strip()
     return None
 
-# 将 EXIF 数值安全转换为浮点数
+# 转换失败返回 None
 def _number(val):
     if val is None:
         return None
@@ -406,16 +381,12 @@ def _number(val):
     except Exception:
         return None
 
-# ---------- 格式化函数(完全模仿 Windows 快门显示)----------
-# 将曝光时间(浮点或分子分母)转换为 Windows 风格的字符串，如 "1/125s"
+# ---------- 格式化函数 ----------
 def exposure_to_str(exp=None, num=None, den=None):
+    """快门显示口径与 Windows 文件属性一致: 优先取 ShutterSpeedValue 计算的浮点 exp,
+    缺省时用 ExposureTime 的有理数 num/den 求值。
+    >=1s 输出保留一位小数的秒数; <1s 转为 round(1/value) 的 1/x 形式; 无法取值或非正值返回空串。
     """
-    完全模拟 Windows 文件属性的快门显示逻辑：
-    1. 优先使用 ShutterSpeedValue 计算的浮点数 exp。
-    2. 否则使用 ExposureTime 的有理数转浮点数。
-    3. 将秒数 value 转换为 1/x 格式，其中 x = round(1 / value)。
-    """
-    # 获取快门秒数(浮点)
     if exp is not None:
         value = exp
     elif num is not None and den is not None and den != 0:
@@ -426,34 +397,28 @@ def exposure_to_str(exp=None, num=None, den=None):
     if value <= 0:
         return ""
     if value >= 1:
-        # 长曝光：保留一位小数
         return f"{value:.1f}s"
     else:
-        # 短曝光：计算倒数并四舍五入
         x = int(round(1.0 / value))
         if x <= 0:
             return ""
         return f"1/{x}s"
 
-# 将光圈值格式化为 "f/数值" 形式
 def aperture_to_str(f):
     if f is None:
         return ""
-    # 判断光圈值是否接近整数(误差小于0.01)
     if abs(f - round(f)) < 0.01:
         return f"f/{int(round(f))}"
     else:
         return f"f/{f:.1f}"
 
-# 将 ISO 值格式化为 "ISO数值" 形式
 def iso_to_str(i):
     if i is None:
         return ""
     return f"ISO{int(i)}"
 
-# 注入临时型号美化映射(仅本次生效, 不写映射表):
-#   copy_on_inject=True 时先拷贝 params(避免污染请求对象);
-#   ensure_map=True 时无论是否注入都确保 params 含 model_map 键(与生成流程一致)
+# 注入临时型号映射(仅本次生效, 不写映射表)。copy_on_inject=True 时先拷贝 params
+# 以免污染调用方对象; ensure_map=True 时无论是否注入都保证 params 含 model_map 键。
 def _inject_model_map(params, raw_model, custom_model, copy_on_inject=False, ensure_map=False):
     if raw_model and custom_model and custom_model != raw_model:
         if copy_on_inject:
@@ -465,14 +430,12 @@ def _inject_model_map(params, raw_model, custom_model, copy_on_inject=False, ens
         params["model_map"] = dict(params.get("model_map", {}))
     return params
 
-# 使用映射表美化型号名称
 def prettify_model(model, model_map):
     if not model:
         return model
     return model_map.get(model, model)
 
 # ---------- Logo 处理 ----------
-# 根据品牌名在 Logo 目录中查找匹配的 Logo 文件
 def find_logo(logo_dir, make):
     if not make or not os.path.isdir(logo_dir):
         return None
@@ -490,7 +453,7 @@ def find_logo(logo_dir, make):
     candidates.sort()
     return candidates[0][1]
 
-# 从 special 子目录加载特定名称的特殊图片(如品牌 Logo 文字图)
+# 加载 special 目录下的特殊图(如品牌 Logo 文字图), 统一转为 RGBA
 def load_special_image(special_dir, name):
     if not os.path.isdir(special_dir):
         return None
@@ -506,7 +469,6 @@ def load_special_image(special_dir, name):
                 return None
     return None
 
-# 加载 Logo 图片并缩放到指定最大高度(保持宽高比)
 def load_logo(path, max_height):
     try:
         img = Image.open(path).convert("RGBA")
@@ -525,9 +487,8 @@ def get_text_height(font, text):
     bbox = draw.textbbox((0, 0), text, font=font)
     return bbox[3] - bbox[1]
 
-# 在图像上绘制带可选描边/投影的文字
-# 按角度分解阴影方向偏移: 角度取时钟系(0°=正上方, 顺时针增大, 90=右, 180=下, 270=左),
-# 便于直觉理解; ox 正=右, oy 正=下
+# 在图像上绘制带可选描边/投影的文字。
+# shadow_angle 采用时钟系(0°=正上方, 顺时针增大), ox 正为右, oy 正为下。
 def _shadow_offset(offset, angle):
     a = math.radians(angle)
     return int(offset * math.sin(a)), int(-offset * math.cos(a))
@@ -538,21 +499,19 @@ def draw_text(draw, canvas, xy, text, font, fill,
               shadow_enable=False, shadow_color="#000000", shadow_offset=1,
               shadow_blur=2, shadow_alpha=0.5, shadow_angle=135,
               shadow_clip_bottom=None):
-    # L6: 用 Pillow 原生描边参数(单次调用), 替代 O(描边宽²) 的逐像素偏移绘制
+    # 使用 Pillow 原生描边参数(单次调用), 避免逐像素偏移绘制。
     use_stroke = stroke_enable and stroke_width > 0
     if shadow_enable and shadow_offset >= 0:
-        # 文字方向投影: 文字 mask 沿角度方向平移后作为阴影, 露出文字实心影(边缘柔和);
-        # 与图片水墨晕开不同, 文字笔画细不做四周晕开, 否则笔画间隙被填满糊成一块
-        # (浓度低又淡得不可见)。blur 只柔和阴影边缘, offset 控制方向位移幅度
+        # 文字投影: 文字 mask 沿角度方向平移后作为阴影(实心影 + 柔和边缘)。
+        # 文字笔画细, 不做四周晕开, 否则笔画间隙会被填满; blur 仅柔化阴影边缘, offset 控制位移幅度。
         sw = stroke_width if use_stroke else 0
         bbox = draw.textbbox(xy, text, font=font, stroke_width=sw)
         ox, oy = _shadow_offset(shadow_offset, shadow_angle)
         cw, ch = canvas.size
-        # 晕开范围=0 时阴影是实心硬边, 大字号行(如型号)底部一条硬边像被框截断;
-        # 强制最小 2px 柔和, 让阴影边缘始终有渐变
+        # shadow_blur 最小按 2px 处理: 否则阴影为硬边, 大字号行底部会出现明显截断感。
         eff_blur = max(shadow_blur, 2)
-        # 高斯模糊的可见晕开范围约 3 倍半径: 阴影(含晕开)必须完整落在画布内并留出边距,
-        # 空间不足时偏移向画布内收(可为负), 避免晕开渐变在画布边缘硬切截断
+        # 高斯模糊可见范围约为半径的 3 倍: 阴影(含晕开)须完整落在画布内,
+        # 空间不足时偏移向画布内收(可为负), 避免渐变在边缘硬切。
         spread = eff_blur * 3 + 8
         if ox > 0:
             ox = min(ox, cw - bbox[2] - spread)
@@ -562,12 +521,11 @@ def draw_text(draw, canvas, xy, text, font, fill,
             oy = min(oy, ch - bbox[3] - spread)
         elif oy < 0:
             oy = max(oy, -(bbox[1] - spread))
-        # 限制阴影不延伸到下一行文字(会被下一行遮挡, 看起来像截断):
-        # clip_bottom 给定时阴影底(含晕开渐变)不超过该边界, 阴影只在行距空白内结束
+        # shadow_clip_bottom 给定时, 阴影底部(含晕开)不超过该边界, 避免投到下一行文字上被遮挡。
         if shadow_clip_bottom is not None:
             oy = min(oy, shadow_clip_bottom - bbox[3] - eff_blur * 3 - 4)
-        # pad 需覆盖高斯模糊可见晕开范围(约 4 倍半径)+文字边缘, 否则渐变尾部被 mask 矩形
-        # 边缘硬切, 阴影底部/四周会露出水平框线; mask 区域只覆盖阴影内容(文字 bbox + 偏移 + 晕开)
+        # pad 需覆盖高斯模糊可见范围(约 4 倍半径)与文字边缘, 否则渐变尾部会被 mask 边界硬切;
+        # mask 区域仅覆盖阴影内容(文字 bbox + 偏移 + 晕开)。
         pad = eff_blur * 4 + 8
         sx0, sy0 = max(0, min(bbox[0], bbox[0] + ox) - pad), max(0, min(bbox[1], bbox[1] + oy) - pad)
         sx1, sy1 = min(cw, max(bbox[2], bbox[2] + ox) + pad), min(ch, max(bbox[3], bbox[3] + oy) + pad)
@@ -598,10 +556,8 @@ def _strip_orientation(exif_bytes):
     except Exception:
         return exif_bytes
 
-# 圆角矩形精确多边形路径(每象限 n_per_quad 段采样, 直边由相邻端点自然连接)。
-# n_super=2 为四分之一圆弧; >2 为超椭圆——拐角曲率渐变、切点处与直边平滑衔接,
-# 视觉比纯圆弧更饱满圆润(接近现代 UI 圆角)。Pillow 的 rounded_rectangle 内部用线段数
-# 很少的 arc 逼近, 切点处几何偏差产生微小凹凸; 自绘路径用密采样 + 四舍五入, 精确贴合
+# 圆角矩形多边形路径: 每象限采样 n_per_quad 段, 直边由相邻端点连接。
+# n_super=2 为四分之一圆弧, >2 为超椭圆(拐角曲率渐变, 与直边平滑衔接)。
 def _rounded_rect_vertices(w, h, radius, n_per_quad=32, n_super=2.5):
     import math
     r = min(max(radius, 0.0), w / 2.0, h / 2.0)
@@ -620,7 +576,7 @@ def _rounded_rect_vertices(w, h, radius, n_per_quad=32, n_super=2.5):
             pts.append((int(cx + x + 0.5), int(cy + y + 0.5)))
     return pts
 
-# 整圆路径(圆心居中, 半径 radius)——圆形档(正圆裁剪)用
+# 整圆路径(圆心居中, 半径 radius), 用于圆形裁剪档
 def _circle_vertices(w, h, radius, n_seg=128):
     import math
     cx, cy = w / 2.0, h / 2.0
@@ -630,17 +586,14 @@ def _circle_vertices(w, h, radius, n_seg=128):
         pts.append((int(cx + radius * math.cos(a) + 0.5), int(cy + radius * math.sin(a) + 0.5)))
     return pts
 
-# 圆角/圆形 mask 缓存
-# mask 只由 (尺寸, 半径) 决定, 与图像内容无关; 而超采样会建一张 4 倍边长的 L 通道图
-# (预览 1667×2500 时是 6668×10000 = 66MP/66MB), 再 LANCZOS 缩回 —— 实测占单次预览
-# 约 150ms, 是整条渲染链路最贵的一步, 而每次调参都在重算同一张 mask。
+# 圆角/圆形 mask 缓存: mask 仅由(尺寸, 半径)决定, 与图像内容无关。
+# 超采样会构建 4 倍边长的 L 通道图再缩回, 开销较大, 故按(尺寸, 半径)复用。
 # putalpha() 会拷贝 alpha 数据, 缓存对象不被输出图持有, 可安全复用。
 _MASK_CACHE = {}
 _MASK_CACHE_LOCK = threading.Lock()
 _MASK_CACHE_MAX = 3          # 只留最近几项
-_MASK_CACHE_MAX_PX = 16_000_000   # 超过约 16MP 的 mask 不缓存: 成品渲染是一次性的,
-                                  # 缓存它只会白占内存(24MP 成品的 mask 就是 24MB)
-# 命中/未命中计数: 只在落"渲染分段"日志时读一次(见 _cache_stats_line), 不在查找路径上做别的事
+_MASK_CACHE_MAX_PX = 16_000_000   # 超过约 16MP 的 mask 不缓存
+                                  # 命中/未命中计数: 仅在写缓存统计日志时读取一次
 _MASK_STATS = {"hit": 0, "miss": 0}
 
 def _cached_mask(key, build):
@@ -660,42 +613,30 @@ def _cached_mask(key, build):
 
 
 # ---------- 渲染中间层缓存(分层缓存) ----------
-# 只服务"同一张图、反复调参"的交互路径: 调间距/文字/颜色时, 图片外观层(圆角+阴影+描边)与
-# 背景层都不需要重算。各层在预览档(2500 画布)上的实测开销: 背景层 ~90ms、图片阴影层 ~48ms、
-# 描边层 ~135ms、圆角 ~6ms —— 而改一个文字参数会把它们全部重算一遍。
-#
-# **键必须覆盖影响该层的全部参数**: 以后新增/修改任何影响某层的参数, 必须同步加进该层的键,
-# 否则会静默复用上一次的结果(表现为"改了参数预览不变")。
-#
-# 代价是工作图分辨率与实际画布差 <3%(强模糊背景上不可辨)。本项目要求"输出与现状逐像素一致",
-# 所以键用**精确尺寸**, 不引入量化 —— 渲染路径一行没改, 只是把"算过的同一张层"留下来复用。
+# 服务"同一张图反复调参"的交互路径: 间距/文字/颜色变化时, 图片外观层与背景层可复用。
+# 约束: 键必须覆盖影响该层的全部参数, 否则会静默复用上次结果(表现为改了参数预览不变)。
+# 键使用精确尺寸而不做量化, 以保证输出与关闭缓存时逐像素一致。
 _LAYER_CACHE = collections.OrderedDict()   # LRU: 末尾最新(淘汰从头部取, 需要 popitem(last=False))
 _LAYER_CACHE_LOCK = threading.Lock()
-_LAYER_CACHE_BUDGET = 128 << 20     # 层数据总量上限(字节); 超了按最久未用淘汰。
-                                    # 预览一套层约 15MB(背景/图片/阴影/描边各一张), 128MB ≈ 8 套,
-                                    # 够 A/B 对比几个参数状态而不互相淘汰。
-_LAYER_CACHE_MAX_PX = 16_000_000    # 单层像素上限(按"预览最长边 2500 -> 最大
-                                    # 6.25MP"推的), 但那只算了**输入图**那一档 —— 画布还受
-                                    # canvas_ratio 影响: 21:9 时预览画布实测 5215x2235 = 11.7MP,
-                                    # 于是整张背景层被这个上限挡在缓存外, 每次调参都重算
-                                    # (放大 61ms + 暗化混合 49ms, 实测均值 420ms -> 264ms)。
-                                    # 取 16MP: 够放下各种比例下的预览画布, 又仍把成品全分辨率那层
-                                    # 挡在外面(4000x3000 + 21:9 的成品画布是 8346x3577 = 29.9MP,
-                                    # 单张 RGB 就 90MB, 缓存它纯属白占内存)。
+_LAYER_CACHE_BUDGET = 128 << 20     # 层数据总量上限(字节): 超出时按最久未使用淘汰
+                                    # 预览一套层约 15MB(背景/图片/阴影/描边各一张), 128MB 约可容纳 8 套
+_LAYER_CACHE_MAX_PX = 16_000_000    # 单层像素上限
+                                    # 取 16MP: 足以容纳各比例下的预览画布(21:9 约 11.7MP),
+                                    # 同时把成品全分辨率图层(约 29.9MP)排除在缓存外。
 _LAYER_CACHE_BYTES = [0]            # 当前占用(字节)
 _LAYER_CACHE_STATS = {"hit": 0, "miss": 0, "skip": 0}   # 观测用: 命中/未命中/未入缓存(层太大)
-# 按线程关闭分层缓存: 批量里每张图只渲染一次, 缓存纯空转, 还会把交互预览的层挤出去。
-# 必须用 thread-local —— 批量进行时用户仍可能拖图调参, 全局开关会误伤预览线程。
+# 按线程关闭分层缓存: 批量中每张图只渲染一次, 缓存无收益且会挤掉交互预览的层。
+# 必须使用 thread-local: 批量进行时预览线程仍可能在渲染。
 _LAYER_CACHE_TLS = threading.local()
-# 预览源缩略图缓存(psrc)的命中计数: 它决定"这张图第一次预览的额外开销"有没有被摊掉
+# 预览源缩略图缓存(psrc)的命中计数
 _THUMB_STATS = {"hit": 0, "miss": 0}
 
 
 def _cache_stats_line():
-    """本次渲染期间的缓存使用情况: 增量(相对上一次落日志) + 累计 + 占用。
+    """本次渲染期间的缓存使用情况: 增量(相对上次落日志)、累计值与占用。
 
-    只在落"渲染分段"日志时调用一次(每次渲染一行), 不在任何查找热路径上。
-    计数是各线程无锁自增的, 这里读到的是近似值; 日志用途足够。
+    仅在写"渲染分段"日志时调用一次, 不在查找热路径上。
+    计数为各线程无锁自增, 读数是近似值。
     """
     with _LAYER_CACHE_LOCK:
         cur = dict(_LAYER_CACHE_STATS)
@@ -723,12 +664,12 @@ def _layer_bytes(im):
 
 
 def _layer_cached(key, build, mutable=False):
-    """取缓存层; 未命中则用 build() 构造并按预算缓存。key 为 None 表示不缓存(直接构造)。
+    """取缓存层; 未命中则调用 build() 构造并按预算缓存。key 为 None 时不使用缓存。
 
-    mutable=True: 调用方**会就地修改**返回的图(如把背景当画布往上画)。此时命中缓存必须返回
-    副本 —— 且必须在锁内判断, 否则"锁外查未命中 -> 期间别的线程填了同一键 -> 拿到共享对象
-    直接改"会污染缓存; 未命中则直接返回新构造的对象(省掉一次无谓的 copy)。
-    像素数超 _LAYER_CACHE_MAX_PX 的层不入缓存(仍会构造并返回)。"""
+    mutable=True 表示调用方会就地修改返回的图(如将背景当作画布继续绘制), 此时命中缓存
+    必须返回副本; 该判断须在锁内完成, 否则其它线程在此期间写入同一键会污染缓存。
+    像素数超过 _LAYER_CACHE_MAX_PX 的层不入缓存(仍会构造并返回)。
+    """
     if key is None or getattr(_LAYER_CACHE_TLS, "off", False):
         _LAYER_CACHE_STATS["skip"] += 1
         return build()
@@ -767,9 +708,8 @@ def _src_key(input_path):
 
 def _build_round_mask(w, h, radius):
     ss = 4  # 超采样倍数
-    # L 单通道 mask 内存便宜(1 字节/像素), 上限放宽到 1.6 亿像素(~160MB);
-    # 原 8 千万上限致 24MP 以上大图(如相机原图 6000×4000)被降级到 ss=1, 完全无抗锯齿,
-    # 直边转圆角处锯齿明显; 放宽后此类图至少 ss=2, 边缘经 LANCZOS 缩小变平滑
+    # L 单通道 mask 每像素 1 字节, 上限放宽到 1.6 亿像素(约 160MB):
+    # 24MP 以上大图(如 6000x4000)可保持 ss>=2, 边缘经 LANCZOS 缩小后平滑。
     while ss > 1 and (w * ss) * (h * ss) > 160_000_000:
         ss -= 1
     mw, mh = w * ss, h * ss
@@ -808,8 +748,7 @@ def round_image_circle(image):
     out.putalpha(mask)
     return out
 
-# ---------- 核心处理函数(增加背景暗化参数)----------
-# 按样式参数加载字体: 粗/斜/粗斜优先用独立字体文件, 缺失则回退常规/默认字体
+# ---------- 核心处理函数 ----------
 def _load_font(size, bold, italic,
                font_path, font_bold_path, font_italic_path, font_bold_italic_path):
     paths = []
@@ -822,8 +761,8 @@ def _load_font(size, bold, italic,
         paths.append(font_italic_path)
     if font_path and os.path.isfile(font_path):
         paths.append(font_path)
-    # 兜底: 传入路径失效时(如预设保存了旧 _MEI 临时目录), 用当前内置/系统字体替代,
-    # 避免 fallback 到 ImageFont.load_default() 位图默认字体导致字号缩放失效.
+    # 兜底: 传入路径失效时使用当前内置/系统字体,
+    # 避免回退到 ImageFont.load_default() 的位图字体导致字号缩放失效
     if not paths:
         if bold and italic:
             p = _default_font_path("SarasaGothicSC-BoldItalic.ttf")
@@ -888,7 +827,7 @@ def _unique_output_path(out_root, stem, suffix="_watermarked.jpg"):
             return candidate
         dup += 1
 
-# 单张图片水印处理主函数：生成带 EXIF 信息水印的最终图片
+# 单张图片水印处理: 生成带 EXIF 信息水印的最终图片
 def process_single(input_path, output_path, logo_dir,
                    font_path, font_bold_path, font_italic_path, font_bold_italic_path,
                    bg_color, text_color, bg_mode, blur_radius, corner_radius,
@@ -924,10 +863,9 @@ def process_single(input_path, output_path, logo_dir,
                    layout_mode="unified",   # 水印布局模式
                    geom_out=None,    # 可选: 传入 dict, 填充间距段几何坐标(画布像素), 供预览叠加标注
                    image_out=None,   # 可选: 传入 list, 直接拿到画布 PIL 图而不落盘(调用方要内存图像时用)
-                   stage_out=None,   # 可选: 传入 list, 回传本次的"渲染分段"结果(供界面显示/复用, 省得读日志)
-                   stage_log=True):  # 内部参数: 是否落"渲染分段"日志(先导帧那类成对刷屏的场景可关)
-    # ---- 分段计时: 渲染链路各阶段耗时, 函数结束时一次性落一条日志(排查瓶颈就靠这条) ----
-    # 每次渲染只多 1 行日志、10 次 time.monotonic()(约 1µs), 不在任何热路径上逐层/逐行记。
+                   stage_out=None,   # 可选: 传入 list, 回传本次渲染分段结果(供界面显示, 免读日志)
+                   stage_log=True):  # 内部参数: 是否记录渲染分段日志
+    # ---- 分段计时: 各阶段耗时在函数结束时一次性写入一条日志 ----
     _t0 = time.monotonic()
     t_prev = _t0
     stages = []   # ["预处理 12ms", ...] 按序累积
@@ -938,11 +876,10 @@ def process_single(input_path, output_path, logo_dir,
         t_prev = now
 
     def _flush_stage_log(tag):
-        """把分段结果落成一条日志(渲染末尾调用一次)。
+        """把分段结果写成一条日志(渲染末尾调用一次)。
 
-        尾部带**参数指纹**: 排查"两次渲染为什么不一样"时, 直接对比两行末尾那段就够了。
-        画布尺寸记的是 render_scale 缩回**之前**的逻辑画布;
-        低清增强时最终回传的图会小 render_scale 倍, 那个尺寸在调用方的请求级日志里。
+        尾部附参数指纹, 便于对比两次渲染的差异。
+        画布尺寸记录的是 render_scale 缩回之前的逻辑画布。
         """
         if not stage_log:
             return
@@ -960,12 +897,12 @@ def process_single(input_path, output_path, logo_dir,
             # 回给调用方: 界面把它放进"上一次渲染"的 tooltip, 不必去读日志文件
             stage_out.append({"tag": tag, "stages": list(stages), "total_ms": total_ms, "sig": sig})
 
-    # 低清增强会放大该值, 参数指纹要记用户输入的原值
+    # 低清增强会放大该值, 参数指纹记录的是用户输入的原值
     min_font_size_in = min_font_size
-    # 显式关闭原图文件句柄, 避免批量处理时句柄/内存堆积;
-    # convert()/resize() 会生成新图像对象, 不受 _original.close() 影响.
-    # src_key: 本次输入图的内容标识, 分层缓存的键都以它开头(换图/改文件即失效)。
-    # 预览档下 input_path 是 psrc 缩略图(文件名带原图 mtime_size 做内容寻址), 所以它就是原图的标识。
+    # 显式关闭原图文件句柄, 避免批量处理时句柄与内存堆积
+    # (convert()/resize() 会生成新图像对象, 不受 close() 影响)。
+    # src_key: 本次输入图的内容标识, 分层缓存键均以它开头。
+    # 预览档下 input_path 为 psrc 缩略图(文件名含原图 mtime 与 size), 可直接作为原图标识。
     src_key = _src_key(input_path)
     original_exif = b""
     _original = Image.open(input_path)
@@ -978,7 +915,7 @@ def process_single(input_path, output_path, logo_dir,
             bg = Image.new("RGBA", original.size, bg_color + "FF")
             original = Image.alpha_composite(bg, original)
         original = original.convert("RGB")
-        # H2: 物理转正像素(应用EXIF Orientation), 否则竖拍照片水印会随查看器旋转而转90°
+        # 按 EXIF Orientation 物理转正像素, 否则竖拍照片的水印方向会随查看器旋转
         original = ImageOps.exif_transpose(original)
         img_w, img_h = original.size
 
@@ -986,8 +923,7 @@ def process_single(input_path, output_path, logo_dir,
         render_scale = 1
         if low_res_enhance and img_h < LOW_RES_THRESHOLD:
             render_scale = 2
-            # 低分辨率增强时, min_font_size 应随渲染比例放大,
-            # 否则最终缩回后有效字号减半, 导致预览(已按 scale2 调整)与成品观感不一致.
+            # 低清增强时 min_font_size 须随渲染比例放大, 否则缩回后有效字号减半, 与预览观感不一致
             min_font_size = int(min_font_size * render_scale)
             img_w *= render_scale
             img_h *= render_scale
@@ -998,11 +934,10 @@ def process_single(input_path, output_path, logo_dir,
         _original.close()
     _stage("预处理(解码/转正/增强)")
 
-    # 获取 EXIF
     exif = get_exif_data_from_path(input_path)
     _stage("EXIF读取")
 
-    # 防御性钳制: 界面仅标准比例档(均在此区间), 防脚本直调/未来回归自由输入产生极端画布
+    # 防御性钳制: 防止直接调用或异常输入产生极端画布尺寸
     if canvas_ratio > 0:
         canvas_ratio = min(max(canvas_ratio, 0.05), 20.0)
 
@@ -1107,7 +1042,7 @@ def process_single(input_path, output_path, logo_dir,
     bottom_gap_px = int(img_h * gap_bottom)
 
     if layout_mode == "split_top_bottom":
-        # 品牌/logo 固定在上方，型号+参数固定在下方
+        # split_top_bottom: 品牌/logo 在上方, 型号与参数在下方
         if show_brand:
             above_lines = lines[:1] if lines else []
             below_lines = lines[1:]
@@ -1135,9 +1070,8 @@ def process_single(input_path, output_path, logo_dir,
         line_spacing = max(0, int(img_h * line_gap))
 
         if layout_mode == "split_top_bottom":
-            # 上下分离(镜像+居中): 上下各留一个等高中带 side_h = max(上带, 下带),
-            # 画布高 = 2*边距 + 2*side_h + 图高 → 图片夹在中间始终垂直居中;
-            # 矮侧边带内的余量落在外侧间距(gap_top/gap_bottom 实际渲染可略大), 内侧间距精确对应滑块
+            # 上下分离(镜像+居中): 上下的中带等高 side_h = max(上带, 下带), 图片因此始终垂直居中;
+            # 矮侧余量落在外侧间距(实际渲染可略大于滑块值), 内侧间距精确对应滑块。
             above_content_h = _sec_height(above_lines, line_spacing)
             below_content_h = _sec_height(below_lines, line_spacing)
             side_h = max(gap_top_px + above_content_h + gap_image_top_px,
@@ -1221,7 +1155,7 @@ def process_single(input_path, output_path, logo_dir,
         img_w = int(img_w * scale)
         img_h = int(img_h * scale)
         original_large = original_large.resize((img_w, img_h), Image.Resampling.LANCZOS)
-        # L1: 图片缩放后重算依赖 img_h 的几何, 使贴底计算(paste_y)与渲染使用一致的值
+        # 图片缩放后须重算依赖 img_h 的几何, 保证贴底计算与渲染阶段使用同一组值
         gap_image_top_px = int(img_h * gap_image_top)
         gap_image_bottom_px = int(img_h * gap_image_bottom)
         gap_top_px = int(img_h * gap_top)
@@ -1236,31 +1170,29 @@ def process_single(input_path, output_path, logo_dir,
             total_text_h = _sec_height(lines, line_spacing)
     _stage("字体/几何")
 
-    # 生成背景(支持暗化)
+    # 生成背景层
     def _build_background():
-        """背景层: 模糊模式下是"工作图放大回来的毛玻璃", 纯色模式就是一张纯色图。
+        """背景层: 模糊模式为工作图放大后的毛玻璃, 纯色模式为纯色图。
 
-        与画布同尺寸, 所以键里带画布尺寸 —— 调间距/文字时画布会变, 这层就命中不了;
-        但改背景色/模糊半径时画布不变, 直接复用(模糊工作图那一步是整条链路最贵的)。
-        暗化不在这里做(见下面的调用处): 它是最后一步的线性混合, 放在缓存之外才能让
-        "拖暗化滑块"也命中这一层。"""
+        层与画布同尺寸, 缓存键包含画布尺寸(调整间距或文字时画布变化, 本层不命中)。
+        暗化不在本层执行, 见下方调用处。
+        """
         if bg_mode != "blur":
-            # 纯色背景不用暗化: 暗化控件仅模糊模式显示,
-            # 纯色模式保持 bg_color 原色, 避免界面残留的暗化值误改纯色背景
+            # 纯色背景不做暗化: 暗化仅对模糊模式生效, 避免残留的暗化值影响纯色背景
             return Image.new("RGB", (canvas_w, canvas_h), bg_color)
 
-        # 1/4 边长(1/16 面积)的工作图把全尺寸 3s+ 压到 <0.5s; 毛玻璃是强模糊背景,
-        # 分辨率损失肉眼几乎无差; 预览/成品走同一条路径, 一致性有保证
+        # 工作图取 1/4 边长(1/16 面积)以降低模糊开销; 毛玻璃为强模糊背景, 分辨率损失可忽略。
+        # 预览与成品走同一路径, 结果一致。
         wk_w, wk_h = max(BLUR_WORK_MIN_SIDE, canvas_w // 4), max(BLUR_WORK_MIN_SIDE, canvas_h // 4)
         # 模糊半径按工作图比例缩放(保持相同视觉模糊程度); 下限 1px 保证始终有柔化
         wk_blur = max(1, round(blur_radius * (wk_w / canvas_w)))
 
         def _build_work_image():
-            """模糊工作图(降采样 → 增强 → 模糊 → 噪声 → 暖白蒙版)。键只含影响这张工作图的参数;
-            放大回画布那一步不在这里 —— 那一步很便宜, 且在 key 里带画布尺寸的那一层做。
+            """模糊工作图(降采样 → 增强 → 模糊 → 噪声 → 暖白蒙版)。
 
-            注: 噪声(effect_noise)本身随机, 缓存把它固定成"同一键内不变"—— 对调参反而更好
-            (不会因为背景噪声每次抖动而看不出参数改动的效果)。"""
+            缓存键只包含影响本图的参数; 放大回画布由调用方完成。
+            噪声为随机量, 缓存使其在同一键内保持不变, 避免背景随参数微调而抖动。
+            """
             x = original_large.resize((wk_w, wk_h), Image.Resampling.LANCZOS)
             x = ImageEnhance.Color(x).enhance(1.35)
             x = ImageEnhance.Contrast(x).enhance(1.08)
@@ -1276,16 +1208,14 @@ def process_single(input_path, output_path, logo_dir,
         work = _layer_cached(("bg_work", src_key, wk_w, wk_h, wk_blur), _build_work_image)
         return work.resize((canvas_w, canvas_h), Image.Resampling.LANCZOS).convert("RGB")
 
-    # 背景层(键**不含**暗化: 暗化是最后一步单独做的, 见下)。
-    # mutable=True 的语义见 _layer_cached: 命中返回副本、未命中返回新对象, 所以下面可以直接把它
-    # 当作画布往上画。纯色底传 key=None 不进缓存 —— 它的 build 就是一次 fill(极便宜), 而缓存它
-    # 每次命中都要拷一份同尺寸副本(预览档 11.7MP 就是 35MB), 反而更亏。
+    # 背景层: 缓存键不含暗化参数(暗化在最后一步单独执行)。
+    # mutable=True 语义见 _layer_cached: 命中返回副本、未命中返回新对象, 因此可直接在其上继续绘制。
+    # 纯色底传 key=None 不入缓存: 其构造仅一次填充, 而缓存命中需拷贝同尺寸副本(预览档约 35MB)。
     bg = _layer_cached(
         ("bg", src_key, canvas_w, canvas_h, bg_mode, blur_radius, bg_color) if bg_mode == "blur" else None,
         _build_background, mutable=True)
-    # 暗化处理(最后, 对文字可读性最重要)。放在缓存之外的理由: 拖"背景暗化"滑块时背景层仍然命中
-    # —— 若把 bg_darken_strength 放进上面那个键, 每动一格都要整张重建(实测 264ms -> 368ms)。
-    # 暗化是线性混合, 放在缓存层之外与放在里面**逐像素等价**(同尺寸同输入, 同样的 blend)。
+    # 暗化处理(最后执行, 影响文字可读性): 置于缓存之外, 使调整暗化参数时背景层仍可命中。
+    # 暗化为线性混合, 置于缓存之外与置于缓存之内逐像素等价。
     if bg_darken_strength > 0:
         canvas = Image.blend(bg, Image.new("RGB", bg.size, (0, 0, 0)), bg_darken_strength)
     else:
@@ -1379,9 +1309,9 @@ def process_single(input_path, output_path, logo_dir,
                     d.polygon(_circle_vertices(mw, mh, max(0.0, rr - half)), fill=0)
                 else:
                     # 描边 = 图片边缘向内外各扩 W/2: 外缘圆角矩形(尺寸向外扩 W, 半径 R+W/2) 填充 255,
-                    # 挖空内缘圆角矩形(尺寸向内缩 W, 半径 R-W/2)。尺寸差保证直边处描边带不空;
-                    # 大圆角(超过短边一半退化为椭圆)时内外缘椭圆长短半轴各差 W/2, 描边带仍存在。
-                    # 此前外缘/内缘共用同一尺寸只改半径, 直边完全重叠被挖空, 圆角>0 时描边消失
+                    # 挖空内缘圆角矩形(尺寸向内缩 W, 半径 R-W/2)。内缘须使用缩小后的尺寸: 仅改半径会使直边处
+                    # 完全重叠而被挖空, 圆角 > 0 时描边消失。大圆角(超过短边一半退化为椭圆)时内外缘长短半轴
+                    # 各差 W/2, 描边带仍存在。
                     sw_, sh_ = out_w * ss, out_h * ss
                     iw_, ih_ = max(2, (img_w - image_stroke_width) * ss), max(2, (img_h - image_stroke_width) * ss)
                     half = image_stroke_width * ss / 2.0
@@ -1565,7 +1495,7 @@ def process_single(input_path, output_path, logo_dir,
         }
 
     if image_out is not None:
-        # 调用方直接要内存图像: 跳过编码、写盘与读回解码
+        # 调用方直接取内存图像: 跳过编码、写盘与读回解码。
         image_out.append(canvas)
         _flush_stage_log("预览")
         return True, None
@@ -1575,8 +1505,8 @@ def process_single(input_path, output_path, logo_dir,
     return ret
 
 
-# ---------- 日志文件配置(按时间戳命名，保留最近 3 份)----------
-# 设置、tmp 残留, 看着乱)。目录在 import 阶段就建出来 —— 下面的 filemode='w' 会往里写。
+# ---------- 日志文件配置(按时间戳命名, 保留最近 3 份)----------
+# 日志置于独立子目录, 该目录在 import 阶段建立, 供下方 filemode='w' 写入。
 LOG_DIR = os.path.join(BASE_DIR, "logs")
 ensure_dir(LOG_DIR)
 
@@ -1615,9 +1545,8 @@ _cleanup_tmp_files()
 LOG_TIMESTAMP = datetime.now().strftime("%Y%m%d_%H%M%S")
 LOG_FILE = os.path.join(LOG_DIR, f"log-{LOG_TIMESTAMP}.log")
 
-# 时间戳带毫秒: 拖放/预览这类时序问题必须能对齐到毫秒
-# 线程名也在格式里: 同时有 界面/预览线程/事件线程/生成线程 四个来源在写同一份日志,
-# 出问题时先看是谁写的(线程名由各线程自己设, 见 RenderWorker 与 xsy_qt/render.py)
+# 时间戳带毫秒, 便于对齐时序问题; 格式含线程名 —— 本程序有界面/预览/事件/生成四个线程
+# 写同一份日志, 排查时先确认来源。
 logging.basicConfig(level=logging.INFO,
                     format='%(asctime)s.%(msecs)03d [%(levelname)s] [%(threadName)s] %(message)s',
                     datefmt='%Y-%m-%d %H:%M:%S',
@@ -1654,7 +1583,7 @@ def _format_manual_exif(manual_exif):
     }
 
 
-# ===== 默认参数(与旧版"恢复默认设置"一致) =====
+# ===== 默认参数 =====
 def default_params():
     return {
         "logo_dir": DEFAULT_LOGO_DIR,
@@ -1740,9 +1669,8 @@ class RenderWorker(threading.Thread):
             if self.mode == "single":
                 self._process_single()
             else:
-                # 批量里每张图都只渲染一次, 分层缓存纯空转, 还会把交互预览的层挤出去 -> 本线程关掉它。
-                # thread-local 且本线程跑完这批就退出(见 RenderWorker 的用法), 无需复位;
-                # 若以后改成线程池复用, 必须在 finally 里复位。
+                # 批量中每张图只渲染一次, 分层缓存无收益且会挤掉交互预览的层, 故本线程关闭。
+                # 使用 thread-local 且线程随本批结束而退出, 无需复位; 若改为线程池复用, 必须在 finally 中复位。
                 _LAYER_CACHE_TLS.off = True
                 self._process_batch()
         except Exception as e:
@@ -1786,7 +1714,7 @@ class RenderWorker(threading.Thread):
             self.events.put({"type": "finished", "message": "没有可处理的图片", "success": False})
             return
 
-        # 与单张对称的兜底: 界面参数集恒含 model_map, 但缺失时批量会 TypeError(单张有 _inject_model_map 注入)
+        # 与单张对称的兜底: model_map 缺失时批量会抛 TypeError(单张由 _inject_model_map 注入)
         self.params.setdefault("model_map", {})
 
         out_dir = self.batch_out_dir or PREVIEW_DIR   # 批量子目录(导出文件夹/批量水印_<时间戳>)
@@ -1797,8 +1725,7 @@ class RenderWorker(threading.Thread):
         t_batch = time.monotonic()
         logging.info(f"批量处理: 共 {total} 个文件 -> {out_dir}")
         if self.manual_exif:
-            # 批量用了"与照片本身无关"的参数, 日志里要留痕 —— 否则以后看到成品型号不对,
-            # 排查时根本想不到是勾了「自定义水印信息」(它一次作用到整批)
+            # 批量使用了与照片无关的参数, 日志留痕便于排查成品型号不符的情况(该设置一次作用于整批)
             logging.info("批量: 使用自定义水印信息(忽略每张照片的 EXIF)")
         for idx, item in enumerate(files, 1):
             if self.stop_event.is_set():
@@ -1821,8 +1748,6 @@ class RenderWorker(threading.Thread):
             self.events.put({"type": "progress", "done": idx, "total": total, "name": fname})
             t_one = time.monotonic()
             try:
-                # manual_exif 与单张同一条口径(见 _process_single): 勾了「自定义水印信息」时,
-                # 这里也没往下传), 于是批量静默忽略该功能 —— 而预览一直按它渲染, 表现就是
                 process_single(fpath, out_path, manual_exif=self.manual_exif, **self.params)
                 success += 1
                 # 每张的耗时: 批量慢时一眼看出是某张特别大还是整体退化
@@ -1864,20 +1789,16 @@ class AppState:
         self._thumb_cache = {}
         self._thumb_lock = threading.Lock()
         self._thumb_gen_lock = threading.Lock()   # 串行化缩略图生成(预热线程 vs 预览请求)
-        # 本次会话用户给过的输出目录(导出文件夹不再持久化, 见 Api.save_settings):
-        # 供 _allowed_open_dir 白名单判断「打开所在目录」是否放行
+        # 本次会话使用过的输出目录: 供 _allowed_open_dir 判断「打开所在目录」是否放行
         self.user_dirs = set()
         ensure_dir(PREVIEW_DIR)
-        self.exit_reason = None  # 退出原因(页面点退出/Ctrl+C), 供退出日志打印
+        self.exit_reason = None  # 退出原因, 供退出日志打印
 
     def _is_allowed_input(self, p):
-        """输入路径校验。
+        """输入路径校验: 只要求存在且为普通文件。
 
-        本副本只服务调用方: 路径来自原生文件对话框或系统拖放回调, **没有"不可信调用方"
-        理由是"调用方不能凭一个字符串读任意文件", 在这里不再提供任何安全价值, 反而变成功能
-        约束 —— 以后想加「最近打开」「命令行传路径」都会被静默拒绝。所以只保留最基本的
-        "存在且是文件"; 图片格式由 _sniff_image_type 在入口处单独判定。
-
+        路径来自原生文件对话框或系统拖放, 不存在不可信调用方这一威胁模型;
+        图片格式由 _sniff_image_type 在入口处单独判定。
         """
         try:
             return bool(p) and os.path.isfile(p)
@@ -1885,8 +1806,9 @@ class AppState:
             return False
 
     def _sniff_image_type(self, p):
-        """按文件头魔数识别图片真实类型, 返回扩展名('.jpg'/'.webp'等)或 None(非受支持图片)。
-        魔数优先于扩展名, 上传时据此反推真实扩展名, 防伪造扩展名导致 Content-Type 错配"""
+        """按文件头魔数识别图片真实类型, 返回扩展名('.jpg'/'.webp' 等)或 None(非受支持图片)。
+        魔数优先于扩展名。
+        """
         if not p or not os.path.isfile(p):
             return None
         try:
@@ -1911,8 +1833,10 @@ class AppState:
         return None
 
     def _allowed_open_dir(self, p):
-        """校验 open_dir 目标目录是否在白名单内(导出目录/PREVIEW_DIR), 返回规范化绝对路径或 None。
-        open_dir 可被界面「打开所在目录」调用, 若不限制可诱导打开任意路径"""
+        """校验 open_dir 目标是否在白名单内(导出目录/PREVIEW_DIR), 返回规范化绝对路径或 None。
+
+        限制可避免被诱导打开任意目录。
+        """
         if not p:
             return None
         try:
@@ -1923,7 +1847,7 @@ class AppState:
         roots = [PREVIEW_DIR, DEFAULT_LOGO_DIR]
         out_dir = (self.settings.get("output_dir") or "").strip()
         if out_dir:
-            roots.append(out_dir)   # 历史遗留值(新版本已不再持久化 output_dir)
+            roots.append(out_dir)   # 历史遗留值(现已不再持久化 output_dir)
         with self._sel_lock:
             roots.extend(self.user_dirs)   # 本次会话实际用过的导出目录(见 start_generate)
         target_nc = os.path.normcase(target)
@@ -1963,10 +1887,7 @@ class AppState:
 
     # ---------- 预设 ----------
     def load_presets(self):
-        """读预设文件。字体路径失效时**只在内存里回退**到本机默认, 不回写文件。
-
-        在对方机器上一加载就被改写, 双方手里的文件不再一致。这是本程序的有意取舍,
-        """
+        """读取预设文件; 字体路径失效时只在内存中回退为默认值, 不回写文件。"""
         presets = _load_json(PRESETS_FILE)
         for key, p in presets.items():
             if not isinstance(p, dict):
@@ -1981,9 +1902,9 @@ class AppState:
 
     # ---------- 预设(10 个固定槽位, 一槽一个文件) ----------
     def load_presets(self):
-        """读 10 个槽位, 返回 {槽位字符串: 记录}(只带有内容的槽)。
+        """读 10 个槽位, 返回 {槽位字符串: 记录}(仅含有内容的槽)。
 
-        "程序悄悄改你的预设文件", 分发出去的那份在对方机器上一加载就走样了(见 README)。
+        字体路径失效时只在内存中回退为默认值, 不回写文件 —— 避免程序改写用户或他人分发的预设文件。
         """
         self._migrate_presets()
         out = {}
@@ -2027,12 +1948,9 @@ class AppState:
         return {"ok": True}
 
     def _migrate_presets(self):
-        """把两种历史格式一次性迁进槽位文件, 然后把老文件挪走(不删数据, 也不留原名 —— 否则
-        每次启动都会把用户已经删掉的预设"复活")。
+        """把两种历史格式的预设迁入槽位文件, 随后将源文件改名(保留数据, 且避免已删除的预设被再次迁入)。
 
-        两种历史:
-          a) 最早那种: 整份 `presets.json`(键就是槽位 "1".."10");
-          b) 中间那版: `presets/*.json` 一个预设一个文件、文件名即预设名(现已废弃)。
+        历史格式: 整份 presets.json(键为槽位); presets/*.json(文件名即预设名, 现已废弃)。
         """
         if os.path.isfile(PRESETS_FILE):
             old = _load_json(PRESETS_FILE)
@@ -2053,9 +1971,8 @@ class AppState:
                              f"{os.path.basename(PRESETS_FILE)}.migrated")
             except OSError as e:
                 logging.warning(f"老预设文件改名失败(下次启动会再迁一次): {e}")
-        # b) 中间那版留下的"按名字命名"的文件: 按名字排序塞进**空槽**, 然后把它们挪进子目录
-        #    (只填空槽 —— 这些是较新的数据, 但也别把槽位里原有的东西盖掉; 放不下的留在
-        #     _migrated/ 里, 只是不参与列表, 不删)
+        # 按名字命名的旧预设文件: 按名字排序填入空槽, 随后移入子目录(只填空槽以免覆盖现有数据,
+        # 放不下的保留在 _migrated/ 中而不删除)
         try:
             stray = [f for f in sorted(os.listdir(PRESETS_DIR))
                      if f.lower().endswith(".json") and not f.lower().startswith("presets")]
@@ -2093,10 +2010,10 @@ class AppState:
             manual_exif = _format_manual_exif(req.get("manual_exif"))
             self.stop_event = threading.Event()
             self.events = queue.Queue()
-            # 导出文件夹: 请求优先(界面未保存的改动即时生效), 否则取持久化设置, 最后兜底临时目录
+            # 导出目录: 以请求值为先(界面未保存的改动即时生效), 否则取持久化设置, 最后回退到临时目录
             out_root = ((req.get("output_dir") or self.settings.get("output_dir") or "").strip()
                         or PREVIEW_DIR)
-            # 记下本次会话用过的导出目录: output_dir 不再持久化, 「打开所在目录」的白名单靠它
+            # 记录本次会话用过的导出目录: output_dir 不再持久化, 「打开所在目录」的白名单依赖它
             with self._sel_lock:
                 self.user_dirs.add(os.path.normcase(os.path.abspath(out_root)))
             if mode == "single":
@@ -2104,7 +2021,7 @@ class AppState:
                 original_name = (req.get("original_name") or os.path.basename(in_p)).strip()
                 if not in_p or not os.path.isfile(in_p) or not self._is_allowed_input(in_p):
                     return {"ok": False, "error": "请先选择一张输入图片"}
-                # 提前建目录: 没权限/只读时立刻报错(而不是渲染完才在保存时失败), 界面弹顶部提示
+                # 提前建目录: 权限不足时立即报错, 避免渲染完成后才在保存阶段失败
                 try:
                     os.makedirs(out_root, exist_ok=True)
                 except Exception as e:
@@ -2121,7 +2038,7 @@ class AppState:
                 file_paths = req.get("file_paths") or []
                 if not file_paths:
                     return {"ok": False, "error": "请先选择要批量处理的图片"}
-                # 与单张模式同等安全策略: 只接受上传副本或"用户亲手交出的"原文件(见 _is_allowed_input)
+                # 与单张模式相同: 仅接受通过校验的原文件路径(见 _is_allowed_input)
                 validated = []
                 for item in file_paths:
                     if not isinstance(item, dict):
@@ -2152,12 +2069,11 @@ class AppState:
 
     # ---------- 预览(临时目录, 程序退出后清除) ----------
     def _write_preview_src(self, im, tag="", max_side=PREVIEW_MAX_SIDE):
-        """把已打开的图缩略到 max_side 并落成 psrc_<tag>.jpg(全帧 2500) / psrcf_<tag>.jpg(先导帧 1200),
-        返回 (src 路径, 原图高度)。
-        文件名带 tag(原文件 mtime_size) 做内容寻址——换图不会覆盖别的图的缓存; 不带 pv:
-        缩略图只由原文件内容决定, 各页面可以共享。quality 90: 预览只看构图/间距, 省编码时间。
-        保存时保留原图 EXIF, 否则预览读不到相机参数(全部显示 unknown); 无 EXIF 时不传
-        max_side<=0 视为不缩略(全量档), 保持原尺寸。"""
+        """把已打开的图缩略到 max_side 并保存为 psrc_<tag>.jpg, 返回 (src 路径, 原图高度)。
+
+        文件名带 tag(原文件 mtime 与 size)实现内容寻址。quality 90: 预览仅用于判断构图与间距。
+        保存时保留原图 EXIF, 否则预览读不到相机参数。max_side<=0 视为不缩略(全量档)。
+        """
         exif = im.info.get("exif", b"")
         src_h = im.size[1]
         if max_side > 0:
@@ -2173,11 +2089,9 @@ class AppState:
     def _preview_src_for(self, input_path, src_image=None, max_side=PREVIEW_MAX_SIDE):
         """返回该原图对应的预览缩略图 (src 路径, 原图高度)。
 
-        max_side 进缓存 key(现在只用 PREVIEW_MAX_SIDE 一档; 留这个形参是为了以后要分档时
-        两档不会互相顶掉缓存)。
-        命中缓存(原文件 mtime+size 未变)就直接复用、**不重读原图** —— 调参时同一张图会被反复预览,
-        本地盘省一次解码, 网络盘省一次完整读盘; 未命中才生成并回填。
-        _thumb_gen_lock: 预热线程与预览请求可能同时走到"未命中", 避免并发写同一个缩略图文件"""
+        max_side 参与缓存键(当前只有一档)。命中缓存(原文件 mtime 与 size 未变)时直接复用, 不重读原图。
+        _thumb_gen_lock: 避免并发写入同一缩略图文件。
+        """
         try:
             st = os.stat(input_path)
             key = (os.path.normcase(os.path.abspath(input_path)), st.st_mtime_ns, st.st_size, max_side)
@@ -2253,10 +2167,9 @@ class AppState:
 
 
     def make_preview(self, req):
-        """实时预览: 输入图缩略到 PREVIEW_MAX_SIDE 快速渲染, **直接把画布 PIL 图回给调用方**。
+        """实时预览: 输入图缩略到 PREVIEW_MAX_SIDE 后渲染, 直接把画布 PIL 图回给调用方, 不落盘。
 
-        按名字缓存这回事, 也没有多标签页并发预览, 整套属于纯陪跑。
-
+        需要落盘的版本走 process_single 的 _save_output。
         """
         input_path = (req.get("input_path") or "").strip()
         if not input_path or not os.path.isfile(input_path) or not self._is_allowed_input(input_path):
@@ -2268,17 +2181,13 @@ class AppState:
         with self._render_lock:
             self._rendering_count += 1
         try:
-            # 只开一次原图: 尺寸计算与缩略图生成共用同一句柄(原来为拿尺寸单开一次, 网络盘上白读一遍)
+            # 只打开一次原图: 尺寸计算与缩略图生成共用同一句柄, 避免重复读取(网络盘尤甚)
             with Image.open(input_path) as im:
                 w, h = im.size
                 long_side = max(w, h) or 1
-                # 画布固定按 2500 档渲染(原项目行为)。**不要为了"上屏 1:1"去缩小画布**:
-                # 画布小的时候 PIL 得把水印字按更小的字号画上去(实测 8px 档), 再缩到屏幕上
-                # 反而比"按 25px 画、再面积平均缩小"更糊 —— 大画布 + 好滤波器对文字更有利。
-                #
-                # PREVIEW_MAX_SIDE=0 时走全量: preview_scale=None 让 _render_preview 直接用
-                # 原图渲(既不缩图也不落 JPEG 中间层), 各像素参数的 ratio 也就等于 1 ——
-                # 此时预览与成品逐像素同源, 用来判断"发虚"是渲染端还是显示端造成的。
+                # 画布按 PREVIEW_MAX_SIDE 档渲染。不要为"上屏 1:1"而缩小画布: 画布过小时水印字号随之变小,
+                # 再缩放到屏幕反而更模糊; 大画布配合高质量滤波器对文字更有利。
+                # PREVIEW_MAX_SIDE=0 时走全量: preview_scale=None, 各像素参数比例等于 1, 预览与成品同源。
                 max_side = PREVIEW_MAX_SIDE
                 preview_scale = None
                 if max_side > 0:
@@ -2301,7 +2210,7 @@ class AppState:
         if not success or not image_out:
             return {"ok": False, "error": "预览生成失败"}
         resp = {"ok": True, "image": image_out[0],
-                # 全量档(max_side=0)报真实画布边长, 免得调用方与日志看到一个 0
+                # 全量档(max_side=0)返回真实画布边长, 避免调用方与日志读到 0
                 "max_side": max_side or max(image_out[0].size)}
         if geom_out:
             resp["geom"] = geom_out   # 间距段坐标, 预览图叠加标注用

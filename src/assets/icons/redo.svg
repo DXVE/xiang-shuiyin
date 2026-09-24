@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16">
+  <!-- 重做: 与 undo.svg 同一个路径**镜像**得到(改一个另一个记得一起改)。 -->
+  <g transform="translate(16,0) scale(-1,1)">
+    <path d="M6.67 6V3.33L2 8l4.67 4.67v-2.73c3.33 0 5.67 1.07 7.33 3.4-.67-3.33-2.67-6.67-7.33-7.33z" fill="#7A756C"/>
+  </g>
+</svg>

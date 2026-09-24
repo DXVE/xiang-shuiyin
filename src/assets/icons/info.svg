@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16">
+  <!-- 图片信息(EXIF): 圆环 + i。替代原来的文字符号 ℹ(U+2139) —— 那个字形在 11px 下
+       只有 3px 宽, 基本看不出(见 README「图标只有一个来源」)。 -->
+  <circle cx="8" cy="8" r="6.1" fill="none" stroke="#7A756C" stroke-width="1.6"/>
+  <rect x="7.15" y="6.7" width="1.7" height="4.7" rx="0.85" fill="#7A756C"/>
+  <circle cx="8" cy="4.85" r="1.05" fill="#7A756C"/>
+</svg>

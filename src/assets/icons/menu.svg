@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16">
+  <!-- 顶栏 ☰ 菜单。**与原先那版自绘 QPixmap 同一几何**(条宽 10、厚 2、间距 2),
+       换成 SVG 是为了全程序图标只有一种机制(见 README「图标只有一个来源」)。 -->
+  <rect x="3" y="3" width="10" height="2" fill="#7A756C"/>
+  <rect x="3" y="7" width="10" height="2" fill="#7A756C"/>
+  <rect x="3" y="11" width="10" height="2" fill="#7A756C"/>
+</svg>

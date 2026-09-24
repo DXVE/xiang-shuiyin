@@ -53,8 +53,8 @@
         <name>Card</name>
         <message>
             <location filename="../window.py" line="559" />
-            <source>↺ 重置本组</source>
-            <translation>↺ Reset group</translation>
+            <source>重置本组</source>
+            <translation>Reset group</translation>
         </message>
         <message>
             <location filename="../window.py" line="123" />
@@ -529,8 +529,8 @@
         </message>
         <message>
             <location filename="../window.py" line="2877" />
-            <source>↺ 刷新预览效果</source>
-            <translation>↺ Refresh preview</translation>
+            <source>刷新预览效果</source>
+            <translation>Refresh preview</translation>
         </message>
         <message>
             <location filename="../window.py" line="2912" />
@@ -847,8 +847,8 @@
         </message>
         <message>
             <location filename="../window.py" line="3916" />
-            <source>渲染 {ms:.0f} ms · 请求→显示 {e2e:.0f} ms</source>
-            <translation>Render {ms:.0f} ms · request→shown {e2e:.0f} ms</translation>
+            <source>渲染 {ms:.0f} ms · 请求 ~ 显示 {e2e:.0f} ms</source>
+            <translation>Render {ms:.0f} ms · request ~ shown {e2e:.0f} ms</translation>
         </message>
         <message>
             <location filename="../window.py" line="3948" />
@@ -944,21 +944,16 @@
         </message>
         <message>
             <location filename="../window.py" line="2708" />
-            <source>↶ 撤销</source>
-            <translation>↶ Undo</translation>
+            <source>撤销</source>
+            <translation>Undo</translation>
         </message>
         <message>
             <location filename="../window.py" line="2709" />
-            <source>↷ 重做</source>
-            <translation>↷ Redo</translation>
+            <source>重做</source>
+            <translation>Redo</translation>
         </message>
         <message>
             <location filename="../window.py" line="2719" />
-            <source>ℹ EXIF信息</source>
-            <translation>ℹ EXIF info</translation>
-        </message>
-        <message>
-            <location filename="../window.py" line="2723" />
             <source>EXIF信息</source>
             <translation>EXIF info</translation>
         </message>
@@ -1731,8 +1726,8 @@
         </message>
         <message>
             <location filename="../stats.py" line="129" />
-            <source>  请求→就绪  p50 {e50:.0f}ms / p95 {e95:.0f}ms / max {emax:.0f}ms</source>
-            <translation>  request→ready p50 {e50:.0f}ms / p95 {e95:.0f}ms / max {emax:.0f}ms</translation>
+            <source>  请求 ~ 就绪  p50 {e50:.0f}ms / p95 {e95:.0f}ms / max {emax:.0f}ms</source>
+            <translation>  request ~ ready p50 {e50:.0f}ms / p95 {e95:.0f}ms / max {emax:.0f}ms</translation>
         </message>
         <message>
             <location filename="../stats.py" line="131" />
@@ -1756,7 +1751,7 @@
         </message>
     </context>
     <context>
-        <name>xiangshuiyin</name>
+        <name>core</name>
         <message>
             <location filename="../i18n.py" line="43" />
             <source>处理中...</source>

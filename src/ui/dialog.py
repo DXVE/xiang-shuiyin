@@ -1,25 +1,18 @@
 # -*- coding: utf-8 -*-
-"""自绘标题栏弹窗(无边框 + 自己画标题栏), 供 window.py 里的弹窗复用。
+"""自绘标题栏弹窗(无边框 + 自绘标题行), 供 window.py 复用。
 
-**为什么需要它**(实测, 2026-09-20, Qt 6.11.2 / Windows 11 26100):
-弹窗第一次显示时, DWM 会把它画的"非客户区(标题栏+边框)"与客户区内容**合成得不同步**,
-肉眼就是一两帧的错位/漂移, 而且会把窗口框闪在屏幕左上角。逐项排除后:
-  * 只有"让 DWM 不画边框"才消除 —— `DWMWA_NCRENDERING_POLICY=DISABLED` 有效但会退回
-    Win7 经典边框(观感不可接受); `FramelessWindowHint` 也有效, 但窗口就没有标题栏了。
-  * Qt 每次 show 都会重建原生窗口, 所以"等渲染完成再显示"这类做法无效(实测: 把窗口先
-    显示在屏幕外、或先全透明再恢复不透明度, 都仍然错位 —— 触发点是"第一次可见"本身)。
-  * `_q_titlebar`(Qt 平台插件为每个顶层窗口建的辅助窗, 位于屏幕原点、从不可见)只是同时刻
-    出现的一个标记物, 不是看到的东西。
-结论: 无边框 + 自绘标题栏 —— 既没有 DWM 画的边框可错位, 观感又能沿用项目自己的卡片语言。
+Qt 6.11 + Windows 11 下, DWM 绘制的非客户区(标题栏与边框)与客户区内容在弹窗首次显示时
+合成不同步, 会出现一两帧错位/漂移。因此采用无边框 + 自绘标题栏: 既没有 DWM 边框可错位,
+观感也与项目卡片语言一致。
 
-**实现要点(都踩过坑)**:
-  * `go_frameless()` 必须在**窗口被创建之前**调用。否则 Qt 沿用建窗时算出的边框尺寸,
-    之后 `move()` 会整体偏一个标题栏高度(实测 31px)。
-  * 透明顶层窗口上 QSS 的 `background` 不画, 所以圆角底板是"垫在内容下面的子控件"
-    (`QFrame#csdPanel`, 见 theme.QSS), 标题行同理做成窗口的子控件, 两者都不参与布局。
-  * 不动原有布局里的任何控件(只改内边距): 早先"把布局项搬进外壳"的写法会踩 PySide 的
-    QLayoutItem 所有权陷阱 —— `takeAt` 拿到的 item 归 Python, GC 时把布局仍在用的
-    QSpacerItem 一起删掉, 之后随便一次 GC 就 abort(实测 exit 127)。
+实现约束:
+  * `go_frameless()` 必须在窗口被创建**之前**调用, 否则 Qt 沿用建窗时算出的边框尺寸, 之后
+    `move()` 会整体偏一个标题栏高度(约 31px);
+  * 透明顶层窗口上 QSS 的 `background` 不绘制, 因此圆角底板与标题行做成窗口的子控件
+    (`QFrame#csdPanel`, 见 theme.QSS), 两者都不参与布局;
+  * 不移动原有布局中的任何控件(仅调整内边距): 搬运布局项会触发 PySide 的 QLayoutItem
+    所有权问题 —— `takeAt` 取出的 item 归 Python 所有, GC 时会删除布局仍在使用的
+    QSpacerItem, 之后任意一次 GC 都会导致进程 abort。
 """
 from PySide6.QtCore import QCoreApplication, QEvent, QObject, Qt
 from PySide6.QtWidgets import (
@@ -28,12 +21,12 @@ from PySide6.QtWidgets import (
 
 from . import theme
 
-DLG_PAD = theme.RADIUS_CARD    # 窗口四周留给投影的余量(= 卡片投影的模糊半径, 免得被裁)
+DLG_PAD = theme.RADIUS_CARD    # 窗口四周留给投影的余量(= 卡片投影的模糊半径, 避免被裁)
 TITLE_H = theme.CTRL_H         # 自绘标题行的高度(与其它控件取齐)
 
 
 def go_frameless(dlg):
-    """在窗口被创建**之前**设好无边框 + 透明背景(顺序很关键, 见模块开头)。"""
+    """在窗口被创建之前设置无边框与透明背景(顺序要求见模块说明)。"""
     dlg.setWindowFlag(Qt.WindowType.FramelessWindowHint, True)
     dlg.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
 
@@ -41,8 +34,8 @@ def go_frameless(dlg):
 class _TitleBar(QWidget):
     """自绘标题行: 空白处按住可拖动整个窗口。
 
-    用 `QWindow.startSystemMove()` 走系统实现 —— 顺带拿到跨屏/贴边这类系统行为,
-    也免得自己按 DPI 换算鼠标位移。
+    用 `QWindow.startSystemMove()` 走系统实现, 可顺带获得跨屏/贴边等系统行为, 也无需自行
+    按 DPI 换算鼠标位移。
     """
 
     def __init__(self, dlg, parent=None):
@@ -56,13 +49,13 @@ class _TitleBar(QWidget):
                 wh = self._dlg.windowHandle()
                 if wh is not None and wh.startSystemMove():
                     return
-            except Exception:                      # noqa: BLE001 - 拖不动就退回默认处理
+            except Exception:                      # noqa: BLE001 - 拖不动时退回默认处理
                 pass
         super().mousePressEvent(e)
 
 
 class _ChromePlacer(QObject):
-    """尺寸变化时把"底板"和"标题行"摆到正确位置(两者都是窗口的子控件, 不参与布局)"""
+    """尺寸变化时把底板与标题行摆到正确位置(两者都是窗口的子控件, 不参与布局)"""
 
     def __init__(self, dlg, panel, bar, left, right, top):
         super().__init__(dlg)
@@ -87,17 +80,17 @@ class _ChromePlacer(QObject):
 
 
 def csdify(dlg, title, recenter):
-    """把已建好的 QDialog 改成"无边框 + 自绘标题栏"(见模块开头的长说明)。
+    """把已建好的 QDialog 改为无边框 + 自绘标题栏(见模块说明)。
 
-    `recenter(dlg)` 由调用方传入(通常是 window._prep_dialog) —— 尺寸变了要重新定死
-    尺寸与位置; 传函数而不是 import, 是为了让本模块只单向依赖 theme。
+    `recenter(dlg)` 由调用方传入(通常是 `window._prep_dialog`): 尺寸变化后需重新定死尺寸与
+    位置。传函数而非在模块内 import, 以使本模块只单向依赖 theme。
     """
-    if getattr(dlg, "_csd_done", False):           # 别重复包装(会多出一条标题栏)
+    if getattr(dlg, "_csd_done", False):           # 避免重复包装(会多出一条标题栏)
         return None
     dlg._csd_done = True
 
     dlg.setObjectName("csdDialog")
-    # 窗口自身透明: 否则主题里那条 QDialog{background:BG} 会把圆角糊成方块
+    # 窗口自身必须透明: 否则 QDialog 的窗口底色会把圆角填成方块
     dlg.setStyleSheet("QDialog#csdDialog { background: transparent; }")
 
     root = dlg.layout()
@@ -135,14 +128,14 @@ def csdify(dlg, title, recenter):
     panel.show()
     bar.show()
     placer.place()
-    # 保住引用(它们没有父布局, 只挂在窗口上)
+    # 保留引用(它们没有父布局, 只挂在窗口上)
     dlg._csd_panel, dlg._csd_bar, dlg._csd_placer = panel, bar, placer
 
     recenter(dlg)
     return panel
 
 
-# 标准按钮的文案: **用的时候才取**, 不能在 import 期建表 —— 那时翻译器还没装(见 i18n.install)
+# 标准按钮的文案: 使用时才取译文, 不能在 import 期建表 —— 那时翻译器尚未安装(见 i18n.install)
 _BTN_TEXT = {
     QMessageBox.StandardButton.Ok: "确定",
     QMessageBox.StandardButton.Yes: "是",
@@ -150,23 +143,21 @@ _BTN_TEXT = {
 }
 
 
-# 弹窗按钮的最小宽度: 「是 / 否 / 关闭」这种两字标签以前会因 #primary 的横向 padding 更大
-# (0 20px vs 0 14px)而宽窄不一(用户报了"自绘弹窗按钮不等宽")。给一个下限, 短标签就一样宽了。
+# 弹窗按钮的最小宽度: 短标签(是/否/关闭)不会因 #primary 的横向内边距更大而宽窄不一
 DLG_BTN_MIN_W = 76
 
 
 def dlg_button(text, slot=None, primary=False, parent=None):
-    """自绘弹窗里统一的按钮。
+    """自绘弹窗统一使用的按钮。
 
-    以前每个弹窗各写各的: 映射弹窗那三个按钮没设高度、关闭也不是主色, 与取色/图片信息弹窗对不上
-    (用户报"这两个按钮的样式和其他自绘弹窗不一致")。现在所有自绘弹窗的按钮都从这一个函数出,
-    样式(高度 CTRL_H / 主按钮 #primary / 手型光标)才真统一; 标题栏那个 ✕ 不走这里(它是弹窗壳的一部分)。
+    样式(高度 CTRL_H / 主按钮 #primary / 手型光标)集中于此, 保证各弹窗一致; 标题栏的 ✕
+    不走本函数(它是弹窗壳 `csdify` 的一部分)。
     """
     b = QPushButton(text, parent)
     if primary:
         b.setObjectName("primary")
     b.setFixedHeight(theme.CTRL_H)
-    b.setMinimumWidth(DLG_BTN_MIN_W)          # 短标签(是/否/关闭)与长标签都不会参差
+    b.setMinimumWidth(DLG_BTN_MIN_W)          # 短标签与长标签宽度不参差
     b.setCursor(Qt.CursorShape.PointingHandCursor)
     if slot is not None:
         b.clicked.connect(slot)
@@ -174,7 +165,7 @@ def dlg_button(text, slot=None, primary=False, parent=None):
 
 
 def dlg_button_row(*buttons):
-    """把按钮摆成弹窗底部那一行: 右对齐、间距统一。"""
+    """把按钮排成弹窗底部那一行: 右对齐、统一间距。"""
     row = QHBoxLayout()
     row.setContentsMargins(0, 0, 0, 0)
     row.setSpacing(theme.GAP_CTRL)
@@ -189,10 +180,10 @@ def _btn_text(btn):
 
 
 class MessageDialog(QDialog):
-    """自绘标题栏的消息框, 替代 QMessageBox —— 与本项目的其它弹窗保持同一套设计语言。
+    """自绘标题栏的消息框, 替代 QMessageBox, 与其它自绘弹窗保持同一套设计语言。
 
-    返回值遵守原 `_message` 的约定: 返回被点中的 `QMessageBox.StandardButton`
-    (调用方仍在 `!= QMessageBox.StandardButton.Yes` 这样比较, 一行都不用改)。
+    返回值遵守原 `_message` 的约定: 返回被点中的 `QMessageBox.StandardButton`,
+    调用方仍以 `!= QMessageBox.StandardButton.Yes` 比较。
     """
 
     def __init__(self, parent, icon, title, text,

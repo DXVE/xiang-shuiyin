@@ -18,10 +18,10 @@
 
 | 文件 | 许可 | 来源 |
 |---|---|---|
-| `src/xiangshuiyin/assets/fonts/SarasaGothicSC-{Regular,Bold,Italic,BoldItalic}.ttf` | **SIL OFL 1.1** | 由「更纱黑体 Sarasa Gothic」1.0.41（Sarasa Gothic SC）**子集化**而来（**名称与版权原样保留**） |
+| `src/assets/fonts/SarasaGothicSC-{Regular,Bold,Italic,BoldItalic}.ttf` | **SIL OFL 1.1** | 由「更纱黑体 Sarasa Gothic」1.0.41（Sarasa Gothic SC）**子集化**而来（**名称与版权原样保留**） |
 
-- **OFL 全文**：`src/xiangshuiyin/assets/fonts/OFL.txt`（原样取自上游仓库的 `LICENSE`）
-- **来源与改动说明**：`src/xiangshuiyin/assets/fonts/NOTICE.txt`（子集范围、改名理由、重建方法）
+- **OFL 全文**：`src/assets/fonts/OFL.txt`（原样取自上游仓库的 `LICENSE`）
+- **来源与改动说明**：`src/assets/fonts/NOTICE.txt`（子集范围、改名理由、重建方法）
 - **版权行**（子集版本一并保留）：
 
       Copyright (c) 2015-2025, Renzhi Li (aka. Belleve Invis, belleve@typeof.net).

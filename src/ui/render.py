@@ -1,12 +1,11 @@
 # -*- coding: utf-8 -*-
-"""后台渲染线程: 预览与生成都跑在这里, 主线程只做 UI。
+"""后台渲染线程: 预览与生成均在本线程执行, 主线程只做界面。
 
-- **不需要三件套**:
-  这里参数变更只是覆盖"待渲染槽", 渲染线程每轮取最新一份 —— 连拖滑块产生的中间态
-  自动合并成最后一次, 不需要防抖也不需要作废在途请求。
-- **界面不冻**: 渲染期间主线程不参与, 没有 GIL 与界面线程互相拖累。
-- **解码留在本线程**: QImage 可在非 GUI 线程构造并解码(QPixmap 不行), 主线程只做
-  `QPixmap.fromImage` 和贴图。
+约束:
+- 参数变更只覆盖"待渲染槽", 渲染线程每轮取最新一份 —— 连拖滑块产生的中间态自动合并成
+  最后一次, 不需要防抖, 也不需要作废在途请求;
+- 解码留在本线程(QImage 可在非 GUI 线程构造并解码, QPixmap 不行), 主线程只做
+  `QPixmap.fromImage` 与贴图。
 """
 import queue
 import threading
@@ -20,8 +19,8 @@ from PySide6.QtGui import QImage
 def _pil_to_qimage(im):
     """PIL 图 -> QImage，不落盘。
 
-    直接用 tobytes() 做一次内存拷贝（约 15MB，比 JPEG 编码 + 写盘 + 读回解码便宜得多）。
-    .copy() 是必须的：QImage 不持有 bytes 的所有权，不拷贝会读到已释放的内存。
+    用 `tobytes()` 做一次内存拷贝(约 15MB)，比 JPEG 编码 + 写盘 + 读回解码便宜得多。
+    必须调用 `.copy()`: QImage 不持有传入 bytes 的所有权，否则会读到已释放的内存。
     """
     if im.mode != "RGB":
         im = im.convert("RGB")
@@ -33,16 +32,13 @@ def _pil_to_qimage(im):
 class PreviewWorker(QThread):
     """latest-wins 预览渲染器。
 
-    request() 只覆盖待渲染槽并唤醒, 不排队 —— 所以渲染耗时 500ms 时, 用户连拖 3 秒滑块
-    最多同时存在"1 个在渲染 + 1 个待渲染", 不会积压出一串过期预览。
+    `request()` 只覆盖待渲染槽并唤醒, 不排队 —— 渲染耗时 500ms 时连续拖动 3 秒, 最多同时
+    存在"1 个在渲染 + 1 个待渲染", 不会积压出一串过期预览。
 
-    但**在跑的那一轮不会被中断**: 它照常渲完、照常上屏(此时参数可能已经又改过)。于是
-    "请求→上屏"会等于"等上一轮跑完 + 自己这一轮", 前一段常被误读成渲染变慢 ——
-    所以这里统计 _arrived_during(渲染期间又新增了几次请求), 由界面写进日志。
-
-    回传的 resp 里另外带两样东西给"预览状态标识"用(见 window.PreviewStateChip):
-    `token`(这一帧对应哪一组参数, 原样带回)与 `queued`(回传这一刻队列里是否已排着更新的
-    请求)。有了它们, 界面才能回答"屏幕上这张图是不是当前参数渲出来的"。
+    在跑的那一轮不会被中断: 它照常渲完并上屏(此时参数可能已再次变更), 因此"请求→上屏"
+    等于"等上一轮跑完 + 自己这一轮", 前一段常被误读成渲染变慢。为此在回传数据中附带:
+    `token`(该帧对应的参数指纹)与 `queued`(回传时刻队列中是否已排着更新的请求),
+    并统计 `_arrived_during`(渲染期间新增的请求次数)供界面写入日志。
     """
 
     rendered = Signal(dict)
@@ -53,7 +49,7 @@ class PreviewWorker(QThread):
         self._cv = threading.Condition()
         self._pending = None          # (req, 发起时刻)
         self._stopping = False
-        self._inflight = False        # 是否正在渲染(用于统计"渲染期间又来了几次请求")
+        self._inflight = False        # 是否正在渲染(用于统计渲染期间新增的请求数)
         self._arrived_during = 0
 
     def request(self, req):
@@ -64,10 +60,9 @@ class PreviewWorker(QThread):
             self._cv.notify()
 
     def busy(self):
-        """现在有没有活(在跑或排队)。界面用它把状态标识立刻切成「渲染中」。
+        """当前是否有活(在渲染或已排队)。界面用它把状态标识立刻切成「渲染中」。
 
-        可以直接在 GUI 线程同步调用: 渲染期间本类**不持有** _cv(render 是在锁外做的),
-        所以这里最多等一瞬, 不会把界面卡住。
+        可在 GUI 线程同步调用: 渲染在锁外执行, 渲染期间本类不持有 `_cv`, 因此最多等一瞬。
         """
         with self._cv:
             return self._inflight or self._pending is not None
@@ -78,7 +73,7 @@ class PreviewWorker(QThread):
             self._cv.notify()
 
     def run(self):
-        # 线程名进日志(%(threadName)s): QThread 的 Python 线程名默认是 Dummy-N, 一点信息都没有
+        # 线程名写入日志的 %(threadName)s, Qt 默认名(Dummy-N)没有区分度
         threading.current_thread().name = "预览线程"
         while True:
             with self._cv:
@@ -89,15 +84,13 @@ class PreviewWorker(QThread):
                 req, t0 = self._pending
                 self._pending = None
                 self._inflight = True
-                self._arrived_during = 0        # 本轮从零开始数
-            # 排队 = 从"用户发起"到"真正开渲"的等待(只可能是等上一轮跑完), 与渲染耗时分开记
+                self._arrived_during = 0        # 本轮从零开始计数
+            # 排队 = 从发起请求到真正开渲的等待(只可能来自等上一轮跑完), 与渲染耗时分开统计
             resp = self._render(req, queue_ms=(time.perf_counter() - t0) * 1000)
             with self._cv:
-                # 这两个数**必须在回传这一刻取**, 不能在本轮开始时取:
-                #   以前 arrived 是每轮开始时读的, 读到的其实是**上一轮**渲染期间的到达数
-                #   (滞后一整轮) —— 而"屏上这帧过没过期"要看的就是这一轮的到达情况与回传时的
-                #   队列, 用滞后一轮的数字会把**最新那一帧**标成过期(停手后不再有新请求来冲掉,
-                #   于是那个错误标签会一直挂着)。
+                # 这两个值必须在回传时刻读取: 在本轮开始时读取得到的是上一轮的到达数(滞后一轮),
+                # 而"屏上这帧是否已过期"取决于这一轮的到达情况与回传时刻的队列, 用滞后数字会把
+                # 最新那一帧标成过期(停手后没有新请求来冲掉, 该错误标签会一直挂着)。
                 arrived = self._arrived_during
                 queued = self._pending is not None
                 self._arrived_during = 0
@@ -122,7 +115,7 @@ class PreviewWorker(QThread):
         if resp.get("ok") and pil is not None:
             t_conv = time.perf_counter()
             resp["image"] = _pil_to_qimage(pil)
-            # PIL->QImage 的内存拷贝: 预览档一张约 10~25ms。与渲染耗时分开记, 免得混成一个数
+            # PIL->QImage 的内存拷贝, 预览档一张约 10~25ms; 与渲染耗时分开统计
             resp["qimg_ms"] = (time.perf_counter() - t_conv) * 1000
         return resp
 
@@ -130,7 +123,7 @@ class PreviewWorker(QThread):
 class EventWatcher(QThread):
     """把核心的事件队列转成 Qt 信号(生成进度/完成)。
 
-    `AppState.start_generate` 每轮会换一个新的 queue.Queue, 所以这里每轮都重新取引用,
+    `AppState.start_generate` 每轮会换一个新的 `queue.Queue`, 因此每轮都重新取引用,
     不能缓存一次性句柄。
     """
 

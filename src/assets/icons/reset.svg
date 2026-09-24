@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16">
+  <!-- 重置 / 刷新(同一个语义: 再来一遍): 圆环 + 实心箭头。替代文字符号 ↺(U+21BA),
+       用在「重置本组」与「刷新预览效果」两处。线条粗细(1.9)与实心箭头对齐撤销/重做的分量。 -->
+  <path d="M12.9 9.2A5.2 5.2 0 1 1 12.2 4.4" fill="none" stroke="#7A756C" stroke-width="1.9"
+        stroke-linecap="round"/>
+  <path d="M14.8 2.4L14.2 7.6L9.4 5.4Z" fill="#7A756C"/>
+</svg>
