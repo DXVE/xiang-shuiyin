@@ -16,21 +16,24 @@
    拉丁/希腊/西里尔 + 常用符号 + 日文假名 + 全角形式；**删掉了繁体次常用（Big5 二级）、谚文
    （韩文音节）与扩展区汉字**。单面 22.8~23.7 MB → 约 5.1 MB，**四档合计约 20.6 MB**。
    （只按 GB2312 裁的话，连「問」这种繁体常用字都会被裁掉 —— 加上 Big5 一级只多 2.2 MB。）
-2. **名称、唯一标识与版权行一律原样保留**（本项目的既定要求：不改动字体名称）：
-   字体族仍是 `Sarasa Gothic SC`，name 表整表未改。这与 OFL 并不冲突 —— 第 1 条要求保留版权声明
-   与许可，第 3 条只禁止**修改版使用保留名**，而这份 OFL 声明的保留名是 Adobe 的 `'Source'`
+2. **名称与版权行一律原样保留**（本项目的既定要求：不改动字体名称）：name 表里 family /
+   subfamily / full / postscript / typographic 名称与版权行（nameID 0）都与上游一致，
+   字体族仍是 `Sarasa Gothic SC`。这与 OFL 并不冲突 —— 第 2 条要求随附版权声明与许可全文，
+   第 3 条只禁止**修改版使用保留名**，而这份 OFL 声明的保留名只有 Adobe 的 `'Source'`
    （来自 Source Han Sans），`'Sarasa Gothic'` 不在其中。
 3. **未改动**：字形轮廓、字距与排版特性（`kern`/`locl` 等）、名称与版权字段。
 
 ## 许可
 
-**SIL Open Font License 1.1** —— 全文见同目录 `OFL.txt`（原样取自上游仓库的 `LICENSE`，未改一字）。
+**SIL Open Font License 1.1** —— 全文见同目录 `OFL.txt`（原样取自上游仓库的 `LICENSE`，未改一字；
+已与上游 `LICENSE` 逐字符比对，113 行完全一致）。
 
 义务要点：
 
 - 允许随软件分发、嵌入、与软件一起出售；**必须附版权声明与许可全文**（本目录的 `OFL.txt` 即为此）。
 - **不得单独出售**字体本身。
-- **修改版不得使用保留名** —— 这份 OFL 声明的保留名是 `'Source'`；本目录的改名与子集化按此进行。
+- **修改版不得使用保留名** —— 这份 OFL 声明的保留名只有 `'Source'`（已与上游 `LICENSE` 核对）；
+  本目录只做子集化、**未改名**，因此沿用族名合规。
 - 版权行（子集版本一并保留）：
 
       Copyright (c) 2015-2025, Renzhi Li (aka. Belleve Invis, belleve@typeof.net).
@@ -41,6 +44,6 @@
 
 ## 怎么重建
 
-命令与保留码位范围见 README 的「内置字体」一节（用 `fontTools` 的 subset）。
+命令与保留码位范围见 `wiki.md` §3.4 与 `AGENTS.md` §4.3（用 `fontTools` 的 subset）。
 本机另有一份便捷脚本 `tools/build_bundled_font.py`（`tools/` 不入库，仅供重建时使用）——
 换 Sarasa 版本时改一个版本号重跑即可。

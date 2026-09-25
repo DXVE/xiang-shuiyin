@@ -131,8 +131,8 @@ PARAM_SPECS = [
 
     dict(tab="font", card=QT_TRANSLATE_NOOP("Card", "最小字号设置"), key="min_font_size", label=QT_TRANSLATE_NOOP("ParamRow", "最小字号"), kind="int",
          args=(0, 200), hint=QT_TRANSLATE_NOOP("ParamRow", "0~200px，默认 20")),
-    dict(tab="font", card=QT_TRANSLATE_NOOP("Card", "最小字号设置"), key="low_res_enhance", label=QT_TRANSLATE_NOOP("ParamRow", "低分辨率增强"),
-         kind="bool", hint=QT_TRANSLATE_NOOP("ParamRow", "图片高度小于 1500px 时 2 倍渲染")),
+    # low_res_enhance(低分辨率增强)有意没有控件: 它已内置常驻开启, 不进 default_params / 设置 / 预设,
+    # 由 process_single 的形参默认值提供(预览侧显式传 False 以省耗时)。它不是"少写了一行"。
 
     dict(tab="font", card=QT_TRANSLATE_NOOP("Card", "画布比例"), key="canvas_ratio_mode", label=QT_TRANSLATE_NOOP("ParamRow", "画布比例"), kind="choice",
          args=[("original", QT_TRANSLATE_NOOP("ParamRow", "跟随原图")), ("1:1", "1:1"), ("3:2", QT_TRANSLATE_NOOP("ParamRow", "3:2（横）")), ("2:3", QT_TRANSLATE_NOOP("ParamRow", "2:3（竖）")),
@@ -182,24 +182,6 @@ PARAM_SPECS = [
          args=(0, 1000), hint=QT_TRANSLATE_NOOP("ParamRow", "0~1000 圆角，默认 0")),
     dict(tab="effects", card=QT_TRANSLATE_NOOP("Card", "背景模式"), key="corner_circle", label=QT_TRANSLATE_NOOP("ParamRow", "圆形（整图正圆）"), kind="bool"),
 
-    dict(tab="effects", card=QT_TRANSLATE_NOOP("Card", "图片描边"), key="enable_image_stroke", label=QT_TRANSLATE_NOOP("ParamRow", "开启"), kind="bool"),
-    dict(tab="effects", card=QT_TRANSLATE_NOOP("Card", "图片描边"), key="image_stroke_color", label=QT_TRANSLATE_NOOP("ParamRow", "颜色"), kind="color",
-         only_if=("enable_image_stroke", (True,))),
-    dict(tab="effects", card=QT_TRANSLATE_NOOP("Card", "图片描边"), key="image_stroke_width", label=QT_TRANSLATE_NOOP("ParamRow", "宽度"), kind="int",
-         args=(1, 50), hint=QT_TRANSLATE_NOOP("ParamRow", "1~50px，默认 5"), only_if=("enable_image_stroke", (True,))),
-
-    dict(tab="effects", card=QT_TRANSLATE_NOOP("Card", "图片投影"), key="enable_image_shadow", label=QT_TRANSLATE_NOOP("ParamRow", "开启"), kind="bool"),
-    dict(tab="effects", card=QT_TRANSLATE_NOOP("Card", "图片投影"), key="image_shadow_color", label=QT_TRANSLATE_NOOP("ParamRow", "颜色"), kind="color",
-         only_if=("enable_image_shadow", (True,))),
-    dict(tab="effects", card=QT_TRANSLATE_NOOP("Card", "图片投影"), key="image_shadow_angle", label=QT_TRANSLATE_NOOP("ParamRow", "方向"), kind="int",
-         args=(0, 360), hint=QT_TRANSLATE_NOOP("ParamRow", "0~360°，默认 135"), only_if=("enable_image_shadow", (True,))),
-    dict(tab="effects", card=QT_TRANSLATE_NOOP("Card", "图片投影"), key="image_shadow_offset", label=QT_TRANSLATE_NOOP("ParamRow", "偏移"), kind="int",
-         args=(0, 100), hint=QT_TRANSLATE_NOOP("ParamRow", "0~100px，默认 25"), only_if=("enable_image_shadow", (True,))),
-    dict(tab="effects", card=QT_TRANSLATE_NOOP("Card", "图片投影"), key="image_shadow_alpha", label=QT_TRANSLATE_NOOP("ParamRow", "浓度"), kind="pct",
-         args=(0.05, 1.0), hint=QT_TRANSLATE_NOOP("ParamRow", "5~100%，默认 35"), only_if=("enable_image_shadow", (True,))),
-    dict(tab="effects", card=QT_TRANSLATE_NOOP("Card", "图片投影"), key="image_shadow_blur", label=QT_TRANSLATE_NOOP("ParamRow", "晕开范围"), kind="int",
-         args=(0, 80), hint=QT_TRANSLATE_NOOP("ParamRow", "0~80px，默认 30"), only_if=("enable_image_shadow", (True,))),
-
     dict(tab="effects", card=QT_TRANSLATE_NOOP("Card", "水印文字"), key="text_color", label=QT_TRANSLATE_NOOP("ParamRow", "文字颜色"), kind="color"),
     dict(tab="effects", card=QT_TRANSLATE_NOOP("Card", "水印文字"), key="scale_logo", label=QT_TRANSLATE_NOOP("ParamRow", "Logo 缩放"), kind="pct",
          args=(0.1, 2.0), hint=QT_TRANSLATE_NOOP("ParamRow", "10~200%，默认 70%")),
@@ -212,22 +194,63 @@ PARAM_SPECS = [
     # 本条目仅用于占位卡片顺序。
     dict(tab="effects", card=QT_TRANSLATE_NOOP("Card", "水印开关"), key=None, special="_build_font_style_card"),
 
-    dict(tab="effects", card=QT_TRANSLATE_NOOP("Card", "文字描边"), key="enable_text_stroke", label=QT_TRANSLATE_NOOP("ParamRow", "开启"), kind="bool"),
-    dict(tab="effects", card=QT_TRANSLATE_NOOP("Card", "文字描边"), key="text_stroke_color", label=QT_TRANSLATE_NOOP("ParamRow", "颜色"), kind="color",
+    # 描边与投影: 四项平时很少调整, 合成一张**可折叠**卡片放在本页签最末, 默认折叠(折叠状态不落盘,
+    # 每次启动都是折叠, 见 Card.toggle); 展开后卡内按 group 分成四组、组间画分割线, 组内不再各折一层。
+    # 本条目只占卡片顺序(key=None): 卡内的行由 special 构建函数生成(见 _build_fx_card)。
+    dict(tab="effects", card=QT_TRANSLATE_NOOP("Card", "描边与投影"), key=None, special="_build_fx_card"),
+
+    dict(tab="effects", card=QT_TRANSLATE_NOOP("Card", "描边与投影"), group=QT_TRANSLATE_NOOP("MainWindow", "图片描边"),
+         key="enable_image_stroke", label=QT_TRANSLATE_NOOP("ParamRow", "开启"), kind="bool"),
+    dict(tab="effects", card=QT_TRANSLATE_NOOP("Card", "描边与投影"), group=QT_TRANSLATE_NOOP("MainWindow", "图片描边"),
+         key="image_stroke_color", label=QT_TRANSLATE_NOOP("ParamRow", "颜色"), kind="color",
+         only_if=("enable_image_stroke", (True,))),
+    dict(tab="effects", card=QT_TRANSLATE_NOOP("Card", "描边与投影"), group=QT_TRANSLATE_NOOP("MainWindow", "图片描边"),
+         key="image_stroke_width", label=QT_TRANSLATE_NOOP("ParamRow", "宽度"), kind="int",
+         args=(1, 50), hint=QT_TRANSLATE_NOOP("ParamRow", "1~50px，默认 5"), only_if=("enable_image_stroke", (True,))),
+
+    dict(tab="effects", card=QT_TRANSLATE_NOOP("Card", "描边与投影"), group=QT_TRANSLATE_NOOP("MainWindow", "图片投影"),
+         key="enable_image_shadow", label=QT_TRANSLATE_NOOP("ParamRow", "开启"), kind="bool"),
+    dict(tab="effects", card=QT_TRANSLATE_NOOP("Card", "描边与投影"), group=QT_TRANSLATE_NOOP("MainWindow", "图片投影"),
+         key="image_shadow_color", label=QT_TRANSLATE_NOOP("ParamRow", "颜色"), kind="color",
+         only_if=("enable_image_shadow", (True,))),
+    dict(tab="effects", card=QT_TRANSLATE_NOOP("Card", "描边与投影"), group=QT_TRANSLATE_NOOP("MainWindow", "图片投影"),
+         key="image_shadow_angle", label=QT_TRANSLATE_NOOP("ParamRow", "方向"), kind="int",
+         args=(0, 360), hint=QT_TRANSLATE_NOOP("ParamRow", "0~360°，默认 135"), only_if=("enable_image_shadow", (True,))),
+    dict(tab="effects", card=QT_TRANSLATE_NOOP("Card", "描边与投影"), group=QT_TRANSLATE_NOOP("MainWindow", "图片投影"),
+         key="image_shadow_offset", label=QT_TRANSLATE_NOOP("ParamRow", "偏移"), kind="int",
+         args=(0, 100), hint=QT_TRANSLATE_NOOP("ParamRow", "0~100px，默认 25"), only_if=("enable_image_shadow", (True,))),
+    dict(tab="effects", card=QT_TRANSLATE_NOOP("Card", "描边与投影"), group=QT_TRANSLATE_NOOP("MainWindow", "图片投影"),
+         key="image_shadow_alpha", label=QT_TRANSLATE_NOOP("ParamRow", "浓度"), kind="pct",
+         args=(0.05, 1.0), hint=QT_TRANSLATE_NOOP("ParamRow", "5~100%，默认 35"), only_if=("enable_image_shadow", (True,))),
+    dict(tab="effects", card=QT_TRANSLATE_NOOP("Card", "描边与投影"), group=QT_TRANSLATE_NOOP("MainWindow", "图片投影"),
+         key="image_shadow_blur", label=QT_TRANSLATE_NOOP("ParamRow", "晕开范围"), kind="int",
+         args=(0, 80), hint=QT_TRANSLATE_NOOP("ParamRow", "0~80px，默认 30"), only_if=("enable_image_shadow", (True,))),
+
+    dict(tab="effects", card=QT_TRANSLATE_NOOP("Card", "描边与投影"), group=QT_TRANSLATE_NOOP("MainWindow", "文字描边"),
+         key="enable_text_stroke", label=QT_TRANSLATE_NOOP("ParamRow", "开启"), kind="bool"),
+    dict(tab="effects", card=QT_TRANSLATE_NOOP("Card", "描边与投影"), group=QT_TRANSLATE_NOOP("MainWindow", "文字描边"),
+         key="text_stroke_color", label=QT_TRANSLATE_NOOP("ParamRow", "颜色"), kind="color",
          only_if=("enable_text_stroke", (True,))),
-    dict(tab="effects", card=QT_TRANSLATE_NOOP("Card", "文字描边"), key="text_stroke_width", label=QT_TRANSLATE_NOOP("ParamRow", "宽度"), kind="int",
+    dict(tab="effects", card=QT_TRANSLATE_NOOP("Card", "描边与投影"), group=QT_TRANSLATE_NOOP("MainWindow", "文字描边"),
+         key="text_stroke_width", label=QT_TRANSLATE_NOOP("ParamRow", "宽度"), kind="int",
          args=(1, 50), hint=QT_TRANSLATE_NOOP("ParamRow", "1~50px，默认 1"), only_if=("enable_text_stroke", (True,))),
 
-    dict(tab="effects", card=QT_TRANSLATE_NOOP("Card", "文字投影"), key="enable_text_shadow", label=QT_TRANSLATE_NOOP("ParamRow", "开启"), kind="bool"),
-    dict(tab="effects", card=QT_TRANSLATE_NOOP("Card", "文字投影"), key="text_shadow_color", label=QT_TRANSLATE_NOOP("ParamRow", "颜色"), kind="color",
+    dict(tab="effects", card=QT_TRANSLATE_NOOP("Card", "描边与投影"), group=QT_TRANSLATE_NOOP("MainWindow", "文字投影"),
+         key="enable_text_shadow", label=QT_TRANSLATE_NOOP("ParamRow", "开启"), kind="bool"),
+    dict(tab="effects", card=QT_TRANSLATE_NOOP("Card", "描边与投影"), group=QT_TRANSLATE_NOOP("MainWindow", "文字投影"),
+         key="text_shadow_color", label=QT_TRANSLATE_NOOP("ParamRow", "颜色"), kind="color",
          only_if=("enable_text_shadow", (True,))),
-    dict(tab="effects", card=QT_TRANSLATE_NOOP("Card", "文字投影"), key="text_shadow_angle", label=QT_TRANSLATE_NOOP("ParamRow", "方向"), kind="int",
+    dict(tab="effects", card=QT_TRANSLATE_NOOP("Card", "描边与投影"), group=QT_TRANSLATE_NOOP("MainWindow", "文字投影"),
+         key="text_shadow_angle", label=QT_TRANSLATE_NOOP("ParamRow", "方向"), kind="int",
          args=(0, 360), hint=QT_TRANSLATE_NOOP("ParamRow", "0~360°，默认 135"), only_if=("enable_text_shadow", (True,))),
-    dict(tab="effects", card=QT_TRANSLATE_NOOP("Card", "文字投影"), key="text_shadow_offset", label=QT_TRANSLATE_NOOP("ParamRow", "偏移"), kind="int",
+    dict(tab="effects", card=QT_TRANSLATE_NOOP("Card", "描边与投影"), group=QT_TRANSLATE_NOOP("MainWindow", "文字投影"),
+         key="text_shadow_offset", label=QT_TRANSLATE_NOOP("ParamRow", "偏移"), kind="int",
          args=(0, 40), hint=QT_TRANSLATE_NOOP("ParamRow", "0~40px，默认 3"), only_if=("enable_text_shadow", (True,))),
-    dict(tab="effects", card=QT_TRANSLATE_NOOP("Card", "文字投影"), key="text_shadow_alpha", label=QT_TRANSLATE_NOOP("ParamRow", "浓度"), kind="pct",
+    dict(tab="effects", card=QT_TRANSLATE_NOOP("Card", "描边与投影"), group=QT_TRANSLATE_NOOP("MainWindow", "文字投影"),
+         key="text_shadow_alpha", label=QT_TRANSLATE_NOOP("ParamRow", "浓度"), kind="pct",
          args=(0.05, 1.0), hint=QT_TRANSLATE_NOOP("ParamRow", "5~100%，默认 20"), only_if=("enable_text_shadow", (True,))),
-    dict(tab="effects", card=QT_TRANSLATE_NOOP("Card", "文字投影"), key="text_shadow_blur", label=QT_TRANSLATE_NOOP("ParamRow", "晕开范围"), kind="int",
+    dict(tab="effects", card=QT_TRANSLATE_NOOP("Card", "描边与投影"), group=QT_TRANSLATE_NOOP("MainWindow", "文字投影"),
+         key="text_shadow_blur", label=QT_TRANSLATE_NOOP("ParamRow", "晕开范围"), kind="int",
          args=(0, 30), hint=QT_TRANSLATE_NOOP("ParamRow", "0~30px，默认 5"), only_if=("enable_text_shadow", (True,))),
 ]
 
@@ -520,21 +543,76 @@ class ParamRow(QWidget):
             self.changed.emit(self.key, path)
 
 
-class Card(QFrame):
-    """卡片: 标题 + 右上角「重置本组」+ 内容区。"""
+def _fx_divider():
+    """「描边与投影」卡内相邻功能组之间的分割线。
 
-    def __init__(self, title, parent=None):
+    自带上下留白(分割线两侧各留一段空), 否则会贴着上一组最后一行。用 QFrame 而非 QWidget:
+    样式表里的 background 只有 QFrame 这类部件会直接绘制。
+    """
+    holder = QWidget()
+    v = QVBoxLayout(holder)
+    v.setContentsMargins(0, 9, 0, 3)
+    v.setSpacing(0)
+    line = QFrame()
+    line.setObjectName("divider")
+    line.setFixedHeight(1)
+    v.addWidget(line)
+    return holder
+
+
+class _CardHead(QWidget):
+    """可折叠卡片的标题行: 整条可点, 与点左端的开合按钮等价。
+
+    行内的子控件(标题、开合按钮、重置按钮)自己吃鼠标事件, 因此点它们不会连带触发本行的点击。
+    """
+
+    clicked = Signal()
+
+    def mouseReleaseEvent(self, e):        # noqa: N802 - Qt 命名
+        if e.button() == Qt.MouseButton.LeftButton and self.rect().contains(e.position().toPoint()):
+            self.clicked.emit()
+        super().mouseReleaseEvent(e)
+
+
+class Card(QFrame):
+    """卡片: 标题 + 右上角「重置本组」+ 内容区。
+
+    可折叠卡片(`collapsible=True`)用于「描边与投影」这类平时不动、需要时才展开的整块参数:
+    标题行整条可点(左端另有开合按钮), 内容区默认收起。收放只改显示, 不碰参数值; 状态不落盘,
+    每次启动都是收起(见 `toggle`)。卡内的分组与分割线不参与折叠, 展开后一次看全。
+    """
+
+    def __init__(self, title, parent=None, collapsible=False):
         super().__init__(parent)
         self.setObjectName("card")
         self.keys = []
+        self.title_display = self.tr(title)   # 卡名显示文本(撤销步名与提示直接取它, 不从控件反查)
+        self.collapsible = collapsible
+        self.collapsed = bool(collapsible)
+        self.body_host = None        # 可折叠卡的内容宿主(布局本身没有可见性, 收起要落在 widget 上)
         theme.apply_shadow(self)
         v = QVBoxLayout(self)
         v.setContentsMargins(theme.PAD_CARD, theme.PAD_CARD - 2, theme.PAD_CARD, theme.PAD_CARD)
         v.setSpacing(theme.GAP_ROW)
 
-        head = QHBoxLayout()
+        if collapsible:
+            self._head = _CardHead(self)
+            self._head.clicked.connect(self.toggle)
+            head = QHBoxLayout(self._head)
+        else:
+            self._head = None
+            head = QHBoxLayout()
         head.setContentsMargins(0, 0, 0, 0)
-        t = QLabel(self.tr(title))            # 卡片名来自 PARAM_SPECS 或手写字面量
+        self._toggle_btn = None
+        if collapsible:
+            # 开合按钮: 负担指示与点击两件事。用 #ghost(既有四档之一)而不是新增按钮分量。
+            self._toggle_btn = QPushButton()
+            self._toggle_btn.setObjectName("ghost")
+            self._toggle_btn.setFixedWidth(24)
+            self._toggle_btn.setCursor(Qt.PointingHandCursor)
+            self._toggle_btn.clicked.connect(self.toggle)
+            head.addWidget(self._toggle_btn)
+        t = QLabel(self.title_display)        # 卡片名来自 PARAM_SPECS 或手写字面量
         t.setObjectName("cardTitle")
         head.addWidget(t)
         head.addStretch(1)
@@ -544,12 +622,48 @@ class Card(QFrame):
         self.reset_btn.setToolTip(self.tr("将本卡片参数恢复为出厂默认值"))
         self.reset_btn.setCursor(Qt.PointingHandCursor)
         head.addWidget(self.reset_btn)
-        v.addLayout(head)
+        if collapsible:
+            v.addWidget(self._head)
+        else:
+            v.addLayout(head)
 
         self.body = QVBoxLayout()
         self.body.setContentsMargins(0, 0, 0, 0)
         self.body.setSpacing(theme.GAP_ROW - 2)
-        v.addLayout(self.body)
+        if collapsible:
+            # 内容宿主: 收起即隐藏它。可见性由构建方(主窗)按 _vis_rule 登记, 本类不直接 setVisible。
+            self.body_host = QWidget(self)
+            self.body_host.setLayout(self.body)
+            v.addWidget(self.body_host)
+            self._sync_collapse_ui()
+        else:
+            v.addLayout(self.body)
+
+    # ---- 折叠 ----
+    def toggle(self):
+        """收起 / 展开内容区。
+
+        只改状态, 随后由主窗走**统一的显隐出口**(`_sync_visibility`): 它先冻结重绘、把终态布局与
+        容器高度算完再放开。卡片带 QGraphicsDropShadowEffect(渲染到离屏图), 自己 setVisible 会先贴出
+        旧尺寸的图, 表现为"跳一下再闪出内容"。折叠不进撤销、不触发预览: 它只影响显示。
+        """
+        if not self.collapsible:
+            return
+        self.collapsed = not self.collapsed
+        self._sync_collapse_ui()
+        sync = getattr(self.window(), "_sync_visibility", None)
+        if sync is not None:
+            sync()
+
+    def _sync_collapse_ui(self):
+        """开合指示: 收起=右向箭头, 展开=下向箭头; 提示语同状态一起切。"""
+        if not self.collapsible:
+            return
+        _iconify(self._toggle_btn, theme.ARROW_RIGHT if self.collapsed else theme.ARROW_DOWN, 12)
+        tip = self.tr("展开本组") if self.collapsed else self.tr("收起本组")
+        self._toggle_btn.setToolTip(tip)
+        self._head.setToolTip(tip)
+        self._head.setCursor(Qt.PointingHandCursor)
 
 
 def _qimage_to_pil(img: QImage):
@@ -2396,7 +2510,7 @@ class MainWindow(QMainWindow):
         keys = set(card.keys)
         for key in card.keys:
             keys.update((self._spec_by_key.get(key) or {}).get("mirror") or ())
-        title = card.findChild(QLabel, "cardTitle").text()
+        title = card.title_display
 
         def _do():
             changed = set()
@@ -2999,6 +3113,90 @@ class MainWindow(QMainWindow):
         card.body.addLayout(grid)
         self._cards.append(card)
         return card
+
+    def _build_fx_card(self):
+        """「描边与投影」: 整块可折叠, 展开后四个功能组用分割线相隔。
+
+        折叠只到"整块"这一层: 组与组之间靠分割线与小标题表达层级, 组内不再各折一次(展开一次看全)。
+        组的划分与顺序来自参数表的 `group` 字段(组的顺序 = 首次出现顺序), 组内顺序同表 ——
+        不在代码里硬编码任何键(见 AGENTS §2.1)。行仍按表建并登记进 `_rows`, 因此显隐、撤销、
+        持久化、预设、预览、悬停与数值框宽度统一这些既有链路全部照旧。
+        """
+        title = QT_TRANSLATE_NOOP("Card", "描边与投影")
+        card = Card(title, collapsible=True)
+        # 本卡不提供"整组重置": 四个功能组各有一个「重置」(见 _fx_group_head), 故收起自带那个按钮。
+        card.reset_btn.setVisible(False)
+        # 收起 = 隐藏内容宿主; 显隐必须走统一出口, 因此在这里登记判据(见 _vis_rule / _sync_visibility)。
+        self._vis_rule(card.body_host, lambda c=card: not c.collapsed)
+        self._cards.append(card)
+
+        specs = [s for s in PARAM_SPECS if s.get("card") == title and s.get("key")]
+        groups = []
+        for s in specs:
+            if s["group"] not in groups:
+                groups.append(s["group"])
+        for i, name in enumerate(groups):
+            if i:                                   # 组与组之间才画分割线(首组之前不画)
+                card.body.addWidget(_fx_divider())
+            keys = [s["key"] for s in specs if s["group"] == name]
+            card.body.addWidget(self._fx_group_head(name, keys))
+            for s in specs:
+                if s["group"] != name:
+                    continue
+                row = ParamRow(s, self._params.get(s["key"]))
+                row.changed.connect(self._on_param)
+                if s["kind"] == "color":
+                    row.colorClicked.connect(lambda r=row: self._open_color_dialog(r))
+                self._rows[s["key"]] = row
+                card.keys.append(s["key"])
+                card.body.addWidget(row)
+        return card
+
+    def _fx_group_head(self, name, keys):
+        """功能组的小标题行: 组名 + 右端「重置」(只重置本组, 一步撤销)。
+
+        合并成一张卡后, 组的边界只能靠这行表达(否则四组的"颜色 / 宽度 / 方向"分不清是谁的)。
+        """
+        w = QWidget()
+        h = QHBoxLayout(w)
+        h.setContentsMargins(0, 4, 0, 0)      # 组与上一组之间多留一点空隙
+        h.setSpacing(theme.GAP_CTRL)
+        lab = QLabel(self.tr(name))
+        lab.setObjectName("groupTitle")
+        h.addWidget(lab)
+        h.addStretch(1)
+        btn = QPushButton(self.tr("重置"))
+        btn.setObjectName("mini")
+        btn.setCursor(Qt.PointingHandCursor)
+        btn.setToolTip(self.tr("将本组参数恢复为出厂默认值"))
+        btn.clicked.connect(lambda _c, g=name, ks=tuple(keys): self._reset_fx_group(g, ks))
+        h.addWidget(btn)
+        return w
+
+    def _reset_fx_group(self, name, keys):
+        """重置一个功能组(开关 + 细节行), 整批算撤销的一步。
+
+        与 `_reset_card` 同形, 范围只到本组; 组内开关复位后其细节行按 `only_if` 收起,
+        因此收尾要再走一次显隐出口。
+        """
+        defaults = core.default_params()
+        title = self.tr(name)
+
+        def _do():
+            changed = set()
+            for key in keys:
+                if key not in defaults:
+                    continue
+                self._params[key] = defaults[key]
+                if key in self._rows:
+                    self._rows[key].set_value(defaults[key])
+                changed.add(key)
+            self._sync_mirror_rows(changed)
+            self._sync_visibility()
+            self._touch()
+
+        self._undo_step(f"__reset_fx__{name}", f"重置「{title}」", _do)
+        self._notify(self.tr("已重置「{title}」为默认值").format(title=title))
 
     # ---------- 「文件与美化」页签的四张卡片 ----------
     def _row(self, label, widget, label_w=_LABEL_W):
@@ -3712,8 +3910,8 @@ class MainWindow(QMainWindow):
         self._preview_err = None
         self._preview.set_geo(resp.get("geom"))
         e2e = (time.perf_counter() - resp.get("_req_t", time.perf_counter())) * 1000
-        # 连接符使用 `~` 而非 `→`(U+2192): 该类符号字形小于汉字且与字号不成比例, 小字号下观感异常
-        self._perf.setText(self.tr("渲染 {ms:.0f} ms · 请求 ~ 显示 {e2e:.0f} ms")
+        # 连接符用 ASCII 的 `-->`: 箭头字符(如 U+2192)字形小于汉字且与字号不成比例, 小字号下观感异常
+        self._perf.setText(self.tr("渲染 {ms:.0f} ms · 请求 --> 显示 {e2e:.0f} ms")
                           .format(ms=resp.get("ms", 0), e2e=e2e))
         self._finish_manual_preview(True)
 

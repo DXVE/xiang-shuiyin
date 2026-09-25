@@ -1,0 +1,37 @@
+MIT License
+
+Copyright (c) 2026 DXVE
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+-------------------------------------------------------------------------------
+
+附加说明（关于 AI 辅助生成内容） / Note on AI-Assisted Content
+
+本项目的部分代码、文档与素材（含程序图标与 Logo）由 AI 辅助生成。作者无法完整追溯该部分内容的来源，因此不对其是否侵犯任何第三方权利作出任何明示或暗示的主张与保证。上述 MIT 许可仅就作者自身拥有权利的部分作出授权；对于第三方可能主张权利的内容，使用者应自行评估并承担相应风险。
+
+本程序运行与打包分发时包含的第三方组件，其版权与许可条款见 THIRD_PARTY_LICENSES.md，各组件版权归其各自作者所有。
+
+若权利人认为本项目内容侵犯其合法权益，可通过本仓库 Issues 联系作者，作者将在核实后及时更正或删除。
+
+Portions of this project, including the application icon and logo, were generated with the assistance of AI. The author cannot fully trace the provenance of such content and therefore makes no representation or warranty, express or implied, regarding non-infringement of any third-party rights. The MIT license above grants rights only in material to which the author holds rights; users must independently assess and bear any risk arising from third-party claims.
+
+Third-party components included in this program at runtime or in packaged distributions are listed, together with their licenses, in THIRD_PARTY_LICENSES.md. All such components remain the property of their respective authors.
+
+If a rights holder believes this project infringes their rights, please contact the author via this repository's Issues; verified concerns will be corrected or removed promptly.

@@ -48,6 +48,24 @@ PREVIEW_MAX_SIDE = 3400
 # 均在小图上完成后再放大回画布; 设置下限以避免小画布下画质损失过大。
 BLUR_WORK_MIN_SIDE = 400
 
+
+# 低清增强(2 倍超采样)的触发阈值(px): 成品的增强判定与预览的像素参数缩放比例(scale2)
+# 都按这一条判据推导, 因此阈值只在这里定义一处, 两处调用同一常量。
+LOW_RES_THRESHOLD = 1500
+
+
+def _oriented_height(im):
+    """按 EXIF Orientation 返回"像素转正后"的高度(不做像素运算, 只读方向标记)。
+
+    增强判定必须与 process_single 同口径: 后者在 ImageOps.exif_transpose() 之后取高度,
+    因此 90 度旋转的图(方向 5~8)要交换宽高; 只取原始高度会让竖拍图在预览与成品之间判反。
+    """
+    try:
+        w, h = im.size
+        return h if im.getexif().get(0x0112) not in (5, 6, 7, 8) else w
+    except Exception:                     # noqa: BLE001 - 读不到方向标记时按未旋转处理
+        return im.size[1]
+
 # 配置管理: 目录常量、默认字体路径、设置文件读写、型号映射文件读写。
 if os.name == 'nt':
     _data_root = os.environ.get('LOCALAPPDATA') or os.path.join(os.path.expanduser('~'), 'AppData', 'Local')
@@ -839,6 +857,9 @@ def process_single(input_path, output_path, logo_dir,
                    corner_circle=False,
                    show_brand=True, show_model=True, show_params=True,
                    min_font_size=20,
+                   # 内部参数(常驻开启): 不进 default_params / PARAM_SPECS / 设置 / 预设, 界面上没有控件。
+                   # 它只表达"2 倍超采样"这一渲染技术, 不是用户意图; 唯一显式传 False 的调用方是预览
+                   # (缩略图不需要超采样, 省一半耗时), 见 AppState._render_preview。
                    low_res_enhance=True,
                    enable_image_stroke=False,
                    image_stroke_color="#ffffff",
@@ -919,7 +940,6 @@ def process_single(input_path, output_path, logo_dir,
         original = ImageOps.exif_transpose(original)
         img_w, img_h = original.size
 
-        LOW_RES_THRESHOLD = 1500
         render_scale = 1
         if low_res_enhance and img_h < LOW_RES_THRESHOLD:
             render_scale = 2
@@ -1617,7 +1637,7 @@ def default_params():
         "bold_params": False,
         "italic_params": True,
         "min_font_size": 20,
-        "low_res_enhance": True,
+        # low_res_enhance 有意不在这里: 内部参数, 常驻开启(见 process_single 的形参说明)。
         "enable_image_stroke": False,
         "image_stroke_color": "#ffffff",
         "image_stroke_width": 5,
@@ -2069,13 +2089,14 @@ class AppState:
 
     # ---------- 预览(临时目录, 程序退出后清除) ----------
     def _write_preview_src(self, im, tag="", max_side=PREVIEW_MAX_SIDE):
-        """把已打开的图缩略到 max_side 并保存为 psrc_<tag>.jpg, 返回 (src 路径, 原图高度)。
+        """把已打开的图缩略到 max_side 并保存为 psrc_<tag>.jpg, 返回 (src 路径, 转正后高度)。
 
-        文件名带 tag(原文件 mtime 与 size)实现内容寻址。quality 90: 预览仅用于判断构图与间距。
-        保存时保留原图 EXIF, 否则预览读不到相机参数。max_side<=0 视为不缩略(全量档)。
+        高度按 EXIF 方向换算(与成品取高度的口径一致, 见 _oriented_height), 供预览推导
+        2x 增强系数。文件名带 tag(原文件 mtime 与 size)实现内容寻址。quality 90: 预览仅用于
+        判断构图与间距。保存时保留原图 EXIF, 否则预览读不到相机参数。max_side<=0 视为不缩略(全量档)。
         """
         exif = im.info.get("exif", b"")
-        src_h = im.size[1]
+        src_h = _oriented_height(im)
         if max_side > 0:
             im.thumbnail((max_side, max_side), Image.Resampling.LANCZOS)
         prefix = "psrc" if max_side <= 0 or max_side >= PREVIEW_MAX_SIDE else "psrcf"
@@ -2087,9 +2108,11 @@ class AppState:
         return src, src_h
 
     def _preview_src_for(self, input_path, src_image=None, max_side=PREVIEW_MAX_SIDE):
-        """返回该原图对应的预览缩略图 (src 路径, 原图高度)。
+        """返回该原图对应的预览缩略图 (src 路径, 原图按 EXIF 转正后的高度)。
 
-        max_side 参与缓存键(当前只有一档)。命中缓存(原文件 mtime 与 size 未变)时直接复用, 不重读原图。
+        高度取转正后的值: 成品的增强判定用的是 exif_transpose() 之后的高度, 预览的 scale2
+        必须同口径(见 _oriented_height)。max_side 参与缓存键(当前只有一档)。命中缓存
+        (原文件 mtime 与 size 未变)时直接复用, 不重读原图。
         _thumb_gen_lock: 避免并发写入同一缩略图文件。
         """
         try:
@@ -2135,17 +2158,19 @@ class AppState:
         为预览/其它入口保留); geom_out 给定时收集间距段几何(供界面预览图叠加标注);
         src_image 给定时复用它(调用方已打开的句柄); 缩略图本身有 (mtime,size) 缓存, 命中不读原图;
         stage_out 给定时回传"渲染分段"结果(见 process_single 的 _flush_stage_log)"""
+        # 预览恒不做 2 倍低清增强: 它只在正式输出时有意义, 缩略预览做一遍等于白花 2~4 倍耗时。
+        # 这是该内部参数唯一的"关"入口, 必须无条件生效 —— 源图长边小于档位时 preview_scale 为
+        # None(下面那个块整段不执行), 把这一行留在块内就会退回签名默认值 True。
+        params = dict(params)
+        params["low_res_enhance"] = False
         if preview_scale:
             src, src_h = self._preview_src_for(input_path, src_image, max_side)
             input_path = src
-            # 成品全分辨率渲染的 2x 增强系数(与 process_single 内部判断一致)
-            scale2 = 2 if params.get("low_res_enhance", True) and src_h < 1500 else 1
             # 预览相对成品的渲染宽度比: 所有绝对像素参数按此等比缩放, 使预览观感与成品一致
-            # (圆角/模糊半径/字号下限/描边宽都是像素绝对值, 不缩放则预览小图上显得更大更粗)
+            # (圆角/模糊半径/字号下限/描边宽都是像素绝对值, 不缩放则预览小图上显得更大更粗)。
+            # scale2 = 成品那一侧的 2x 系数(成品恒为开), 按 EXIF 转正后的高度判定(见 _oriented_height)。
+            scale2 = 2 if src_h < LOW_RES_THRESHOLD else 1
             ratio = preview_scale / scale2
-            params = dict(params)
-            # 缩略预览分辨率低: 关闭 2x 低分辨率增强(仅正式输出需要), 显著降低实时预览耗时
-            params["low_res_enhance"] = False
             params["min_font_size"] = max(8, int(params.get("min_font_size", 20) * ratio))
             params["corner_radius"] = max(0, int(params.get("corner_radius", 0) * ratio))
             params["image_stroke_width"] = max(0, int(params.get("image_stroke_width", 5) * ratio))

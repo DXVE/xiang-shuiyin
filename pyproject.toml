@@ -12,9 +12,9 @@ license = "MIT"
 dependencies = [
     "Pillow>=10.0",
     "exifread>=3.0",
-    # 运行时仅使用 QtWidgets/QtGui/QtCore(均在 PySide6-Essentials 内);
-    # 此处依赖 PySide6 元包, 打包时应换成 PySide6-Essentials
-    "PySide6>=6.11",
+    # 运行时只用到 QtCore/QtGui/QtWidgets/QtNetwork, 都在 PySide6-Essentials 内;
+    # 不依赖 PySide6 元包(它会带上用不到的 Addons, 体积远超本程序所需)。
+    "PySide6-Essentials>=6.11",
 ]
 
 [project.optional-dependencies]

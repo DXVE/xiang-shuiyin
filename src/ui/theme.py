@@ -76,6 +76,8 @@ UNDO = _asset("undo.svg")      # 撤销
 REDO = _asset("redo.svg")      # 重做
 INFO = _asset("info.svg")      # 图片信息/EXIF
 RESET = _asset("reset.svg")    # 重置本组 / 刷新预览效果
+# 折叠区块的开合指示: 展开复用上方资源段的 ARROW_DOWN(与下拉框箭头同一张图), 收起用右向箭头。
+ARROW_RIGHT = _asset("arrow_right.svg")
 
 QSS = f"""
 /* ---------- 基础 ----------
@@ -129,6 +131,18 @@ QLabel#cardTitle {{
     font-weight: bold;
     color: #334155;
     background: transparent;
+}}
+/* 卡片内部的功能组小标题: 比卡名低一档, 与组内的参数行同列起排。 */
+QLabel#groupTitle {{
+    font-size: 12px;
+    font-weight: bold;
+    color: #475569;
+    background: transparent;
+}}
+/* 功能组之间的分割线(1px, 与卡片描边同色)。 */
+QFrame#divider {{
+    background: {LINE};
+    border: none;
 }}
 QLabel#hint {{ color: {MUTED}; font-size: 11px; background: transparent; }}
 QLabel#fieldLabel {{ background: transparent; }}
