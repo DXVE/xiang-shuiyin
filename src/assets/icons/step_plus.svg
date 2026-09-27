@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16">
+  <!-- 数值框的加号步进按钮。加号本身在子集字体里有(U+002B), 这里仍出素材: 与 step_minus 成对,
+       两枚按钮同一几何与分量, 不用"一个字形的加号"配"一张素材的减号"。 -->
+  <path d="M8 4v8M4 8h8" fill="none" stroke="#7A756C" stroke-width="1.8" stroke-linecap="round"/>
+</svg>

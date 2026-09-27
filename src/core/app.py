@@ -1234,9 +1234,9 @@ def process_single(input_path, output_path, logo_dir,
     bg = _layer_cached(
         ("bg", src_key, canvas_w, canvas_h, bg_mode, blur_radius, bg_color) if bg_mode == "blur" else None,
         _build_background, mutable=True)
-    # 暗化处理(最后执行, 影响文字可读性): 置于缓存之外, 使调整暗化参数时背景层仍可命中。
-    # 暗化为线性混合, 置于缓存之外与置于缓存之内逐像素等价。
-    if bg_darken_strength > 0:
+    # 暗化处理(最后执行, 影响文字可读性): 仅模糊模式生效, 纯色背景不暗化。
+    # 置于缓存之外, 使调整暗化参数时背景层仍可命中; 暗化为线性混合, 置于缓存之外与之内逐像素等价。
+    if bg_mode == "blur" and bg_darken_strength > 0:
         canvas = Image.blend(bg, Image.new("RGB", bg.size, (0, 0, 0)), bg_darken_strength)
     else:
         canvas = bg
@@ -1905,21 +1905,6 @@ class AppState:
         save_settings(self.settings)
         return {"ok": True, "colors": arr}
 
-    # ---------- 预设 ----------
-    def load_presets(self):
-        """读取预设文件; 字体路径失效时只在内存中回退为默认值, 不回写文件。"""
-        presets = _load_json(PRESETS_FILE)
-        for key, p in presets.items():
-            if not isinstance(p, dict):
-                continue
-            for fkey, fname in FONT_SETTING_MAP:
-                cur = p.get(fkey)
-                if not cur or not os.path.isfile(cur):
-                    newp = _default_font_path(fname)
-                    if newp:
-                        p[fkey] = newp
-        return presets
-
     # ---------- 预设(10 个固定槽位, 一槽一个文件) ----------
     def load_presets(self):
         """读 10 个槽位, 返回 {槽位字符串: 记录}(仅含有内容的槽)。
@@ -2188,9 +2173,6 @@ class AppState:
                               geom_out=geom_out, image_out=image_out, stage_out=stage_out,
                               **params)
 
-
-
-
     def make_preview(self, req):
         """实时预览: 输入图缩略到 PREVIEW_MAX_SIDE 后渲染, 直接把画布 PIL 图回给调用方, 不落盘。
 
@@ -2269,21 +2251,3 @@ def _list_images_in_dir(folder, recursive=False):
     except Exception as e:
         logging.warning(f"列出目录失败 {folder}: {e}")
     return out
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-if __name__ == "__main__":
-    main()

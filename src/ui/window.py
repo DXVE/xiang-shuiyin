@@ -77,6 +77,11 @@ ILLEGAL_FN_CHARS = set(chr(92) + '/:*?"<>|')
 _UNDO_LIMIT = 100
 _UNDO_COALESCE_MS = 600
 
+# 数值框 ± 步进按钮的素材边长（逻辑像素）: 与原先的 12px 粗体字形同量级。
+_STEP_ICON = 14
+# 色块选中态勾号的素材边长（逻辑像素）。
+_CHIP_CHECK = 14
+
 
 def migrate_preset(p):
     """把预设迁成当前口径，返回副本，不修改传入对象。
@@ -434,8 +439,12 @@ class ParamRow(QWidget):
                     self.spin.setToolTip(hint)
                 self.slider.valueChanged.connect(self._from_slider)
                 self.spin.valueChanged.connect(self._from_spin)
-                minus = QPushButton("−")
-                plus = QPushButton("+")
+                # 两个按钮都出素材而不是字形: 界面字体是内置子集, 其中的减号(U+2212)缺码位,
+                # 而加号(U+002B)有 —— 一字形一素材必然不成对(见 theme.py 的「界面图标」)。
+                minus = QPushButton()
+                plus = QPushButton()
+                _iconify(minus, theme.STEP_MINUS, _STEP_ICON)
+                _iconify(plus, theme.STEP_PLUS, _STEP_ICON)
                 for b, slot in ((minus, self.spin.stepDown), (plus, self.spin.stepUp)):
                     b.setObjectName("step")
                     b.setCursor(Qt.PointingHandCursor)
@@ -781,7 +790,7 @@ class PreviewBox(QWidget):
         # 执行(结果缓存在 _scaled), 所以每次预览最多一行 —— 绝不进逐帧重绘路径。
         scale_ms = (time.perf_counter() - t0) * 1000
         src = self._pil.size
-        logging.info(f"[上屏] 缩放 {src[0]}x{src[1]}→{dev.width()}x{dev.height()} "
+        logging.info(f"[上屏] 缩放 {src[0]}x{src[1]}-->{dev.width()}x{dev.height()} "
                      f"dpr={dpr:g} 耗时 {scale_ms:.0f}ms (PIL LANCZOS)")
         if self.stats is not None:
             self.stats.add_display_scale(scale_ms)
@@ -1470,6 +1479,19 @@ _DLG_W = (_COLS_PRESET * _CHIP_W + (_COLS_PRESET - 1) * _CHIP_GAP
 _CUR_W = theme.CTRL_H * 2 + 8
 
 
+def _swatch_fg(color):
+    """色块上的前景色: 浅底用黑(000)、深底用白(fff)。
+
+    色块文字与选中态勾号的素材都按这一条判据选色, 因此判据只写在这里一处。
+    """
+    return "#000" if QColor(color).lightness() > 128 else "#fff"
+
+
+def _swatch_check(color):
+    """选中态勾号的素材路径: 与 `_swatch_fg` 同判据, 深浅底各一份(SVG 填充色写死)。"""
+    return theme.CHIP_CHECK_DARK if _swatch_fg(color) == "#000" else theme.CHIP_CHECK_LIGHT
+
+
 def _swatch_qss(color, radius=theme.RADIUS_SMALL, selected=False):
     """色块样式(取色弹窗的色块与「当前颜色」共用此定义)。
 
@@ -1481,10 +1503,10 @@ def _swatch_qss(color, radius=theme.RADIUS_SMALL, selected=False):
       · 2px margin 使描边离开色块一圈、中间露出卡片底色, 选中态表现为色块外套一圈;
         未选中为 LINE, 选中为主色;
       · 悬停不改变色相, 仅把描边换成深一档的暖灰(MUTED)。
-    选中另配 ✓ 字形, 不单独依赖描边表达。
+    选中另配勾号素材(见 `_swatch_check`), 不单独依赖描边表达。
     """
     col = QColor(color)
-    fg = "#000" if col.lightness() > 128 else "#fff"
+    fg = _swatch_fg(color)
     ring, ring_hot = ((theme.ACCENT, theme.ACCENT2) if selected else (theme.LINE, theme.MUTED))
     return ("QPushButton { background:%s; border:2px solid %s; border-radius:%dpx; margin:2px;"
             " color:%s; font-weight:bold; padding:0; }"
@@ -1703,9 +1725,15 @@ class ColorDialog(QDialog):
 
     # ---- 状态刷新 ----
     def _paint_chip(self, btn, color):
-        """色块 = 底色 + 选中态(✓ 与强调色描边)。新建与刷新统一走此处, 避免两处状态不一致。"""
+        """色块 = 底色 + 选中态(勾号素材与强调色描边)。新建与刷新统一走此处, 避免两处状态不一致。
+
+        勾号用素材而不是字形: 界面字体是内置子集, 不含 ✓(U+2713); 素材深浅底各一份,
+        按 `_swatch_check` 的判据选。
+        """
         selected = color.lower() == self._current.lower()
-        btn.setText("✓" if selected else "")
+        btn.setText("")
+        btn.setIcon(QIcon(_swatch_check(color)) if selected else QIcon())
+        btn.setIconSize(QSize(_CHIP_CHECK, _CHIP_CHECK))
         btn.setStyleSheet(_swatch_qss(color, selected=selected))
 
     def _sync_current(self):
@@ -1854,7 +1882,7 @@ class MapDialog(QDialog):
             self._logo_dir = core.DEFAULT_LOGO_DIR
 
         v = QVBoxLayout(self)
-        tip = QLabel(self.tr("识别到的原始型号 → 水印上显示的型号。"
+        tip = QLabel(self.tr("识别到的原始型号 --> 水印上显示的型号。"
                              "在列表里选中一条即可修改或删除（删除前会先确认）。"))
         tip.setObjectName("hint")
         tip.setWordWrap(True)
@@ -1903,7 +1931,7 @@ class MapDialog(QDialog):
         """
         self._list.clear()
         for k in sorted(self._data):
-            self._list.addItem(f"{k}   →   {self._data[k]}")
+            self._list.addItem(f"{k}   -->   {self._data[k]}")
         if select is None:
             return
         for i in range(self._list.count()):
@@ -1914,8 +1942,8 @@ class MapDialog(QDialog):
 
     @staticmethod
     def _item_key(item):
-        """从列表项文本「原始   →   显示」中取出原始型号。分隔符须与拼串处一致。"""
-        return item.text().split("   →   ")[0]
+        """从列表项文本「原始   -->   显示」中取出原始型号。分隔符须与拼串处一致。"""
+        return item.text().split("   -->   ")[0]
 
     def _on_select(self, cur, _prev):
         if cur is None:
@@ -1984,7 +2012,7 @@ class MapDialog(QDialog):
             return
         nice = self._data.get(raw) or ""
         if _message(self, QMessageBox.Icon.Question, self.tr("删除型号映射"),
-                    self.tr("确定删除「{raw}」→「{nice}」这条映射？").format(
+                    self.tr("确定删除「{raw}」-->「{nice}」这条映射？").format(
                         raw=raw, nice=nice or self.tr("（显示为空）")),
                     QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
                     QMessageBox.StandardButton.No) != QMessageBox.StandardButton.Yes:
@@ -3925,7 +3953,7 @@ class MainWindow(QMainWindow):
         parts = [f"[预览] 渲染 {ms:.0f}ms (排队 {queue_ms:.0f}ms, 转图 {qimg_ms:.0f}ms)",
                  f"画布 {size}",
                  f"档 {resp.get('max_side', '-')}",
-                 f"请求→就绪 {e2e:.0f}ms"]
+                 f"请求-->就绪 {e2e:.0f}ms"]
         if arrived:
             # 排队时间往往就是它造成的: 在跑的那一轮不会被中断, 新请求要等它跑完
             parts.append(f"渲染期间新增 {arrived} 次请求(上一轮不可中断, 排队主要来自这里)")

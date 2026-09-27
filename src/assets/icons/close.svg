@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16">
+  <!-- 弹窗自绘标题栏的关闭按钮。替代文字符号 ✕(U+2715): 内置字体 Sarasa Gothic SC 是子集,
+       不含该码位, 用它作界面字体时该字符会落到逐字回退上。线条分量与 undo/reset 一致。 -->
+  <path d="M4.2 4.2L11.8 11.8M11.8 4.2L4.2 11.8" fill="none" stroke="#7A756C"
+        stroke-width="1.9" stroke-linecap="round"/>
+</svg>

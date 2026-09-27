@@ -34,6 +34,10 @@ a = Analysis(
     binaries=[],
     datas=[
         (str(ROOT / "src" / "assets"), "assets"),                # 资源 -> <_MEIPASS>/assets
+        # 本程序的翻译文件: 打包器只收 .py 模块, 同目录的 .qm 必须显式映射, 否则界面语言
+        # 切到英文时找不到文件而回退中文。目标目录须与 ui/i18n.py 由自身 __file__ 推出的
+        # 目录一致, 即 <_MEIPASS>/ui/i18n。
+        (str(ROOT / "src" / "ui" / "i18n"), "ui/i18n"),
         (str(ROOT / "licenses"), "licenses"),                    # 许可文本 -> <_MEIPASS>/licenses
         (str(ROOT / "LICENSE"), "."),
         (str(ROOT / "THIRD_PARTY_LICENSES.md"), "."),

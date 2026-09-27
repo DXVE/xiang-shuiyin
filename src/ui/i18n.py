@@ -10,6 +10,9 @@
 `.ts`(源)与生成的 `.qm` 都随仓库提交, 因此 `python main.py` 可直接运行, 无需安装 lrelease;
 改动文案时才需要 `tools/build_i18n.py` 重新生成。
 
+Qt 自带的那部分文案(系统原生对话框的按钮与列名等)不在本程序的 `.ts` 里, 由 `install()`
+从 Qt 的 translations 目录装载 `qtbase_<locale>.qm` 与 `qt_<locale>.qm`(见 `_QT_LOCALE`)。
+
 核心线程的消息是 f-string 拼好的中文串, 无法逐个 `tr()`, 因此在
 `_CORE_MSG_TEMPLATES` 中登记为模板(带 `{占位符}`), 在**显示边界**经 `tr_msg()` 处理:
 先精确匹配, 再按模板匹配取占位符的值并用该模板的译文重新格式化, 匹配不到则原样显示
@@ -33,6 +36,13 @@ _QM_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "i18n")
 _CTX = "core"                   # 运行期查表用的 context; NOOP 处必须写同样字面量
                                # (lupdate 不认变量, 写 _CTX 会把条目归到空 context)
 _translator = None              # 必须保留引用: 局部变量被回收后翻译即失效
+_qt_translators = []            # 同上, 这是 Qt 自带翻译的引用
+
+# Qt 自带翻译: 本程序的 tr() 只覆盖自己写的文案, 由 Qt 绘制的那部分(文件/目录选择弹窗的
+# 标题、按钮与列名, 输入框右键菜单)取自 Qt 的 .qm, 未装载时这些位置显示英文。
+# 目录名用地区码(zh_CN), 而本程序的语言码是 zh, 故需一张映射表; 表里没有的语言不装载。
+_QT_LOCALE = {"zh": "zh_CN", "en": "en"}
+_QT_CATALOGS = ("qtbase", "qt")     # 基础控件 + Qt 通用文案
 
 # 核心与弹窗中无法逐个 tr() 的中文串。带 {占位符} 的是模板, 其余为精确匹配。
 # 只登记用户可见的消息; 仅进日志的中文不在此列(不翻译)。
@@ -134,10 +144,42 @@ def tr_msg(text):
     return "\n".join(out)
 
 
+def _install_qt_translations(app, lang):
+    """装载 Qt 自带翻译(按语言码换地区码), 返回装载成功的目录名列表。
+
+    与本程序的中文文案无关: 这里管的是 Qt 自己绘制/提供的文案, 例如系统原生对话框的
+    「确定 / 取消 / 查找范围 / 父目录」。核实过装载中文不会改写本程序自己的文案 ——
+    两边的 context 不重叠(core / Card / ParamRow 等均不受影响)。
+
+    中文是源语言, 本程序不需要自己的 .qm, 但 Qt 那份仍要装, 因此本函数在装中文时也调用。
+    """
+    from PySide6.QtCore import QLibraryInfo
+
+    locale = _QT_LOCALE.get(lang)
+    if not locale:
+        return []
+    base = QLibraryInfo.path(QLibraryInfo.LibraryPath.TranslationsPath)
+    loaded = []
+    for name in _QT_CATALOGS:
+        t = QTranslator(app)
+        if t.load(f"{name}_{locale}", base):
+            app.installTranslator(t)
+            _qt_translators.append(t)
+            loaded.append(f"{name}_{locale}")
+    if loaded:
+        logging.info(f"[i18n] Qt 自带翻译: {', '.join(loaded)}")
+    else:
+        logging.warning(f"[i18n] 未找到 Qt 自带翻译({locale})，Qt 绘制的文案将显示英文")
+    return loaded
+
+
 def install(app, lang):
     """按语言安装翻译器。必须在建主窗口之前调用(窗口字面量在构造时即 tr())。"""
     global _translator
-    if not lang or lang == DEFAULT_LANG:
+    lang = lang or DEFAULT_LANG
+    # Qt 自带翻译先装: 中文是源语言, 下面那段对本程序自己的翻译器会直接返回
+    _install_qt_translations(app, lang)
+    if lang == DEFAULT_LANG:
         return None
     path = os.path.join(_QM_DIR, f"xiangshuiyin_{lang}")
     if not os.path.isfile(path + ".qm"):

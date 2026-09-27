@@ -14,7 +14,8 @@ Qt 6.11 + Windows 11 下, DWM 绘制的非客户区(标题栏与边框)与客户
     所有权问题 —— `takeAt` 取出的 item 归 Python 所有, GC 时会删除布局仍在使用的
     QSpacerItem, 之后任意一次 GC 都会导致进程 abort。
 """
-from PySide6.QtCore import QCoreApplication, QEvent, QObject, Qt
+from PySide6.QtCore import QCoreApplication, QEvent, QObject, QSize, Qt
+from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import (
     QDialog, QFrame, QHBoxLayout, QLabel, QMessageBox, QPushButton, QVBoxLayout, QWidget,
 )
@@ -23,6 +24,7 @@ from . import theme
 
 DLG_PAD = theme.RADIUS_CARD    # 窗口四周留给投影的余量(= 卡片投影的模糊半径, 避免被裁)
 TITLE_H = theme.CTRL_H         # 自绘标题行的高度(与其它控件取齐)
+CLOSE_ICON = 12                # 关闭按钮素材的边长: #mini 的内边距两侧各 8px, 恰好放下 12px
 
 
 def go_frameless(dlg):
@@ -114,8 +116,12 @@ def csdify(dlg, title, recenter):
     lab.setObjectName("cardTitle")
     lay.addWidget(lab)
     lay.addStretch(1)
-    close = QPushButton("✕", bar)
+    # 关闭按钮用素材而不是文字符号 ✕(U+2715): 界面字体是内置子集, 不含该码位。
+    # 此处不借用 window._iconify(会与 window 形成循环导入), 素材仍取自 theme 的「界面图标」段。
+    close = QPushButton(bar)
     close.setObjectName("mini")
+    close.setIcon(QIcon(theme.CLOSE))
+    close.setIconSize(QSize(CLOSE_ICON, CLOSE_ICON))
     close.setFixedSize(TITLE_H, TITLE_H)
     close.setCursor(Qt.CursorShape.PointingHandCursor)
     close.setToolTip(QCoreApplication.translate("dialog", "关闭"))

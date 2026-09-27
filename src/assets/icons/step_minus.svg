@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16">
+  <!-- 数值框的减号步进按钮。替代文字符号 −(U+2212): 内置字体 Sarasa Gothic SC 是子集,
+       不含该码位。与 step_plus 同一几何(横竖各 8 单位、圆头、粗细 1.8), 两枚按钮观感一致。 -->
+  <path d="M4 8h8" fill="none" stroke="#7A756C" stroke-width="1.8" stroke-linecap="round"/>
+</svg>

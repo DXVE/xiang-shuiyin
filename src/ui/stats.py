@@ -158,7 +158,7 @@ class SessionStats:
                       f"排队 p50 {q50:.0f}/max {qmax:.0f}ms",
                       f"转图 p50 {c50:.0f}ms",
                       f"上屏缩放 p50 {s50:.0f}ms",
-                      f"请求→就绪 p50 {e50:.0f}/p95 {e95:.0f}/max {emax:.0f}ms",
+                      f"请求-->就绪 p50 {e50:.0f}/p95 {e95:.0f}/max {emax:.0f}ms",
                       f"渲染期间新增 {arrived} 次请求"]
         mh, mm, _mp = rates["蒙版"]
         th, tm, _tp = rates["缩略图"]

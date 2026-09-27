@@ -78,13 +78,33 @@ INFO = _asset("info.svg")      # 图片信息/EXIF
 RESET = _asset("reset.svg")    # 重置本组 / 刷新预览效果
 # 折叠区块的开合指示: 展开复用上方资源段的 ARROW_DOWN(与下拉框箭头同一张图), 收起用右向箭头。
 ARROW_RIGHT = _asset("arrow_right.svg")
+# 自绘标题栏弹窗的关闭按钮。原先用文字符号 ✕(U+2715), 内置字体子集不含该码位。
+CLOSE = _asset("close.svg")
+# 数值框的 ± 步进按钮: 成对出素材, 不用「字体里的加号」配「素材的减号」(见 AGENTS 的图标来源约束)。
+STEP_MINUS = _asset("step_minus.svg")
+STEP_PLUS = _asset("step_plus.svg")
+# 色块选中态的勾号: 浅底与深底各一份 —— SVG 的填充色必须写死在文件里, 不能随底色变化。
+# 勾形与 MENU_CHECK 相同(全程序只有一种勾)。
+CHIP_CHECK_DARK = _asset("chip_check_dark.svg")
+CHIP_CHECK_LIGHT = _asset("chip_check_light.svg")
+
+# ---------- 界面字体 ----------
+# 字体族优先级: 内置字体在前(随程序分发, 三个平台一致), 其后是各平台常见的中文字体,
+# 最后交给 sans-serif。Qt 按列表逐字回退, 因此列表里某款不存在时不影响其余项。
+# 内置字体是子集, 界面文案不得使用它不含的符号(✕ U+2715 / − U+2212 / ✓ U+2713 / → U+2192):
+# 这些位置改用 src/assets/icons 下的素材或 ASCII 连接符(见 AGENTS 的图标来源约束)。
+FONT_FAMILIES = ("Sarasa Gothic SC", "Microsoft YaHei UI", "Microsoft YaHei",
+                 "PingFang SC", "Hiragino Sans GB", "Noto Sans CJK SC",
+                 "Source Han Sans SC", "WenQuanYi Micro Hei", "Segoe UI")
+# QSS 的 font-family 引用同一份列表: 字体族只在这一处定义, 不在别处另写一份。
+_QSS_FAMILIES = ", ".join(f'"{name}"' for name in FONT_FAMILIES) + ", sans-serif"
 
 QSS = f"""
 /* ---------- 基础 ----------
    背景只给顶层容器; 不得使用 QWidget 通配背景, 否则子容器会各自刷一层窗口底色。 */
 QWidget {{
     color: {TEXT};
-    font-family: "Microsoft YaHei UI", "Segoe UI", sans-serif;
+    font-family: {_QSS_FAMILIES};
     font-size: 12px;
 }}
 QMainWindow, QDialog {{ background: {BG}; }}
@@ -371,20 +391,39 @@ def apply_shadow(widget, blur=12, dy=2, alpha=40):
     widget.setGraphicsEffect(eff)
 
 
+def load_bundled_fonts():
+    """把随包分发的内置字体注册给 Qt, 返回成功注册的字体 id 列表。
+
+    内置字体位于包外(见 `core.ASSETS_DIR`), 解析顺序为持久副本、打包资源、系统字体目录。
+    不注册时它们只被绘制水印的 Pillow 侧使用, 界面用不到 —— 界面字体因此会落回系统字体。
+    """
+    from PySide6.QtGui import QFontDatabase
+
+    ids = []
+    for _key, fname in core.FONT_SETTING_MAP:
+        path = core._default_font_path(fname)
+        if not path:
+            continue
+        fid = QFontDatabase.addApplicationFont(path)
+        if fid >= 0:
+            ids.append(fid)
+    return ids
+
+
 def apply_font(app):
-    """显式指定字体族并关闭栅格化对齐。
+    """注册内置字体、按优先级指定字体族, 并关闭栅格化对齐。
+
+    注册必须在建窗之前(窗口类构造时即按字体族解析), 这也是界面层唯一装配字体之处。
 
     Windows 默认使用 full hinting, 笔画被吸附到像素网格, 中文小字号边缘偏硬;
     PreferNoHinting 配合 PreferAntialias 可获得更平滑的小字号观感。
     """
-    from PySide6.QtGui import QFont, QFontDatabase
+    from PySide6.QtGui import QFont
 
-    fams = QFontDatabase.families()
+    load_bundled_fonts()
     f = QFont()
-    for name in ("Microsoft YaHei UI", "Microsoft YaHei", "Segoe UI"):
-        if name in fams:
-            f.setFamily(name)
-            break
+    # 传列表而非单族: 内置字体是子集, 子集外的字符由列表里其余字体逐字回退。
+    f.setFamilies(list(FONT_FAMILIES))
     f.setStyleStrategy(QFont.StyleStrategy.PreferAntialias)
     f.setHintingPreference(QFont.HintingPreference.PreferNoHinting)
     app.setFont(f)

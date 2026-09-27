@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 14 14">
+  <!-- 色块选中态的勾号(深色底用; 与 chip_check_dark.svg 同几何, 只换描边颜色)。
+       深浅两份的原因是 SVG 的填充色必须写死, 不能随底色变化。 -->
+  <path d="M3.4 7.4L6 10L10.6 4.4" fill="none" stroke="#FFFFFF" stroke-width="2"
+        stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

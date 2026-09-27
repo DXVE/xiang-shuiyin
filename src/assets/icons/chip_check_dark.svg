@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 14 14">
+  <!-- 色块选中态的勾号(浅色底用)。替代文字符号 ✓(U+2713): 内置字体 Sarasa Gothic SC 是子集,
+       不含该码位。勾的几何与 menu_check.svg 相同, 全程序只有一种勾形。
+       填充色必须写死在文件里 —— Qt 的 SVG 渲染不解析 currentColor, 因此深浅底各一份素材。 -->
+  <path d="M3.4 7.4L6 10L10.6 4.4" fill="none" stroke="#000000" stroke-width="2"
+        stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
