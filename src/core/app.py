@@ -49,9 +49,26 @@ PREVIEW_MAX_SIDE = 3400
 BLUR_WORK_MIN_SIDE = 400
 
 
+# 工作图边长的量化网格(px): 工作图尺寸按此对齐, 使画布尺寸的细微变化(拖间距/字号, 每次
+# 几十像素)仍落在同一网格内 —— 工作图可复用, 不必重做增强/模糊/噪声(37MP 画布下约 380ms)。
+# 代价是工作图与画布宽高比差最多一个网格(强模糊后不可辨)。
+_BLUR_WORK_STEP = 128
+
+
+def _quantize_work(v):
+    """把工作图边长对齐到 _BLUR_WORK_STEP 网格(不足一格按一格算)。"""
+    return max(_BLUR_WORK_STEP, int(round(v / _BLUR_WORK_STEP)) * _BLUR_WORK_STEP)
+
+
 # 低清增强(2 倍超采样)的触发阈值(px): 成品的增强判定与预览的像素参数缩放比例(scale2)
 # 都按这一条判据推导, 因此阈值只在这里定义一处, 两处调用同一常量。
 LOW_RES_THRESHOLD = 1500
+
+
+# "偏慢"的分界线(ms): 预览一帧超过它才算慢。核心用它决定要不要为这一帧落"渲染分段"日志
+# (分段明细本来就随 stage_out 回给界面挂在 tooltip 上, 每帧再写一行只会把日志灌满);
+# 界面用它把请求级日志降级成 WARNING —— 两侧共用这一条线, 见 ui/window.py 的 _SLOW_RENDER_MS。
+SLOW_RENDER_MS = 800
 
 
 def _oriented_height(im):
@@ -613,20 +630,24 @@ _MASK_CACHE_MAX = 3          # 只留最近几项
 _MASK_CACHE_MAX_PX = 16_000_000   # 超过约 16MP 的 mask 不缓存
                                   # 命中/未命中计数: 仅在写缓存统计日志时读取一次
 _MASK_STATS = {"hit": 0, "miss": 0}
+_MASK_SAVED_MS = [0.0]            # 命中省下的构建耗时累计(毫秒), 供界面统计显示
 
 def _cached_mask(key, build):
     with _MASK_CACHE_LOCK:
-        m = _MASK_CACHE.get(key)
-    if m is not None:
+        ent = _MASK_CACHE.get(key)
+    if ent is not None:
         _MASK_STATS["hit"] += 1
-        return m
+        _MASK_SAVED_MS[0] += ent[1]
+        return ent[0]
+    t0 = time.perf_counter()
     m = build()
+    build_ms = (time.perf_counter() - t0) * 1000
     _MASK_STATS["miss"] += 1
     if key[1] * key[2] <= _MASK_CACHE_MAX_PX:
         with _MASK_CACHE_LOCK:
             if len(_MASK_CACHE) >= _MASK_CACHE_MAX:
                 _MASK_CACHE.clear()
-            _MASK_CACHE[key] = m
+            _MASK_CACHE[key] = (m, build_ms)
     return m
 
 
@@ -643,11 +664,26 @@ _LAYER_CACHE_MAX_PX = 16_000_000    # 单层像素上限
                                     # 同时把成品全分辨率图层(约 29.9MP)排除在缓存外。
 _LAYER_CACHE_BYTES = [0]            # 当前占用(字节)
 _LAYER_CACHE_STATS = {"hit": 0, "miss": 0, "skip": 0}   # 观测用: 命中/未命中/未入缓存(层太大)
+_LAYER_CACHE_SAVED_MS = [0.0]       # 命中省下的净耗时(毫秒): 该条目上次构建耗时 - 命中本身的副本开销
 # 按线程关闭分层缓存: 批量中每张图只渲染一次, 缓存无收益且会挤掉交互预览的层。
 # 必须使用 thread-local: 批量进行时预览线程仍可能在渲染。
 _LAYER_CACHE_TLS = threading.local()
 # 预览源缩略图缓存(psrc)的命中计数
 _THUMB_STATS = {"hit": 0, "miss": 0}
+_THUMB_SAVED_MS = [0.0]             # 命中省下的生成耗时(读原图 + 缩略 + 落盘)累计(毫秒)
+
+
+def cache_saved_ms():
+    """缓存命中省下的时间(毫秒, 估算值), 供界面统计显示。
+
+    口径: 命中时按该条目**上次构建的耗时**计入; 分层缓存再扣掉命中本身的副本开销(它只在命中时发生)。
+    不入缓存的条目(层/蒙版超过单层上限)与关掉缓存的批量线程都不产生"节省"。
+    浮点自增在 GIL 下不会撕裂, 读数不加锁。
+    """
+    layer = _LAYER_CACHE_SAVED_MS[0]
+    mask = _MASK_SAVED_MS[0]
+    thumb = _THUMB_SAVED_MS[0]
+    return {"层": layer, "蒙版": mask, "缩略图": thumb, "合计": layer + mask + thumb}
 
 
 def _cache_stats_line():
@@ -696,19 +732,25 @@ def _layer_cached(key, build, mutable=False):
         if ent is not None:
             _LAYER_CACHE[key] = _LAYER_CACHE.pop(key)   # LRU: 移到末尾
             _LAYER_CACHE_STATS["hit"] += 1
-            return ent[0].copy() if mutable else ent[0]
+            t0 = time.perf_counter()
+            val = ent[0].copy() if mutable else ent[0]
+            # 省下的净耗时 = 该条目上次构建耗时 - 命中本身的副本开销(这两项都只在命中路径上可比)
+            _LAYER_CACHE_SAVED_MS[0] += ent[2] - (time.perf_counter() - t0) * 1000
+            return val
     _LAYER_CACHE_STATS["miss"] += 1
+    t0 = time.perf_counter()
     val = build()
+    build_ms = (time.perf_counter() - t0) * 1000
     try:
         px = val.size[0] * val.size[1]
     except Exception:
         px = 0
     if px and px <= _LAYER_CACHE_MAX_PX:
         with _LAYER_CACHE_LOCK:
-            _LAYER_CACHE[key] = (val, _layer_bytes(val))
+            _LAYER_CACHE[key] = (val, _layer_bytes(val), build_ms)
             _LAYER_CACHE_BYTES[0] += _LAYER_CACHE[key][1]
             while _LAYER_CACHE_BYTES[0] > _LAYER_CACHE_BUDGET and len(_LAYER_CACHE) > 1:
-                _, (_, nb) = _LAYER_CACHE.popitem(last=False)
+                _, (_v, nb, _ms) = _LAYER_CACHE.popitem(last=False)
                 _LAYER_CACHE_BYTES[0] -= nb
         # 入缓存后返回副本给会改图的调用方(缓存里那份要保持干净)
         return val.copy() if mutable else val
@@ -846,6 +888,14 @@ def _unique_output_path(out_root, stem, suffix="_watermarked.jpg"):
         dup += 1
 
 # 单张图片水印处理: 生成带 EXIF 信息水印的最终图片
+class PreviewCancelled(Exception):
+    """预览这一轮已被更新的请求取代, 在阶段边界抛出(见 process_single 的 cancel_check)。
+
+    只有预览路径传 cancel_check; 成品生成(单张/批量)不传, 因此永远不会被中断 —— 生成中的
+    图必须落盘, 半途作废会留下不完整的产物。
+    """
+
+
 def process_single(input_path, output_path, logo_dir,
                    font_path, font_bold_path, font_italic_path, font_bold_italic_path,
                    bg_color, text_color, bg_mode, blur_radius, corner_radius,
@@ -885,13 +935,21 @@ def process_single(input_path, output_path, logo_dir,
                    geom_out=None,    # 可选: 传入 dict, 填充间距段几何坐标(画布像素), 供预览叠加标注
                    image_out=None,   # 可选: 传入 list, 直接拿到画布 PIL 图而不落盘(调用方要内存图像时用)
                    stage_out=None,   # 可选: 传入 list, 回传本次渲染分段结果(供界面显示, 免读日志)
-                   stage_log=True):  # 内部参数: 是否记录渲染分段日志
+                   stage_log=True,   # 内部参数: 是否记录渲染分段日志
+                   cancel_check=None):  # 可选: 返回 True 表示"这轮已过期", 在阶段边界中止
     # ---- 分段计时: 各阶段耗时在函数结束时一次性写入一条日志 ----
     _t0 = time.monotonic()
     t_prev = _t0
     stages = []   # ["预处理 12ms", ...] 按序累积
+
+    def _check_cancel(tag):
+        """过期就抛 PreviewCancelled(只可能在预览路径触发, 见 cancel_check 说明)。"""
+        if cancel_check is not None and cancel_check():
+            raise PreviewCancelled(tag)
+
     def _stage(name):
         nonlocal t_prev
+        _check_cancel(name)
         now = time.monotonic()
         stages.append(f"{name} {(now - t_prev) * 1000:.0f}ms")
         t_prev = now
@@ -912,11 +970,15 @@ def process_single(input_path, output_path, logo_dir,
                f" 描边{int(enable_image_stroke)} 影{int(enable_image_shadow)}o{image_shadow_offset}"
                f"b{image_shadow_blur}a{image_shadow_alpha} 字描{int(enable_text_stroke)} 字影{int(enable_text_shadow)}")
         total_ms = (time.monotonic() - _t0) * 1000
-        logging.info(f"[{tag}] 渲染分段: " + ", ".join(stages)
-                     + f" | 合计 {total_ms:.0f}ms | {sig}{_cache_stats_line()}")
         if stage_out is not None:
             # 回给调用方: 界面把它放进"上一次渲染"的 tooltip, 不必去读日志文件
             stage_out.append({"tag": tag, "stages": list(stages), "total_ms": total_ms, "sig": sig})
+        # 预览帧(内存回图那条)的分段明细已经交给界面显示, 只在偏慢时留一行日志(见 SLOW_RENDER_MS);
+        # 落日志时才会去取缓存计数行, 不落日志的帧不为它付代价
+        if image_out is not None and total_ms < SLOW_RENDER_MS:
+            return
+        logging.info(f"[{tag}] 渲染分段: " + ", ".join(stages)
+                     + f" | 合计 {total_ms:.0f}ms | {sig}{_cache_stats_line()}")
 
     # 低清增强会放大该值, 参数指纹记录的是用户输入的原值
     min_font_size_in = min_font_size
@@ -1194,7 +1256,8 @@ def process_single(input_path, output_path, logo_dir,
     def _build_background():
         """背景层: 模糊模式为工作图放大后的毛玻璃, 纯色模式为纯色图。
 
-        层与画布同尺寸, 缓存键包含画布尺寸(调整间距或文字时画布变化, 本层不命中)。
+        工作图尺寸量化到 _BLUR_WORK_STEP 网格: 画布尺寸的细微变化(拖间距/字号)落在同一网格内,
+        同一张工作图可复用, 否则每改一个参数都要重做一遍增强/模糊/噪声。
         暗化不在本层执行, 见下方调用处。
         """
         if bg_mode != "blur":
@@ -1202,8 +1265,9 @@ def process_single(input_path, output_path, logo_dir,
             return Image.new("RGB", (canvas_w, canvas_h), bg_color)
 
         # 工作图取 1/4 边长(1/16 面积)以降低模糊开销; 毛玻璃为强模糊背景, 分辨率损失可忽略。
-        # 预览与成品走同一路径, 结果一致。
-        wk_w, wk_h = max(BLUR_WORK_MIN_SIDE, canvas_w // 4), max(BLUR_WORK_MIN_SIDE, canvas_h // 4)
+        # 预览与成品走同一路径, 结果一致。量化后与画布宽高比最多差一个网格, 模糊后不可辨。
+        wk_w = max(BLUR_WORK_MIN_SIDE, _quantize_work(canvas_w // 4))
+        wk_h = max(BLUR_WORK_MIN_SIDE, _quantize_work(canvas_h // 4))
         # 模糊半径按工作图比例缩放(保持相同视觉模糊程度); 下限 1px 保证始终有柔化
         wk_blur = max(1, round(blur_radius * (wk_w / canvas_w)))
 
@@ -1225,8 +1289,15 @@ def process_single(input_path, output_path, logo_dir,
             x = Image.blend(x, Image.new("RGB", (wk_w, wk_h), (250, 248, 245)), 0.22)
             return x
 
+        # 工作图构造约 380ms、放大回画布约 180ms, 是单轮里最长的两段: 各加一次过期检查,
+        # 使拖动中的旧请求能在这两段之间就让位(否则最坏要等整段跑完才响应新参数)。
+        _check_cancel("背景层")
         work = _layer_cached(("bg_work", src_key, wk_w, wk_h, wk_blur), _build_work_image)
-        return work.resize((canvas_w, canvas_h), Image.Resampling.LANCZOS).convert("RGB")
+        # 放大用 BILINEAR: 工作图已被强模糊, 放大到什么滤波器都无高频可保; 37MP 画布上比
+        # LANCZOS 省约一半时间(实测最大通道差 2/255、平均 0.004)。工作图本身是 RGB,
+        # 不需要再 convert("RGB")(那会整张复制一遍, 37MP 约 47ms)。
+        _check_cancel("背景层")
+        return work.resize((canvas_w, canvas_h), Image.Resampling.BILINEAR)
 
     # 背景层: 缓存键不含暗化参数(暗化在最后一步单独执行)。
     # mutable=True 语义见 _layer_cached: 命中返回副本、未命中返回新对象, 因此可直接在其上继续绘制。
@@ -2111,34 +2182,39 @@ class AppState:
                 ent = self._thumb_cache.get(key)
             if ent and os.path.isfile(ent[0]):
                 _THUMB_STATS["hit"] += 1
+                _THUMB_SAVED_MS[0] += ent[2]        # 省下的是"读原图 + 缩略 + 落盘"那一次
                 logging.info(f"预览: 命中缩略图缓存 {os.path.basename(ent[0])}")
-                return ent
+                return ent[0], ent[1]
         with self._thumb_gen_lock:
             if key is not None:   # 等锁期间可能已被预热线程生成好
                 with self._thumb_lock:
                     ent = self._thumb_cache.get(key)
                 if ent and os.path.isfile(ent[0]):
                     _THUMB_STATS["hit"] += 1
+                    _THUMB_SAVED_MS[0] += ent[2]
                     logging.info(f"预览: 命中缩略图缓存(等锁后) {os.path.basename(ent[0])}")
-                    return ent
+                    return ent[0], ent[1]
+            t0 = time.perf_counter()
             if src_image is not None:
                 src, src_h = self._write_preview_src(src_image, tag, max_side)
             else:
                 with Image.open(input_path) as im:
                     src, src_h = self._write_preview_src(im, tag, max_side)
+            gen_ms = (time.perf_counter() - t0) * 1000
             _THUMB_STATS["miss"] += 1
             if key is not None:
                 with self._thumb_lock:
                     if len(self._thumb_cache) > 8:   # 预览源通常就一张, 留少量最近项即可
                         self._thumb_cache.clear()
-                    self._thumb_cache[key] = (src, src_h)
+                    self._thumb_cache[key] = (src, src_h, gen_ms)
         logging.info(f"预览: 生成缩略图 {os.path.basename(src)} (src_h={src_h})")
         return src, src_h
 
 
     def _render_preview(self, input_path, params, manual_exif, raw_model, custom_model,
                         out_path, preview_scale=None, pv="", geom_out=None, src_image=None,
-                        image_out=None, stage_out=None, max_side=PREVIEW_MAX_SIDE):
+                        image_out=None, stage_out=None, max_side=PREVIEW_MAX_SIDE,
+                        cancel_check=None):
         """统一渲染入口: preview_scale 给定时先缩略输入图(实时预览), 否则原图全量(目前无调用方,
         为预览/其它入口保留); geom_out 给定时收集间距段几何(供界面预览图叠加标注);
         src_image 给定时复用它(调用方已打开的句柄); 缩略图本身有 (mtime,size) 缓存, 命中不读原图;
@@ -2171,12 +2247,15 @@ class AppState:
         return process_single(input_path, out_path,
                               manual_exif=_format_manual_exif(manual_exif),
                               geom_out=geom_out, image_out=image_out, stage_out=stage_out,
+                              cancel_check=cancel_check,
                               **params)
 
-    def make_preview(self, req):
+    def make_preview(self, req, cancel_check=None):
         """实时预览: 输入图缩略到 PREVIEW_MAX_SIDE 后渲染, 直接把画布 PIL 图回给调用方, 不落盘。
 
         需要落盘的版本走 process_single 的 _save_output。
+        cancel_check 由预览线程传入: 拖动时一旦有更新的请求在等, 本轮在阶段边界中止, 线程
+        立刻转去渲最新那一份(见 PreviewWorker)。成品生成不传, 因此不会被中断。
         """
         input_path = (req.get("input_path") or "").strip()
         if not input_path or not os.path.isfile(input_path) or not self._is_allowed_input(input_path):
@@ -2187,6 +2266,8 @@ class AppState:
         stage_out = []          # 渲染分段结果: 随 resp 回给调用方(界面 tooltip 用), 成本可忽略
         with self._render_lock:
             self._rendering_count += 1
+        # 本帧靠缓存命中省下的时间: 取渲染前后的差值(读的是已有计数器, 不是新加的计时点)
+        saved_before = cache_saved_ms()["合计"]
         try:
             # 只打开一次原图: 尺寸计算与缩略图生成共用同一句柄, 避免重复读取(网络盘尤甚)
             with Image.open(input_path) as im:
@@ -2207,7 +2288,13 @@ class AppState:
                     req.get("raw_model"), req.get("custom_model"),
                     None, preview_scale=preview_scale,
                     geom_out=geom_out, src_image=im, image_out=image_out,
-                    stage_out=stage_out, max_side=max_side)
+                    stage_out=stage_out, max_side=max_side,
+                    cancel_check=cancel_check)
+        except PreviewCancelled as e:
+            # 这一轮已过期: 不回帧、不当失败(屏上留上一张, 状态标识自会显示"渲染中"),
+            # 渲染线程随即去取待渲染槽里的最新一份。
+            logging.info(f"预览: 上一轮在「{e}」处让位给更新的请求")
+            return {"ok": False, "cancelled": True}
         except Exception as e:
             logging.error(f"预览生成失败: {e}")
             return {"ok": False, "error": f"预览生成失败: {e}"}
@@ -2216,7 +2303,11 @@ class AppState:
                 self._rendering_count -= 1
         if not success or not image_out:
             return {"ok": False, "error": "预览生成失败"}
+        # 这一帧的缓存收益: 与本帧渲染耗时并列显示, 才有"对照"的意义(累计值只会一直变大)
+        # 口径: 命中次数 × 各条目上次构建耗时。生成线程同时在跑时, 它的命中会算进来, 略有偏差。
+        hit_ms = max(0.0, cache_saved_ms()["合计"] - saved_before)
         resp = {"ok": True, "image": image_out[0],
+                "cache_hit_ms": hit_ms,
                 # 全量档(max_side=0)返回真实画布边长, 避免调用方与日志读到 0
                 "max_side": max_side or max(image_out[0].size)}
         if geom_out:

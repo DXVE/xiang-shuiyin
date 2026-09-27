@@ -20,7 +20,7 @@ from PySide6.QtGui import (QColor, QCursor, QDesktopServices, QFont, QIcon, QIma
                            QKeySequence, QPainter, QPainterPath, QPen, QPixmap, QShortcut)
 from PySide6.QtWidgets import (
     QAbstractSpinBox, QApplication, QCheckBox, QColorDialog, QComboBox, QDialog,
-    QFileDialog, QFrame, QGraphicsOpacityEffect, QGridLayout, QHBoxLayout, QLabel,
+    QDoubleSpinBox, QFileDialog, QFrame, QGraphicsOpacityEffect, QGridLayout, QHBoxLayout, QLabel,
     QLineEdit, QListWidget, QMainWindow, QMenu, QMessageBox, QProgressBar, QPushButton,
     QScrollArea, QSizePolicy, QSlider, QSpacerItem, QSpinBox, QSplitter, QStackedWidget,
     QVBoxLayout, QWidget,
@@ -148,28 +148,34 @@ PARAM_SPECS = [
          args=[("unified", QT_TRANSLATE_NOOP("ParamRow", "统一下方")), ("split_top_bottom", QT_TRANSLATE_NOOP("ParamRow", "上下分离")),
                ("split_left_right", QT_TRANSLATE_NOOP("ParamRow", "下方左右分离"))]),
 
+    # 边距卡片: 这几个百分比参数声明 decimals=1 + step=0.5 —— 数值框可输 1 位小数(0.1% 一档),
+    # ± 按钮按 0.5% 走; 其余百分比参数(缩放/浓度/暗化)仍按整数百分比, 不做小数档。
     dict(tab="font", card=QT_TRANSLATE_NOOP("Card", "边距"), key="image_margin", label=QT_TRANSLATE_NOOP("ParamRow", "图片与边框间距"), kind="pct",
-         args=(0.005, 0.05), hint=QT_TRANSLATE_NOOP("ParamRow", "1~5%，默认 1.5%（框里按整数取整显示）")),
+         args=(0.005, 0.05), decimals=1, step=0.5,
+         hint=QT_TRANSLATE_NOOP("ParamRow", "0.5~5%，默认 1.5%；可输 1 位小数，按钮按 0.5% 步进")),
     # 上下分离为镜像+居中模式：后端以等高中带保证图片垂直居中，外侧实际渲染值可大于滑块值。
     # 该档只提供两个镜像滑块，不提供 4 个独立值。
     dict(tab="font", card=QT_TRANSLATE_NOOP("Card", "边距"), key="gap_inner", label=QT_TRANSLATE_NOOP("ParamRow", "内侧间距（水印与图片间距）"), kind="pct",
-         args=(0.001, 0.20), mirror=("gap_image_top", "gap_image_bottom"),
-         hint=QT_TRANSLATE_NOOP("ParamRow", "1~20%，上下镜像同步（默认 4%，仅上下分离）"),
+         args=(0.001, 0.20), mirror=("gap_image_top", "gap_image_bottom"), decimals=1, step=0.5,
+         hint=QT_TRANSLATE_NOOP("ParamRow", "0.1~20%，上下镜像同步（默认 4%，仅上下分离）；可输 1 位小数"),
          only_if=("layout_mode", ("split_top_bottom",))),
     dict(tab="font", card=QT_TRANSLATE_NOOP("Card", "边距"), key="gap_outer", label=QT_TRANSLATE_NOOP("ParamRow", "外侧间距（水印与画布边距）"), kind="pct",
-         args=(0.001, 0.20), mirror=("gap_top", "gap_bottom"),
-         hint=QT_TRANSLATE_NOOP("ParamRow", "1~20%，上下镜像同步（默认 4%，仅上下分离）"),
+         args=(0.001, 0.20), mirror=("gap_top", "gap_bottom"), decimals=1, step=0.5,
+         hint=QT_TRANSLATE_NOOP("ParamRow", "0.1~20%，上下镜像同步（默认 4%，仅上下分离）；可输 1 位小数"),
          only_if=("layout_mode", ("split_top_bottom",))),
     # gap_image_top / gap_top 无对应控件：仅由上下分离模式下的镜像行写入，其余布局模式不使用
     # 这两个间距，故固定不显示。参数本身仍由 default_params 提供并传给 process_single。
     dict(tab="font", card=QT_TRANSLATE_NOOP("Card", "边距"), key="gap_image_bottom", label=QT_TRANSLATE_NOOP("ParamRow", "水印与图片间距"), kind="pct",
-         args=(0.001, 0.20), hint=QT_TRANSLATE_NOOP("ParamRow", "1~20%，默认 4%"),
+         args=(0.001, 0.20), decimals=1, step=0.5,
+         hint=QT_TRANSLATE_NOOP("ParamRow", "0.1~20%，默认 4%；可输 1 位小数，按钮按 0.5% 步进"),
          only_if_not=("layout_mode", ("split_top_bottom",))),
     dict(tab="font", card=QT_TRANSLATE_NOOP("Card", "边距"), key="gap_bottom", label=QT_TRANSLATE_NOOP("ParamRow", "水印与底部间距"), kind="pct",
-         args=(0.001, 0.20), hint=QT_TRANSLATE_NOOP("ParamRow", "1~20%，默认 4%"),
+         args=(0.001, 0.20), decimals=1, step=0.5,
+         hint=QT_TRANSLATE_NOOP("ParamRow", "0.1~20%，默认 4%；可输 1 位小数，按钮按 0.5% 步进"),
          only_if_not=("layout_mode", ("split_top_bottom",))),
     dict(tab="font", card=QT_TRANSLATE_NOOP("Card", "边距"), key="line_gap", label=QT_TRANSLATE_NOOP("ParamRow", "水印行间距"), kind="pct",
-         args=(0.0, 0.10), hint=QT_TRANSLATE_NOOP("ParamRow", "0~10%，默认 2%")),
+         args=(0.0, 0.10), decimals=1, step=0.5,
+         hint=QT_TRANSLATE_NOOP("ParamRow", "0~10%，默认 2%；可输 1 位小数，按钮按 0.5% 步进")),
 
     # ---------- 水印与效果 ----------
     dict(tab="effects", card=QT_TRANSLATE_NOOP("Card", "背景模式"), key="bg_mode", label=QT_TRANSLATE_NOOP("ParamRow", "背景模式"), kind="choice",
@@ -260,19 +266,22 @@ PARAM_SPECS = [
 ]
 
 _LABEL_W = 128
-# 百分比类参数(pct)内部为 0~1 的小数，显示值 = 内部值 × 100，数值框一律按整数、不带单位显示。
+# 百分比类参数(pct)内部为 0~1 的小数，显示值 = 内部值 × 100，数值框不带单位显示。
+# 声明了 decimals=1 的行(边距类)再放大 10 倍：滑块/换算用的整数是"十分位"(1.5% -> 15)，
+# 数值框按十分位的小数显示(1.5)，于是既能手输 0.1% 也要得动 ± 按钮的 0.5% 步进。
 _PCT_SCALE = 100
 
 
-def _display_range(kind, lo, hi):
+def _display_range(kind, lo, hi, decimals=0):
     """参数区间 -> 数值框/滑块的整数显示区间。
 
-    int 类原样返回；pct 类按百分比换算(0.04 -> 4)。下界向上取整：下界 0.001 取整得 0，
-    而 0 间距无意义，须取 1 以对应最低 1%。
+    int 类原样返回；pct 类按百分比换算(0.04 -> 4)，decimals=1 时再 ×10(0.015 -> 15)。
+    下界向上取整：下界 0.001 取整得 0，而 0 间距无意义，须取 1(或 0.1)以对应最低一档。
     """
     if kind != "pct":
         return int(lo), int(hi)
-    return math.ceil(lo * _PCT_SCALE - 1e-9), int(round(hi * _PCT_SCALE))
+    mult = _PCT_SCALE * (10 ** int(decimals or 0))
+    return math.ceil(lo * mult - 1e-9), int(round(hi * mult))
 
 # 持久化时剥离的键：输入/输出路径不落盘（model_map 存放于 logo_dir 下的 model_map.json）。
 _NOT_PERSISTED = {"logo_dir", "input_path", "output_path", "batch_dir", "output_dir", "model_map"}
@@ -288,7 +297,9 @@ _PREVIEW_FIT_SCALE = math.sqrt(_PREVIEW_FIT_AREA)
 # _segbar_row 据此为页签行留出右侧占位。
 _SB_W = 14
 
-# 预览显示缩放使用 PIL 的 LANCZOS（非 QPixmap.scaled(Smooth)），见 PreviewBox._scale_for_display。
+# 预览上屏缩图在渲染线程完成(见 PreviewWorker._render), 用的是 PIL 的 LANCZOS(非
+# QPixmap.scaled(Smooth)): 后者降采样是面积平均(盒式滤波), 平滑但不锐。界面只在窗口尺寸
+# 与请求时不符时回落到现场重采样(见 PreviewBox._scale_for_display), 同样是 PIL LANCZOS。
 
 # ---------- 预览状态标识 ----------
 # 标识当前预览图是否由当前参数渲染而来。各状态圆点色取自 PRESET_COLORS，不另造色号。
@@ -326,8 +337,9 @@ _WIN_W_RATIO, _WIN_H_RATIO, _WIN_EDGE = 0.8, 0.9, 100
 _SPLIT_LEFT = 0.4
 
 # 慢调用阈值(ms)：超过则把请求日志降级为 WARNING 并标注偏慢。渲染与排队一并计入，
-# 排队源于当前渲染轮次不可中断。
-_SLOW_RENDER_MS = 800
+# 排队源于上一轮让位前的剩余时间。这条线只定义在核心(见 core.SLOW_RENDER_MS)，那里还用它
+# 决定要不要为这一帧落"渲染分段"日志 —— 两处同一条线，不得各写一个数。
+_SLOW_RENDER_MS = core.SLOW_RENDER_MS
 
 # 字体样式：每行一种文字(显示 / 粗体 / 斜体 三列)
 FONT_STYLE_COLS = ("显示", "粗体", "斜体")
@@ -420,17 +432,27 @@ class ParamRow(QWidget):
                 b.clicked.connect(self._pick_font)
                 lay.addWidget(b)
 
-            else:                                   # pct / int —— 两者都按整数显示
-                # 全部参数均为整数, 故不用 QDoubleSpinBox: 不存在小数位与百分号后缀的差异
+            else:                                   # pct / int —— 整数显示; pct 可声明 decimals 走小数档
                 lo, hi = spec["args"]
-                self._disp_lo, self._disp_hi = _display_range(self.kind, lo, hi)
+                # decimals=1 的行(边距类): 显示保留 1 位小数, ± 按钮按 spec 的 step 走(当前 0.5)
+                self._decimals = int(spec.get("decimals", 0) or 0) if self.kind == "pct" else 0
+                self._step = float(spec.get("step", 1.0) or 1.0)
+                self._disp_lo, self._disp_hi = _display_range(self.kind, lo, hi, self._decimals)
                 self.slider = NoWheelSlider(Qt.Horizontal)
-                self.spin = QSpinBox()
-                # 滑块与数值框共用同一套显示单位(整数), 两边可直接同步, 无需各自换算系数
                 self.slider.setRange(self._disp_lo, self._disp_hi)
-                self.spin.setRange(self._disp_lo, self._disp_hi)
+                # 滑块与方向键的步长: 小数档为 0.1%(显示整数即十分位), 其余 1(1% / 1px)
                 self.slider.setSingleStep(1)
-                self.spin.setSingleStep(1)
+                if self._decimals:
+                    # 只有小数档用 QDoubleSpinBox: 其余参数都是整数, 混两套只会让宽度统一更难算。
+                    # ± 按钮调 stepDown/stepUp, 走的就是 singleStep, 因此按钮步进 = step。
+                    self.spin = QDoubleSpinBox()
+                    self.spin.setDecimals(self._decimals)
+                    self.spin.setRange(self._disp_lo / 10, self._disp_hi / 10)
+                    self.spin.setSingleStep(self._step)
+                else:
+                    self.spin = QSpinBox()
+                    self.spin.setRange(self._disp_lo, self._disp_hi)
+                    self.spin.setSingleStep(self._step)
                 # − / + 步进按钮: 关掉 QSpinBox 自带箭头 —— QSS 下 Qt 既不画原生箭头, 也不支持
                 # CSS 的 border 三角写法, 只能改用素材图标。
                 self.spin.setButtonSymbols(QAbstractSpinBox.ButtonSymbols.NoButtons)
@@ -483,19 +505,30 @@ class ParamRow(QWidget):
             v = max(lo, min(hi, float(v)))
             disp = max(self._disp_lo, min(self._disp_hi, self._value_to_disp(v)))
             self.slider.setValue(disp)
-            self.spin.setValue(disp)
+            self.spin.setValue(self._slider_to_spin(disp))
         self._updating = False
 
     def value(self):
         return self._value
 
     # ---- 显示值(整数) <-> 内部值 ----
-    # pct 类内部是 0~1 的小数, 差一个 ×100; int 类两者相同。
+    # pct 类内部是 0~1 的小数, 差一个 ×100(小数档再 ×10, 见 _PCT_SCALE); int 类两者相同。
     def _disp_to_value(self, disp):
-        return disp / _PCT_SCALE if self.kind == "pct" else int(disp)
+        if self.kind != "pct":
+            return int(disp)
+        return disp / (_PCT_SCALE * (10 ** self._decimals))
 
     def _value_to_disp(self, value):
-        return int(round(float(value) * _PCT_SCALE)) if self.kind == "pct" else int(value)
+        if self.kind != "pct":
+            return int(value)
+        return int(round(float(value) * _PCT_SCALE * (10 ** self._decimals)))
+
+    # 小数档: 滑块的显示整数是"十分位", 数值框是带小数的百分数 —— 两者差 10 倍
+    def _slider_to_spin(self, disp):
+        return disp / 10 if self._decimals else disp
+
+    def _spin_to_slider(self, val):
+        return int(round(val * 10)) if self._decimals else int(val)
 
     def _paint_swatch(self, color):
         """色块外观: 底色为颜色本身, 色号用对比色写在上面(浅底黑字/深底白字)。
@@ -523,17 +556,18 @@ class ParamRow(QWidget):
         if self._updating:
             return
         self._updating = True
-        self.spin.setValue(v)               # 两边同一套显示单位, 直接同步
+        self.spin.setValue(self._slider_to_spin(v))      # 小数档差 10 倍, 其余直接同步
         self._updating = False
         self.changed.emit(self.key, self._disp_to_value(v))
 
     def _from_spin(self, v):
         if self._updating:
             return
+        disp = self._spin_to_slider(v)
         self._updating = True
-        self.slider.setValue(v)
+        self.slider.setValue(disp)
         self._updating = False
-        self.changed.emit(self.key, self._disp_to_value(v))
+        self.changed.emit(self.key, self._disp_to_value(disp))
 
     # ---- 悬停: 让预览图高亮对应的间距段 ----
     # **只有一条机制**: 主窗按光标位置重算(`MainWindow._sync_gap_hover`), 由 80ms 心跳定时器驱动。
@@ -676,7 +710,7 @@ class Card(QFrame):
 
 
 def _qimage_to_pil(img: QImage):
-    """QImage -> PIL(显示缩放走 PIL, 见 PreviewBox._scale_for_display)"""
+    """QImage -> PIL(仅回落路径用: 窗口尺寸/dpr 与请求时不符时现场重采样)"""
     q = img.convertToFormat(QImage.Format.Format_RGB888)
     return Image.frombytes("RGB", (q.width(), q.height()), q.constBits().tobytes(),
                            "raw", "RGB", q.bytesPerLine())
@@ -742,15 +776,26 @@ def _rgba(hex_color, alpha):
 
 
 class PreviewBox(QWidget):
-    """预览显示区: 等比缩放居中。自绘(而非 QLabel), 为放大镜与间距几何标注提供绘制入口。"""
+    """预览显示区: 等比缩放居中。自绘(而非 QLabel), 为放大镜与间距几何标注提供绘制入口。
+
+    上屏缩放已由渲染线程完成(见 PreviewWorker._render): 本控件收到的 image 就是"请求时预览框
+    尺寸"下的位图, 绘制路径只剩 QPixmap.fromImage 与贴图 —— 37MP 画布下这一步在界面线程上
+    原本要约 400ms(转 PIL 89ms + LANCZOS 缩放 275ms + 两次 QPixmap 33ms), 拖动滑块时每次
+    新画面都会卡一下界面。
+
+    窗口被拖动缩放或换了屏(尺寸/dpr 与请求时不符)才回落到现场重采样, 见 _scale_for_display;
+    回落需要整幅画布的 PIL, 因此那一次才付 QImage->PIL 的转换。
+    """
 
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setMinimumSize(360, 300)
         self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-        self.stats = None        # 由 MainWindow 注入的 SessionStats(记录上屏缩放耗时); None 时只记日志
-        self._pix = None
-        self._pil = None
+        self._pix = None         # 已缩到上屏尺寸的位图(设备像素, 不设 dpr: 贴图按设备几何算)
+        self._src = None         # 整幅画布 QImage: 放大镜源 + 回落路径的重采样源
+        self._canvas = None      # 整幅画布尺寸(px), 算等比尺寸用
+        self._shown_for = None   # _pix 对应的可用区设备尺寸 + dpr: 相符才直接贴
+        self._pil = None         # 回落路径用(按需从 _src 转换, 见 _scale_for_display)
         self._scaled = None
         self._scaled_for = None
         self._hint = self.tr("请拖入图片，或点击「打开图片」")
@@ -759,41 +804,49 @@ class PreviewBox(QWidget):
         self._mag_pos = None   # 放大镜: 光标在控件内的位置(None=不显示)
         self.setMouseTracking(True)
 
-    def set_image(self, image: QImage):
+    def avail_dev(self):
+        """当前预览框能给出的上屏设备像素尺寸(渲染线程按同一算法缩图, 见 PreviewWorker)。"""
+        dpr = self.devicePixelRatioF()
+        avail = QSize(max(1, int(self.width() * _PREVIEW_FIT_SCALE)),
+                      max(1, int(self.height() * _PREVIEW_FIT_SCALE)))
+        return QSize(max(1, round(avail.width() * dpr)), max(1, round(avail.height() * dpr)))
+
+    def set_image(self, image: QImage, source=None, canvas=None, shown=None, shown_dpr=None):
+        """接收一帧: image 已是上屏尺寸, source 是整幅画布(放大镜与回落路径用)。
+
+        shown 为渲染线程缩图时用的可用区设备尺寸; 与本控件当前尺寸一致才 1:1 直贴。
+        """
         self._pix = QPixmap.fromImage(image)
-        self._pil = _qimage_to_pil(image)      # 显示缩放用 PIL(LANCZOS), 见 _scale_for_display
+        self._src = source if source is not None else image
+        self._canvas = tuple(canvas) if canvas else (image.width(), image.height())
+        self._shown_for = (tuple(shown), shown_dpr) if shown else None
+        self._pil = None
         self._scaled = None
         self._scaled_for = None
         self.update()
 
+    def _fit_dev(self):
+        """按整幅画布的宽高比, 在本控件可用区内等比取出的设备像素尺寸。"""
+        cw, ch = self._canvas or (1, 1)
+        return QSize(cw, ch).scaled(self.avail_dev(), Qt.AspectRatioMode.KeepAspectRatio)
 
-    def _scale_for_display(self, target):
-        """把固有源缩到 target(**逻辑**上屏尺寸), 带缓存。两件事缺一不可:
+    def _scale_for_display(self, target_dev):
+        """回落路径: 控件尺寸/dpr 与请求时不符时, 从整幅画布现场重采样。
 
-        1) 用 PIL 的 LANCZOS, 不用 QPixmap.scaled(SmoothTransformation): 后者降采样是面积
-           平均(盒式滤波), 平滑但不锐; LANCZOS 带负瓣, 缩小的同时略有锐化。两者数值差
-           约 1.6/255, 但差在高对比边缘(水印笔画、圆角)上。
-        2) **按设备像素缩**(target × devicePixelRatioF), 再 setDevicePixelRatio。只按逻辑尺寸
-           缩时, 上屏那一步 Qt 还要把整张位图放大 dpr 倍, 而该路径未开 SmoothPixmapTransform,
-           走的是**最近邻** —— 斜边、圆角、文字笔画会出现台阶。按设备像素缩则 1:1 落屏,
-           不再重采样。放大镜不走这条路径(从固有源按像素直接画, 只重采样一次)。
-
-        只在控件尺寸/画面/dpr 变化时算一次(缓存在 _scaled), 一张 4090x3526 的画布约 10~40ms。
+        用 PIL 的 LANCZOS, 不用 QPixmap.scaled(SmoothTransformation): 后者降采样是面积平均
+        (盒式滤波), 平滑但不锐; LANCZOS 带负瓣, 缩小的同时略有锐化。两者数值差约 1.6/255,
+        但差在高对比边缘(水印笔画、圆角)上。只在窗口拖动/换屏时执行, 不进逐帧路径。
         """
         dpr = self.devicePixelRatioF()
-        dev = QSize(max(1, round(target.width() * dpr)), max(1, round(target.height() * dpr)))
         t0 = time.perf_counter()
-        im = self._pil.resize((dev.width(), dev.height()), Image.LANCZOS)
+        if self._pil is None:
+            self._pil = _qimage_to_pil(self._src)      # 整幅画布转 PIL: 仅回落时付一次
+        im = self._pil.resize((target_dev.width(), target_dev.height()), Image.LANCZOS)
         pm = QPixmap.fromImage(_pil_to_qimage(im))
-        pm.setDevicePixelRatio(dpr)      # 位图是设备像素尺寸, 按逻辑坐标画才是 1:1
-        # 上屏缩放跑在 GUI 线程上(最慢可达数十毫秒), 单独记一条耗时。仅在「新画面/新尺寸」时
-        # 执行(结果缓存在 _scaled), 所以每次预览最多一行 —— 绝不进逐帧重绘路径。
         scale_ms = (time.perf_counter() - t0) * 1000
-        src = self._pil.size
-        logging.info(f"[上屏] 缩放 {src[0]}x{src[1]}-->{dev.width()}x{dev.height()} "
-                     f"dpr={dpr:g} 耗时 {scale_ms:.0f}ms (PIL LANCZOS)")
-        if self.stats is not None:
-            self.stats.add_display_scale(scale_ms)
+        logging.info(f"[上屏] 回落重采样 {self._pil.size[0]}x{self._pil.size[1]}"
+                     f"-->{target_dev.width()}x{target_dev.height()} dpr={dpr:g} "
+                     f"耗时 {scale_ms:.0f}ms (PIL LANCZOS)")
         return pm
 
     def set_geo(self, geom):
@@ -825,6 +878,9 @@ class PreviewBox(QWidget):
 
     def clear(self):
         self._pix = None
+        self._src = None
+        self._canvas = None
+        self._shown_for = None
         self._pil = None
         self._scaled = None
         self._scaled_for = None
@@ -846,23 +902,27 @@ class PreviewBox(QWidget):
             p.setPen(QColor("#9aa0a6"))
             p.drawText(self.rect(), Qt.AlignCenter, self._hint)
             return
-        # 预览位图按设备像素缩好再画(见 _scale_for_display), 绝大多数情况下是 1:1。
-        # SmoothPixmapTransform 是兜底: 缩放率非整数时 round() 会差半个像素, 开着它最多是
-        # 一次极轻的重采样, 关着(Qt 默认)就变成最近邻抽样 —— 斜边/圆角立刻起锯齿。
+        # SmoothPixmapTransform 是兜底: 目标矩形按设备像素对齐时是 1:1 拷贝, 不对齐(拖动窗口
+        # 过程中的小数位置)时开着它最多是一次极轻的重采样, 关着(Qt 默认)会变成最近邻抽样。
         p.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform, True)
-        # 可用区为预览框等比收缩到面积的 95%(见 _PREVIEW_FIT_AREA): 四边各留约 1.3% 余量
-        avail = QSize(max(1, int(self.width() * _PREVIEW_FIT_SCALE)),
-                      max(1, int(self.height() * _PREVIEW_FIT_SCALE)))
-        target = self._pix.size().scaled(avail, Qt.KeepAspectRatio)
-        # dpr 进缓存键: 移到另一块缩放率不同的屏上必须重算(否则会沿用旧 dpr 的位图)
-        key = (target, self.devicePixelRatioF())
-        if self._scaled is None or self._scaled_for != key:
-            self._scaled = self._scale_for_display(target)
-            self._scaled_for = key
-        ox = (self.width() - target.width()) // 2
-        oy = (self.height() - target.height()) // 2
-        p.drawPixmap(ox, oy, self._scaled)
-        box = QRectF(ox, oy, target.width(), target.height())
+        dpr = self.devicePixelRatioF()
+        dev = self._fit_dev()
+        # 渲染线程正是按"这个可用区尺寸"缩的图: 相符就直接贴, 不相符(窗口刚被拖动/换屏)才回落
+        if self._shown_for == ((dev.width(), dev.height()), dpr):
+            pm = self._pix
+        else:
+            # dpr 进缓存键: 移到另一块缩放率不同的屏上必须重算(否则会沿用旧 dpr 的位图)
+            key = (dev, dpr)
+            if self._scaled is None or self._scaled_for != key:
+                self._scaled = self._scale_for_display(dev)
+                self._scaled_for = key
+            pm = self._scaled
+        # 原点取整到**设备像素**: 位图不设 dpr, 由这里按设备几何给出目标矩形, 与屏幕 1:1。
+        ox = round((self.width() * dpr - pm.width()) / 2) / dpr
+        oy = round((self.height() * dpr - pm.height()) / 2) / dpr
+        p.drawPixmap(QRectF(ox, oy, pm.width() / dpr, pm.height() / dpr), pm,
+                     QRectF(0, 0, pm.width(), pm.height()))
+        box = QRectF(ox, oy, pm.width() / dpr, pm.height() / dpr)
         self._paint_geom(p, box)
         self._paint_magnifier(p, box)
 
@@ -871,11 +931,14 @@ class PreviewBox(QWidget):
 
         按**像素宽度**从固有源重采样(不是把已缩小的位图再放大), 所以边缘不虚。
         光标不在图像区域内(深色留白)时不显示: 那里没有可放大的内容。
+
+        源是整幅画布的 QImage: 只取光标附近那一小块重采样, 实测与从 QPixmap 画同样快
+        (约 0.4ms), 因此不必在界面线程为它多留一张 37MP 的 QPixmap。
         """
         pos = self._mag_pos
-        if pos is None or self._pix is None or not target.contains(pos):
+        src = self._src
+        if pos is None or src is None or not target.contains(pos):
             return
-        src = self._pix
         sw, sh = src.width(), src.height()
         dw, dh = target.width(), target.height()
         if dw <= 0 or dh <= 0 or sw <= 0 or sh <= 0:
@@ -884,7 +947,7 @@ class PreviewBox(QWidget):
         src_h = min(float(sh), MAG_H * sh / (dh * MAG_ZOOM))
         cx = (pos.x() - target.left()) / dw * sw
         cy = (pos.y() - target.top()) / dh * sh
-        # 贴边时夹住源矩形(而不是让 drawPixmap 拿到越界的源区)
+        # 贴边时夹住源矩形(而不是让 drawImage 拿到越界的源区)
         x0 = max(0.0, min(cx - src_w / 2, sw - src_w))
         y0 = max(0.0, min(cy - src_h / 2, sh - src_h))
         box = QRectF(self.width() - MAG_W - MAG_MARGIN, MAG_MARGIN, MAG_W, MAG_H)
@@ -905,7 +968,7 @@ class PreviewBox(QWidget):
         p.save()
         p.setClipPath(clip)
         p.fillRect(box, QColor("#222222"))
-        p.drawPixmap(box, src, QRectF(x0, y0, src_w, src_h))
+        p.drawImage(box, src, QRectF(x0, y0, src_w, src_h))
         p.restore()
 
         # 白色边框: 内缩半个笔宽, 否则一半压在裁剪外被切掉
@@ -2301,7 +2364,6 @@ class MainWindow(QMainWindow):
         self._stats = SessionStats(core)  # 会话统计: 界面右侧显示 + 退出时落一条汇总
         self._fit_to_screen()
         self._build_ui()
-        self._preview.stats = self._stats     # 上屏缩放的耗时也进统计(见 PreviewBox._scale_for_display)
         self._sync_visibility()
         self._mode_btns["single"].setChecked(True)
         self._sync_files_ui()
@@ -3048,8 +3110,9 @@ class MainWindow(QMainWindow):
         fm = rows[0].spin.fontMetrics()
         widest = 0
         for r in rows:
-            # 取该行可能出现的最大显示值(整数), 全表按最宽者计算
-            widest = max(widest, fm.horizontalAdvance(str(r._disp_hi)))
+            # 取该行可能出现的最大显示值(整数档是整数, 小数档是带 1 位小数的百分数), 全表按最宽者计算
+            txt = f"{r._disp_hi / 10:.1f}" if getattr(r, "_decimals", 0) else str(r._disp_hi)
+            widest = max(widest, fm.horizontalAdvance(txt))
         width = widest + 26
         for r in rows:
             r.spin.setFixedWidth(width)
@@ -3915,6 +3978,10 @@ class MainWindow(QMainWindow):
         req = self._preview_payload()
         # 身份标识随请求走, 由渲染线程原样回传: 界面据此知道"屏上这帧是哪一组参数渲的"
         req["token"] = self._preview_token()
+        # 上屏尺寸随请求走(不参与指纹): 渲染线程据此把画布直接缩到预览框要的尺寸,
+        # 界面线程就只剩贴图。窗口尺寸变了也只是下一次请求带上新尺寸, 不影响"已同步"判定。
+        dev = self._preview.avail_dev()
+        req["display"] = (dev.width(), dev.height(), self._preview.devicePixelRatioF())
         # 不防抖、不作废: 覆盖待渲染槽即可, 渲染线程每轮取最新一份
         self._preview_worker.request(req)
         self._sync_chip()
@@ -3932,15 +3999,19 @@ class MainWindow(QMainWindow):
             return
         img = resp.get("image")
         if img is not None:
-            self._preview.set_image(img)
+            self._preview.set_image(img, source=resp.get("source"), canvas=resp.get("canvas"),
+                                    shown=resp.get("display"), shown_dpr=resp.get("display_dpr"))
         # 只有**成功**才更新"屏上指纹": 失败时屏上留的是上一张, 指纹也就还该是上一帧的
         self._shown_token = resp.get("token")
         self._preview_err = None
         self._preview.set_geo(resp.get("geom"))
         e2e = (time.perf_counter() - resp.get("_req_t", time.perf_counter())) * 1000
-        # 连接符用 ASCII 的 `-->`: 箭头字符(如 U+2192)字形小于汉字且与字号不成比例, 小字号下观感异常
-        self._perf.setText(self.tr("渲染 {ms:.0f} ms · 请求 --> 显示 {e2e:.0f} ms")
-                          .format(ms=resp.get("ms", 0), e2e=e2e))
+        # 连接符用 ASCII 的 `>`: 箭头字符(如 U+2192)字形小于汉字且与字号不成比例, 小字号下观感异常
+        # 本帧耗时 + 本帧靠缓存省下的时间: 后者与渲染耗时并列才看得清"缓存帮了多少";
+        # 累计值只会一直变大, 没有对照意义(会话累计仍写在统计汇总里)
+        hit_ms = float(resp.get("cache_hit_ms") or 0.0)
+        self._perf.setText(self.tr("渲染 {ms:.0f} ms · 请求 > 显示 {e2e:.0f} ms · 缓存命中 -{hit:.0f}ms")
+                          .format(ms=resp.get("ms", 0), e2e=e2e, hit=hit_ms))
         self._finish_manual_preview(True)
 
         # ---- 请求级日志 ----
@@ -3948,12 +4019,15 @@ class MainWindow(QMainWindow):
         ms = resp.get("ms", 0.0)
         queue_ms = resp.get("queue_ms", 0.0)
         qimg_ms = resp.get("qimg_ms", 0.0)
+        scale_ms = resp.get("scale_ms", 0.0)
         arrived = resp.get("arrived_during", 0)
-        size = f"{img.width()}x{img.height()}" if img is not None else "-"
-        parts = [f"[预览] 渲染 {ms:.0f}ms (排队 {queue_ms:.0f}ms, 转图 {qimg_ms:.0f}ms)",
+        # 画布尺寸取整幅画布(resp["canvas"]): resp["image"] 已是上屏尺寸的小图
+        cw, ch = resp.get("canvas") or ((img.width(), img.height()) if img is not None else ("-", "-"))
+        size = f"{cw}x{ch}"
+        parts = [f"[预览] 渲染 {ms:.0f}ms (排队 {queue_ms:.0f}ms, 缩图 {scale_ms:.0f}ms, 转图 {qimg_ms:.0f}ms)",
                  f"画布 {size}",
                  f"档 {resp.get('max_side', '-')}",
-                 f"请求-->就绪 {e2e:.0f}ms"]
+                 f"请求 > 就绪 {e2e:.0f}ms"]
         if arrived:
             # 排队时间往往就是它造成的: 在跑的那一轮不会被中断, 新请求要等它跑完
             parts.append(f"渲染期间新增 {arrived} 次请求(上一轮不可中断, 排队主要来自这里)")
@@ -3963,9 +4037,8 @@ class MainWindow(QMainWindow):
         else:
             logging.info(line)
 
-        # 会话统计: 与界面上的 _stats 标签同一份数据源
-        self._stats.add_preview(ms=ms, queue_ms=queue_ms, qimg_ms=qimg_ms, e2e_ms=e2e,
-                                arrived=arrived)
+        # 会话统计: 与界面上的 _stats 标签同一份数据源(转图/上屏的明细只在上面那行日志里)
+        self._stats.add_preview(ms=ms, queue_ms=queue_ms, e2e_ms=e2e, arrived=arrived)
         # 上一次渲染的分段耗时挂到 tooltip: 参数改完不用去翻日志就知道时间花在哪一段
         st = resp.get("stage") or {}
         if st.get("stages"):
@@ -4195,9 +4268,11 @@ class MainWindow(QMainWindow):
         if self._save_timer.isActive():     # 防抖还没到点就关窗: 立刻落盘, 否则最后一次改动会丢
             self._save_timer.stop()
             self._save_settings_now()
-        # 退出时落一条会话汇总: 单条日志答不了"这次整体有没有退化/缓存有没有用"
+        # 退出时落一条会话汇总: 单条日志答不了"这次整体有没有退化/缓存有没有用"。
+        # 分行写(每行带 [统计] 前缀), 不用一行塞满 —— 那行已经长到没人愿意读。
         try:
-            logging.info("[统计] " + self._stats.summary_oneline())
+            for line in self._stats.summary().splitlines():
+                logging.info("[统计] " + line)
         except Exception as ex:             # noqa: BLE001 - 汇总失败不能挡住关窗
             logging.warning(f"[统计] 汇总失败: {ex}")
         self._preview_worker.stop()
