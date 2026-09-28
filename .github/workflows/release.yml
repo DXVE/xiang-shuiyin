@@ -1,0 +1,123 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    # Windows 专用：PyInstaller 与 Inno Setup 都只在 Windows 上出本项目的分发产物
+    runs-on: windows-latest
+    env:
+      # 版本号 = 触发本次发布的 v* tag（如 v1.0）。放在 job 级 env，而不是在 run 里内插
+      # ${{ github.ref_name }}：tag 含 $()/引号等字符时内插会被 shell 当代码执行，
+      # env 变量仅作数据传入。
+      # 注意：tag 只用于资产命名；程序与安装器的版本号唯一来源是 src/core/__init__.py，
+      # 由打包脚本与安装器脚本自行派生，本流程不做注入也不做校验。
+      BUILD_TAG: ${{ github.ref_name }}
+      # 目录形态打包。安装器脚本（packaging\xiangshuiyin-qt.iss）的 [Files] 与 LicenseFile
+      # 都指向 dist\xiangshuiyin-qt\，因此必须用这一形态。
+      XSY_ONEDIR: '1'
+      # 安装器产物路径（等于脚本里 OutputBaseFilename 的固定值，位于 OutputDir=..\dist）
+      INSTALLER: dist\xiangshuiyin-qt-portable.exe
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: 设置 Python
+        uses: actions/setup-python@v7
+        with:
+          # pyproject 的 requires-python>=3.10；本地 venv 也在 3.14 上跑过
+          python-version: '3.14'
+
+      - name: 安装构建依赖
+        # .[build] 是可选依赖组，内含 pyinstaller；运行依赖（PySide6-Essentials 等）随包安装。
+        # 用 -e 与仓库文档中的本地流程保持一致。
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[build]"
+
+      - name: 安装 Inno Setup
+        # 用官方发行包而非包管理器：安装路径可控、版本固定（升级即替换下面的版本号）。
+        # /PORTABLE=1 免注册表与卸载器，装完只需要其中的 ISCC.exe（命令行编译器）。
+        # 与该发行包配套的中文语言文件不在包里，脚本已改用仓库内副本（packaging\i18n\），
+        # 因此这里不需要额外步骤。
+        shell: pwsh
+        run: |
+          $exe = Join-Path $env:RUNNER_TEMP 'innosetup.exe'
+          $dir = Join-Path $env:RUNNER_TEMP 'innosetup'
+          Invoke-WebRequest -Uri 'https://github.com/jrsoftware/issrc/releases/download/is-6_7_3/innosetup-6.7.3.exe' -OutFile $exe
+          Start-Process -FilePath $exe -ArgumentList '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', '/PORTABLE=1', '/NOICONS', "/DIR=$dir" -Wait
+          if (-not (Test-Path (Join-Path $dir 'ISCC.exe'))) {
+            Write-Error 'ISCC.exe 未安装成功'
+            exit 1
+          }
+
+      - name: PyInstaller 打包（目录形态）
+        # 不传 --workpath/--distpath：安装器脚本按仓库根的 dist\ 与 build\ 定位，
+        # 改用自定义输出目录时必须同步修改 packaging\xiangshuiyin-qt.iss。
+        # 本次打包同时生成 build\version.iss（版本头文件），供下一步的安装器编译 include。
+        run: python -m PyInstaller --noconfirm packaging\xiangshuiyin-qt.spec
+
+      - name: 编译安装器
+        shell: pwsh
+        run: |
+          $iscc = Join-Path $env:RUNNER_TEMP 'innosetup\ISCC.exe'
+          & $iscc 'packaging\xiangshuiyin-qt.iss'
+          if ($LASTEXITCODE -ne 0) {
+            Write-Error "安装器编译失败（ISCC 退出码 $LASTEXITCODE）"
+            exit 1
+          }
+          if (-not (Test-Path $env:INSTALLER)) {
+            Write-Error "未生成安装器: $($env:INSTALLER)"
+            exit 1
+          }
+
+      - name: 重命名产物并列出大小
+        # 资产名带上 tag，便于用户区分版本。tag 与安装器内部版本号互不校验：
+        # 版本号唯一来源是 src/core/__init__.py，发布前请自行确认 tag 与它一致。
+        # 若确实要额外附上「单文件」形态：再跑一次不带 XSY_ONEDIR 的打包，并把
+        # dist\xiangshuiyin-qt.exe 一并加入下面的 files 列表；注意该形态无法替换 Qt 库，
+        # 只能走 LGPLv3 第 4 条 d 项 0 款（源码位置已在 licenses/Qt-Notice.txt 里给出）。
+        shell: pwsh
+        run: |
+          $dst = "dist\xiangshuiyin-qt-portable-$env:BUILD_TAG.exe"
+          Move-Item -Path $env:INSTALLER -Destination $dst -Force
+          Get-Item $dst |
+            Select-Object Name, @{N = 'Size_MB'; E = { [Math]::Round($_.Length / 1MB, 2) }}, LastWriteTime |
+            Format-Table -AutoSize
+
+      - name: 清理同名 tag 的旧 release
+        # 先删后建：重推同一 tag 时同名资产虽会被 overwrite_files（默认 true）覆盖，
+        # 但历史遗留的旧命名产物不会被覆盖，会在 release 里堆积多个产物。
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: pwsh
+        run: |
+          $tag = $env:BUILD_TAG   # 与 github.ref_name 同值；不内插进脚本以免 tag 字符被当代码执行
+          gh release view $tag --json name 2>$null | Out-Null
+          if ($LASTEXITCODE -eq 0) {
+            Write-Host "发现旧 release, 正在删除..."
+            gh release delete $tag --yes
+            if ($LASTEXITCODE -ne 0) {
+              Write-Error "删除旧 release 失败, 请检查权限或网络"
+              exit 1
+            }
+            Write-Host "已删除旧 release: $tag"
+          } else {
+            Write-Host "无旧 release ($tag), 跳过清理"
+          }
+          # gh release view 未命中时 $LASTEXITCODE 非 0, 不重置会让本步整体判失败
+          $LASTEXITCODE = 0
+
+      - name: 上传安装器到 Release
+        # 源码 zip/tar.gz 由 GitHub 自动生成（Source code），不自行打包
+        uses: softprops/action-gh-release@v3
+        with:
+          # 资产名随 tag 变化；未匹配到文件时默认静默跳过，会发布出没有产物的 release，必须显式失败
+          fail_on_unmatched_files: true
+          files: |
+            dist/xiangshuiyin-qt-portable-${{ github.ref_name }}.exe

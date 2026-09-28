@@ -1,6 +1,6 @@
 # 第三方组件与许可
 
-「镶 · 水印 Qt 版」在运行、打包与对外分发时涉及的第三方组件与许可义务如下。本文件是**索引与义务清单**，不复制各许可的全文；**对外分发时（含发给朋友、内网传播），除本文件外还必须随附各组件的版权声明与许可全文** —— 这对 LGPLv3、MIT-CMU、BSD-3-Clause 都是硬要求。
+「镶 · 水印」 水印处理工具在运行、打包与对外分发时涉及的第三方组件与许可义务如下。本文件是**索引与义务清单**，不复制各许可的全文；**对外分发时（含发给朋友、内网传播），除本文件外还必须随附各组件的版权声明与许可全文** —— 这对 LGPLv3、MIT-CMU、BSD-3-Clause 都是硬要求。
 
 ## 运行时依赖
 
@@ -18,6 +18,7 @@
 | 组件 | 版本 | 许可 | 说明 |
 |---|---|---|---|
 | **PyInstaller** | 6.22.3 | GPL-2.0-or-later + 特殊例外 | 只作构建工具，不进运行时依赖；但它的 **bootloader 会被嵌入生成的 exe**，例外条款允许用它打包非自由程序，随附其 `COPYING.txt` 更稳妥。 |
+| **Inno Setup** | 6.7.3 | Inno Setup License（正文允许任何用途，含商业应用） | 只作构建工具；但**产物（Windows 安装器）内含其安装引导程序**，属随包分发的第三方代码，其许可文本已随附于 `licenses/Inno-Setup-License.txt`。官网在下载页与编译器启动时另提示「商业使用需购买许可」，与该许可正文不完全一致，商业使用口径需自行确认。仓库内另存有官方简体中文语言文件（`packaging/i18n/ChineseSimplified.isl`），仅用于编译安装器。 |
 | **Windows VC/UCRT 运行库** | 随 Python | 微软可再分发条款 | 产物内可能含 `vcruntime140.dll` 等，按微软再分发条款随产物分发即可。 |
 
 ## 内置字体
@@ -46,7 +47,7 @@
 
 ## 分发时必须随附的文本
 
-这些文本已收在仓库根的 `licenses/`，源码分发时就在仓库里；打包时 `packaging/xiangshuiyin-qt.spec` 会在构建结束后把它们复制到 `dist/`（单文件产物的内部解包目录用户看不到，所以要放在产物**旁边**）。分发单位 = 程序 + `LICENSE` + 本文件 + `licenses/`。
+这些文本已收在仓库根的 `licenses/`，源码分发时就在仓库里；打包时 `packaging/xiangshuiyin-qt.spec` 会在构建结束后把它们复制到产物目录：单文件形态放在 exe 旁边，目录形态（安装器分发的那一形态）则随安装器装进程序目录，用户看得到。分发单位 = 程序 + `LICENSE` + 本文件 + `licenses/`（安装器装出的程序目录里已经包含这些文本）。
 
 | 文本 | 组件 | 来源 |
 |---|---|---|
@@ -56,19 +57,24 @@
 | `licenses/ExifRead-BSD-3-Clause.txt` | exifread | `.venv/Lib/site-packages/exifread-*.dist-info/licenses/LICENSE` |
 | `licenses/Python-PSF-2.0.txt` | Python 运行时 | Python 安装目录的 `LICENSE.txt` |
 | `licenses/PyInstaller-GPL-2.0-with-exception.txt` | PyInstaller | `.venv/Lib/site-packages/pyinstaller-*.dist-info/licenses/COPYING.txt` |
+| `licenses/Inno-Setup-License.txt` | Inno Setup | 构建机 Inno Setup 安装目录内的 `license.txt`（随附的是原文，仅统一行尾） |
 | `licenses/Sarasa-Gothic-OFL-1.1.txt`、`licenses/Sarasa-Gothic-NOTICE.txt` | 内置字体 | 构建时从 `src/assets/fonts/OFL.txt` 与 `NOTICE.txt` 复制（权威副本在字体目录里） |
 | `LICENSE` | 本项目 | 仓库根目录 |
 
+> Inno Setup 的许可正文允许任何用途（含商业应用），而其下载页与编译器启动时另提示「商业使用需购买许可」，两者口径不一致：本项目按其许可正文随附 `Inno-Setup-License.txt`，商业使用口径需自行确认。
+
 ## 打包形态与「可替换该库」
 
-`packaging/xiangshuiyin-qt.spec` 默认产出**单文件** exe：Qt 库被封在 exe 内、运行时解包到临时目录，用户无法替换，因此 LGPLv3 第 4 条 d 项走 **0 款**（源码位置写在 `licenses/Qt-Notice.txt`）。需要满足 1 款「可替换」时用目录模式构建：
+对外分发的形态是**安装器**（`dist\xiangshuiyin-qt-portable.exe`）：它装出的是目录形态，Qt 的 DLL 就在程序目录里、用户可以直接替换，因此走 LGPLv3 第 4 条 d 项 **1 款**（「可替换该库」）。`licenses/Qt-Notice.txt` 同时给出各组件的源码位置，作为 0 款的兜底。
+
+只做目录形态构建时（安装器的输入）：
 
 ```bat
 set XSY_ONEDIR=1
 .venv\Scripts\pyinstaller.exe packaging\xiangshuiyin-qt.spec
 ```
 
-产物变为 `dist\xiangshuiyin-qt\` 文件夹，Qt 的 DLL 就在文件夹里，可以整体替换。
+产物为 `dist\xiangshuiyin-qt\` 文件夹，Qt 的 DLL 在文件夹里，可以整体替换。默认的单文件产物把 Qt 库封在 exe 内、运行时解包到临时目录，用户无法替换，只能走 0 款，因此不作为对外分发形态。
 
 ## 已处理的依赖项
 

@@ -1,25 +1,31 @@
 # -*- mode: python ; coding: utf-8 -*-
-"""PyInstaller 打包配置（默认 onefile，无控制台）。
+"""PyInstaller 打包配置（无控制台）。
 
 `datas` 必须把 `src/assets` 放到包根目录下的 `assets/`：冻结后 `core/app.py` 以
 `_MEIPASS/assets` 定位资源。位置错误会表现为字体回退到系统字体、界面图标与关于框 logo 缺失。
 
 许可文本：`licenses/` + `LICENSE` + `THIRD_PARTY_LICENSES.md` 既打进产物内部，也在构建结束后
-被复制到 `dist/` 下（LGPLv3 第 4 条 b 项要求分发时随附 GPL 与 LGPL 全文；单文件产物内部
-解包目录用户看不到，所以必须在产物**旁边**也放一份）。字体那两份从 `src/assets/fonts/` 复制。
+被复制到产物目录（LGPLv3 第 4 条 b 项要求分发时随附 GPL 与 LGPL 全文；目录形态下这些文本随后
+由安装器装进程序目录，用户看得到）。字体那两份从 `src/assets/fonts/` 复制。
 
-构建形态：
+构建形态（对外分发用第一种）：
+    XSY_ONEDIR=1  目录形态 —— 产物是 `dist/xiangshuiyin-qt/` 文件夹，Qt 的 DLL 就在文件夹里、
+                用户可替换，满足 LGPLv3 第 4 条 d 项 1 款（"可替换该库"）。它同时是安装器脚本
+                `packaging/xiangshuiyin-qt.iss` 的输入，即对外分发的形态。
     默认        onefile —— 单个 `dist/xiangshuiyin-qt.exe`。Qt 库被封在 exe 内、运行时解包到临时
-                目录，用户无法替换，因此 LGPLv3 第 4 条 d 项走 0 款（源码位置见 licenses/Qt-Notice.txt）。
-    XSY_ONEDIR=1  目录模式 —— 产物是 `dist/xiangshuiyin-qt/` 文件夹，Qt 的 DLL 就在文件夹里、
-                用户可替换，满足 LGPLv3 第 4 条 d 项 1 款（"可替换该库"）。
+                目录，用户无法替换，因此只能走 d 项 0 款（源码位置见 licenses/Qt-Notice.txt）；
+                该形态仅用于本机快速试用，不对外分发。
+
+版本头文件：两种形态都会把 `core.__version__` 写成 `build/version.iss`，供安装器脚本 include
+（版本号唯一来源，见 AGENTS §4.2）。
 
 用法（在仓库根目录）：
     .venv\\Scripts\\python.exe -m pip install -e ".[build]"
-    .venv\\Scripts\\python.exe -m PyInstaller packaging\\xiangshuiyin-qt.spec
     set XSY_ONEDIR=1 && .venv\\Scripts\\python.exe -m PyInstaller packaging\\xiangshuiyin-qt.spec
+    .venv\\Scripts\\python.exe -m PyInstaller packaging\\xiangshuiyin-qt.spec
 """
 import os
+import re
 import shutil
 from pathlib import Path
 
@@ -27,6 +33,21 @@ ROOT = Path(SPECPATH).resolve().parent          # SPECPATH = 本文件所在目�
 # 产物目录用 PyInstaller 注入的 DISTPATH（与 --distpath 一致），取不到时回退到 <仓库根>/dist
 DIST_ROOT = Path(globals().get("DISTPATH") or (ROOT / "dist"))
 ONEDIR = os.environ.get("XSY_ONEDIR") == "1"
+
+# ---- 版本号：唯一来源是 src/core/__init__.py 的 __version__ ----
+# 这里把版本写出一份 ISPP 头文件，供安装器脚本(packaging/xiangshuiyin-qt.iss)直接 include，
+# 使「更新版本只改一处」在打包侧也成立。生成位置在 build/（已被 .gitignore 排除，不入库），
+# 每次打包覆盖写入；安装器脚本必须先于 ISCC 编译执行本脚本，否则 include 会失败。
+_APP_VER = re.search(r'^__version__\s*=\s*"([^"]+)"',
+                     (ROOT / "src" / "core" / "__init__.py").read_text(encoding="utf-8"),
+                     re.M).group(1)
+_VERSION_ISS = ROOT / "build" / "version.iss"
+_VERSION_ISS.parent.mkdir(parents=True, exist_ok=True)
+_VERSION_ISS.write_text(
+    "; 本文件由 packaging/xiangshuiyin-qt.spec 在打包时生成, 请勿手工编辑。\n"
+    "; 内容取自 src/core/__init__.py 的 __version__（版本号唯一来源）。\n"
+    '#define AppVer "%s"\n' % _APP_VER,
+    encoding="utf-8")
 
 a = Analysis(
     [str(ROOT / "main.py")],                                     # 入口

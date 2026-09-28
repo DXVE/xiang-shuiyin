@@ -4,4 +4,4 @@
 字体与图标资源位于 `src/assets/`（与包目录平级），路径见 app.ASSETS_DIR / app.BUNDLED_FONT_DIR。
 """
 
-__version__ = "1.0.0"
+__version__ = "1.0"

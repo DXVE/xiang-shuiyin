@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""镶·水印 · 主窗口。
+"""「镶 · 水印」 水印处理工具 主窗口。
 
 参数面板分三个页签（文件与美化 / 字体与画布 / 水印与效果），控件与取值范围由 PARAM_SPECS
 一张表驱动。窗口持有参数状态、预设槽位与撤销/重做栈，并负责 UI 参数到渲染内核参数契约的转换。
@@ -1250,7 +1250,7 @@ class AboutDialog(QDialog):
             v.addWidget(lb)
             v.addSpacing(18)
 
-        v.addWidget(_about_label(self.tr("「镶 · 水印」"), "aboutName", spacing=6.0))
+        v.addWidget(_about_label(self.tr("「镶 · 水印」 水印处理工具"), "aboutName", spacing=6.0))
         v.addSpacing(6)
         v.addWidget(_about_label(self.tr("一帧入画　一镶成框"), "aboutSub", spacing=2.0))
         v.addSpacing(18)
@@ -2357,7 +2357,7 @@ class MainWindow(QMainWindow):
         # 当前界面语言(启动时 main.py 已按 settings['lang'] 装好翻译器)
         self._lang = (state.settings or {}).get("lang") or i18n.DEFAULT_LANG
 
-        self.setWindowTitle(self.tr("镶 · 水印（Qt 版）"))
+        self.setWindowTitle(self.tr("「镶 · 水印」 水印处理工具"))
         self.setAcceptDrops(True)
         self._split_user_set = False     # 用户是否手动拖过分隔条(拖过就不再自动分配比例)
         self._fitted = False             # 是否已按屏幕可用区定过尺寸(见 _fit_to_screen)

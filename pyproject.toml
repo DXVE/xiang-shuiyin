@@ -4,8 +4,10 @@ build-backend = "hatchling.build"
 
 [project]
 name = "xiang-shuiyin-qt"
-version = "0.1.0"
-description = "镶·水印 · Qt6 桌面版(相机参数水印渲染)"
+# 版本号不写死在这里：唯一来源是 src/core/__init__.py 的 __version__（见 [tool.hatch.version]），
+# 使「更新版本只改一处」成立。
+dynamic = ["version"]
+description = "「镶 · 水印」 水印处理工具（Qt6 桌面版）"
 readme = "README.md"
 requires-python = ">=3.10"
 license = "MIT"
@@ -29,6 +31,11 @@ packages = ["src/core", "src/ui"]
 # 与 core/app.py 的定位规则一致(资源目录 = 包目录的上一级)。
 [tool.hatch.build.targets.wheel.force-include]
 "src/assets" = "assets"
+
+[tool.hatch.version]
+# 版本号从内核源码读取，避免在 pyproject 里再写一份（改版本只改 src/core/__init__.py）。
+path = "src/core/__init__.py"
+pattern = '__version__\s*=\s*"(?P<version>[^"]+)"'
 
 [tool.ruff]
 line-length = 100

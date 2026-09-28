@@ -281,7 +281,11 @@
 - spec 的 `datas` 有两条**必须**成立的映射：`src/assets` → 包根的 `assets/`（与内核的 `_MEIPASS/assets` 定位规则对应）、`src/ui/i18n` → `ui/i18n`（打包器只收 `.py` 模块，缺了它打包版切英文会静默回退中文）。位置错误不会报错，仅表现为字体回落、图标缺失与翻译失效。
 - 运行期只允许 `PySide6-Essentials` 范围内的模块（`QtCore` / `QtGui` / `QtWidgets` / `QtNetwork`）：**不得**引入 QtWebEngine、QtQuick 等 Addons。
 - PyInstaller 只能留在可选依赖 `build` 里：**不得**进运行时依赖。
-- **验收**：`dist/` 产物能启动、资源在位、无 Addons 依赖（打包项与因果见 wiki §3.2）。
+- **版本号只定义一处**：`core.__version__`（`src/core/__init__.py`）。`pyproject.toml` 由 `[tool.hatch.version]` 读它，安装器脚本由打包时生成的 `build/version.iss` 读它；**不得**在打包脚本、安装器脚本、文档或其它代码里另写版本字面量（升版本只改那一行）。
+- 分发形态 = **目录形态产物 + 安装器**：先以 `XSY_ONEDIR=1` 打包（产出载荷与 `build/version.iss`），再编译 `packaging/xiangshuiyin-qt.iss`。脚本按 `dist/xiangshuiyin-qt/` 与 `build/version.iss` 定位，**不得**改用自定义输出目录，也**不得**把分发退回单文件（目录形态同时是「Qt 库可替换」的前提，见 §4.4）。
+- 安装器脚本的语言文件用仓库内副本（`packaging/i18n/`）：官方安装包不捆绑简体中文，**不得**改回 `compiler:Languages\...`（干净环境会直接编译失败）。
+- 发布由 `.github/workflows/release.yml` 在打 tag 时执行：它只做打包与上传，**不得**依赖 tag 注入版本号（版本号只来自内核，tag 仅用于资产命名）。
+- **验收**：`dist/` 产物能启动、资源在位、无 Addons 依赖；安装器装完可运行、桌面快捷方式齐备、**不写开始菜单**、注册表无新增、删除程序目录与快捷方式即卸载干净；版本字面量只出现在 `src/core/__init__.py`（打包项与因果见 wiki §3.2、§3.6）。
 
 ### 4.3 字体与许可
 
@@ -296,7 +300,7 @@
 
 - `window.REPO_URL` 目前是**占位符**：没有明确指示**不得**改成某个真实仓库地址。
 - 许可文本收在仓库根 `licenses/`（GPLv3 与 LGPLv3 全文、Qt 声明与源码位置、Pillow / exifread / Python / PyInstaller 的文本）**不得**删除：LGPLv3 第 4 条 b 项要求分发时随附 **GPL 与 LGPL 两份全文**，而 PySide6 的 wheel 只带一个商业许可引用文件。spec 会在构建后把它们复制到 `dist/`，该步骤**不得**移除（单文件产物的内部解包目录用户看不到）。
-- 打包形态决定「可替换该库」走哪一款：默认单文件产物走 LGPLv3 第 4 条 d 项 **0 款**（源码位置写在 `licenses/Qt-Notice.txt`）；需要 1 款（库可替换）时用 `XSY_ONEDIR=1` 构建目录模式。**不得**在缺少源码位置说明的情况下对外分发单文件产物。
+- 打包形态决定「可替换该库」走哪一款：对外分发用安装器（装出目录形态），Qt 的 DLL 落在程序目录里、用户可替换，对应 LGPLv3 第 4 条 d 项 **1 款**；`licenses/Qt-Notice.txt` 同时给出源码位置，作为 0 款的兜底。若仍要分发单文件产物，只能走 0 款，且**不得**在缺少源码位置说明的情况下分发。
 - 运行时依赖用 `PySide6-Essentials`：**不得**改回 `PySide6` 元包（会带上用不到的 Addons，安装体积 435 MB 量级）。
 
 ## 5. 多语言
@@ -380,6 +384,7 @@
 | 多语言 | 见 §6.6 |
 | 界面字体 / 图标素材 | 界面无缺字方框；步进按钮、弹窗关闭按钮、色块勾号仍正常；常规宽度下左对齐线不变 |
 | 资源与打包 | 冻结后字体 / 界面图标 / 关于框 logo 都在；spec 的 `datas` 与内核定位规则一致；打包版切英文生效 |
+| 分发形态 | 目录形态产物能启动；安装器装完可运行、桌面快捷方式齐备、不写开始菜单、注册表无新增、删程序目录即卸载干净；版本字面量只在 `src/core/__init__.py` 出现 |
 | 内置字体 | 见 §6.5 |
 
 ## 7. 自检、工具与排障入口
@@ -397,7 +402,7 @@
 
 - 运行：仓库内 `.venv` 的 Python 执行 `main.py`（Windows 布局为 `.venv\Scripts\python.exe`）。
 - 界面截图：`tools/shot.py`（真实平台插件 + `WA_DontShowOnScreen`，产物默认写 `shots/`）。**禁止**用 `QT_QPA_PLATFORM=offscreen` 截图（字体库为空，中文渲染为方块，会将布局问题误判为字体问题）。
-- 打包：装可选依赖 `.[build]` 后 `python -m PyInstaller packaging/xiangshuiyin-qt.spec`，产物在 `dist/`。核实方式是读产物归档表确认资源与 `ui/i18n/*.qm` 在位，并把数据目录指向沙箱、写入英文设置后启动产物，读日志里的 `[i18n]` 行。
+- 打包：装可选依赖 `.[build]`。两步：`XSY_ONEDIR=1` 时 `python -m PyInstaller packaging/xiangshuiyin-qt.spec` 出目录形态载荷并生成 `build/version.iss`；再 `ISCC.exe packaging/xiangshuiyin-qt.iss` 出安装器（构建机需装 Inno Setup 6.3 或更高版本；它只作构建工具，不随产物分发）。核实方式是读产物归档表确认资源与 `ui/i18n/*.qm` 在位，并把数据目录指向沙箱、写入英文设置后启动产物，读日志里的 `[i18n]` 行；安装器另按 §4.2 的验收项核对。
 - 多语言：`tools/build_i18n.py`（演练）/ `--write`，校验 `tools/check_i18n.py`（§5）。
 
 ### 7.3 探针纪律（`tools/`，被 `.gitignore` 排除，不入库）

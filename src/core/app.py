@@ -118,7 +118,7 @@ def preset_path(slot):
 #   assets/fonts/  内置字体 Sarasa Gothic SC 四变体(子集, 随程序分发, SIL OFL 1.1;
 #                  来源与许可见 assets/fonts/NOTICE.txt、OFL.txt)
 #   assets/icons/  界面图标(SVG / ico / logo)
-# 冻结(PyInstaller onefile)后 __file__ 指向 PYZ 内的虚拟路径, 不能用于定位资源;
+# 冻结(PyInstaller)后 __file__ 指向 PYZ 内的虚拟路径, 不能用于定位资源;
 # 打包时将 src/assets 置于包根目录, 此处以 _MEIPASS 兜底。
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 _BUNDLE_ROOT = getattr(sys, "_MEIPASS", None)

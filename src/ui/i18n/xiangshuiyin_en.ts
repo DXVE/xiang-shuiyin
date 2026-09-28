@@ -10,8 +10,8 @@
         </message>
         <message>
             <location filename="../window.py" line="1253" />
-            <source>「镶 · 水印」</source>
-            <translation>「ShuiYin · Watermark」</translation>
+            <source>「镶 · 水印」 水印处理工具</source>
+            <translation>「ShuiYin · Watermark」 Watermark Tool</translation>
         </message>
         <message>
             <location filename="../window.py" line="1255" />
@@ -525,6 +525,11 @@
             <translation>Text shadow</translation>
         </message>
         <message>
+            <location filename="../window.py" line="2360" />
+            <source>「镶 · 水印」 水印处理工具</source>
+            <translation>「ShuiYin · Watermark」 Watermark Tool</translation>
+        </message>
+        <message>
             <location filename="../window.py" line="2805" />
             <source>关于</source>
             <translation>About</translation>
@@ -980,11 +985,6 @@
             <location filename="../window.py" line="4206" />
             <source>请先选择图片</source>
             <translation>Select an image first</translation>
-        </message>
-        <message>
-            <location filename="../window.py" line="2360" />
-            <source>镶 · 水印（Qt 版）</source>
-            <translation>ShuiYin · Watermark (Qt)</translation>
         </message>
         <message>
             <location filename="../window.py" line="2773" />
@@ -1891,8 +1891,8 @@
         <name>main</name>
         <message>
             <location filename="../../../main.py" line="69" />
-            <source>镶 · 水印（Qt 版）</source>
-            <translation>ShuiYin · Watermark (Qt)</translation>
+            <source>「镶 · 水印」 水印处理工具</source>
+            <translation>「ShuiYin · Watermark」 Watermark Tool</translation>
         </message>
     </context>
     <context>

@@ -1,4 +1,4 @@
-# 镶·水印 · Qt6 版 工程 Wiki
+# 「镶 · 水印」 水印处理工具 工程 Wiki
 
 > 面向维护者与深度集成者：**设计意图、接口与数据契约的事实描述、扩展点涉及哪些模块、出问题从哪里查**。
 > 本文只描述“是什么、为什么如此设计、异常时有何表现”，因此不使用祈使句式；凡是“必须 / 不要 / 改完验证什么”这类规范性条目都在 `AGENTS.md`，本文需要时只给指针。使用者视角的说明在 `README.md`。
@@ -75,7 +75,7 @@
 | `src/ui/i18n/` | 翻译源与生成物 | `xiangshuiyin_en.ts` / `.qm` |
 | `src/ui/stats.py` | 会话耗时与缓存命中统计 | `SessionStats` |
 | `src/assets/` | 两个包共用的资源（在包外，见 §3.3） | `fonts/`、`icons/` |
-| `packaging/` | 打包配置 | `xiangshuiyin-qt.spec` |
+| `packaging/` | 打包配置与安装器脚本 | `xiangshuiyin-qt.spec`、`xiangshuiyin-qt.iss`、`i18n/` |
 | `docs/` | 对外展示文档（各平台的功能差异、成因与影响） | `跨平台功能点差异.md` |
 | `tools/`、`shots/` | 本机自检脚本与截图产物（被 `.gitignore` 排除） | `shot.py`、`build_i18n.py`、`check_i18n.py`、多个 `_probe_*.py` |
 
@@ -217,13 +217,14 @@
 
 ### 3.2 打包配置项与其因果
 
-配置在 `packaging/xiangshuiyin-qt.spec`（onefile、无控制台）：
+配置在 `packaging/xiangshuiyin-qt.spec`（默认单文件、无控制台；`XSY_ONEDIR=1` 时出目录形态）：
 
 | 项 | 值 | 相关的因果 |
 |---|---|---|
 | 入口 | `main.py` | 与源码运行同一条入口链路 |
 | `pathex` | `src` | 让打包器找到 `core` / `ui` 两个包 |
 | `datas` | `src/assets` → 包根的 `assets/`；`src/ui/i18n` → `ui/i18n` | 冻结后内核按 `_MEIPASS/assets` 定位资源（§3.3）。翻译文件与资源一样不会被自动收进产物（打包器只收 `.py` 模块），该映射漏掉时界面语言切到英文会在启动日志里报“缺少翻译文件”并回退中文。**两条映射少任何一条都不会报错**，而是表现为字体回落到系统字体、界面图标与关于框 logo 缺失、切英文后仍是中文 |
+| 版本头文件 | `build/version.iss`（由 `core.__version__` 生成） | 安装器脚本 `#include` 它取版本，使版本号只有一处定义（§3.6） |
 | `console` | `False` | 窗口应用；调试时临时改 `True` 可以直接看到 traceback |
 | `icon` | 窗口图标 `.ico` | 与运行时窗口图标取自同一文件 |
 
@@ -258,7 +259,31 @@ PyInstaller 属可选依赖（`build` 组），不进运行时依赖；打包目
 `THIRD_PARTY_LICENSES.md` 是索引与义务清单（不复制各许可证全文）。它对分发提出的硬要求是：**必须随附各组件的版权声明与许可全文**；其中 LGPLv3 全文**不在** PySide6 的 wheel 里（wheel 只带一个商业许可引用文件），必须自行获取后随包。字体那一侧不需要额外动作：`OFL.txt` 与 `NOTICE.txt` 就放在 `src/assets/fonts/`，会被打包 spec 的 `datas` 一起收进产物，OFL 第 2 条的随附要求因此自动成立（`OFL.txt` 与上游 `LICENSE` 逐字符一致，保留名只有 `'Source'`）。其中两条尚未完成的义务会影响打包方式：
 
 1. 运行时依赖已从 `PySide6` 元包换成 **`PySide6-Essentials`**：本程序只用 `QtCore` / `QtGui` / `QtWidgets` / `QtNetwork`，元包会额外带上用不到的 Addons（安装体积 435 MB 量级）。
-2. 单文件产物无法替换库，因此 LGPLv3 第 4 条 d 项走 **0 款**：`licenses/Qt-Notice.txt` 里写明所用版本与源码位置。要满足 1 款（可替换）时用 `XSY_ONEDIR=1` 构建目录模式，Qt 的 DLL 就落在产物文件夹里。
+2. 可替换性由**分发形态**决定：对外分发用安装器（装出目录形态），Qt 的 DLL 落在程序目录里、用户可替换，因此第 4 条 d 项走 **1 款**；`licenses/Qt-Notice.txt` 同时给出源码位置，作为 0 款的兜底。若另外分发单文件产物，则只能走 0 款。
+
+### 3.6 分发形态与版本号来源
+
+对外分发走**两段式**，两个工具各管一件事：
+
+| 阶段 | 工具 | 产出 | 它为什么不可省 |
+|---|---|---|---|
+| 一 | PyInstaller（`XSY_ONEDIR=1`） | `dist\xiangshuiyin-qt\` 目录形态载荷，以及版本头文件 `build\version.iss` | 把解释器、Qt 库、字体与资源做成「目标机器不装 Python 也能跑」的运行时 |
+| 二 | Inno Setup 的 `ISCC` | `dist\xiangshuiyin-qt-portable.exe` | 把载荷封成安装器：可选安装位置、桌面快捷方式、中英向导 |
+
+分发物是**安装器**而不是单文件 exe，原因有两条：安装器装出的是目录形态，日常启动直接运行安装目录里的程序，没有单文件形态「每次启动解压到临时目录」的空档；同时 Qt 的 DLL 摊在程序目录里、可以被替换，对应 LGPLv3 第 4 条 d 项 1 款（§3.5）。
+
+安装器的行为取舍集中在脚本头部（`packaging\xiangshuiyin-qt.iss`）：免管理员、默认装到数据根目录下的 `app` 子目录、不装卸载器、不写注册表，因此卸载就是删除程序目录与两条快捷方式。脚本里的中文语言文件是仓库内副本（`packaging/i18n/`），因为官方安装包并不捆绑简体中文。
+
+**版本号只有一处定义**：`src/core/__init__.py` 的 `__version__`。其余位置都由它派生：
+
+| 位置 | 派生方式 |
+|---|---|
+| `pyproject.toml` | `[tool.hatch.version]` 从源码读出 `__version__` |
+| `build\version.iss` | 打包时由 spec 生成，内容是一行 `#define AppVer "…"` |
+| 安装器脚本 | `#include` 上面的头文件；向导标题、文件属性与产品版本都用 `{#AppVer}` |
+| 界面与日志 | 关于弹窗显示 `v{__version__}`、启动日志写 `v{__version__}`（`v` 前缀由显示处拼） |
+
+因此升版本只需要改那一行。发布工作流（`.github/workflows/release.yml`）在打 tag 时执行，它只做打包与上传，不注入也不校验版本号，tag 仅用于资产命名。
 
 ---
 
@@ -886,4 +911,5 @@ QTranslator 装配（早于主窗口创建）
 | 单实例协议 | `src/ui/single.py` |
 | 翻译装配与消息模板 | `src/ui/i18n.py` |
 | 会话统计 | `src/ui/stats.py` |
-| 打包资源映射 | `packaging/xiangshuiyin-qt.spec`、`pyproject.toml` |
+| 打包资源映射 | `packaging/xiangshuiyin-qt.spec`、`packaging/xiangshuiyin-qt.iss`、`pyproject.toml` |
+| 版本号来源 | `src/core/__init__.py` 的 `__version__`（派生链见 §3.6） |

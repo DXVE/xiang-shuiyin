@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""镶·水印 · 入口。
+"""「镶 · 水印」 水印处理工具 入口。
 
 用法: .venv\\Scripts\\python.exe main.py
 
@@ -66,7 +66,7 @@ def main():
         _say("[启动] 程序已在运行，已激活已有窗口；本次启动退出")
         return 0
 
-    app.setApplicationName(QCoreApplication.translate("main", "镶 · 水印（Qt 版）"))
+    app.setApplicationName(QCoreApplication.translate("main", "「镶 · 水印」 水印处理工具"))
     theme.apply_font(app)
     theme.apply_palette(app)          # 主题与调色板定义见 ui/theme.py
     icon = os.path.join(core.ICONS_DIR, "exif-watermark-icon.ico")
@@ -98,7 +98,7 @@ def _log_environment(win):
 
     from PySide6 import __version__ as pyside_version
 
-    logging.info(f"[环境] 版本 {app_version} | Python {platform.python_version()} | "
+    logging.info(f"[环境] 版本 v{app_version} | Python {platform.python_version()} | "
                  f"PySide6 {pyside_version} | {platform.system()}-{platform.release()}-{platform.version()}")
     # 实现版本标记行: 用于确认当前运行的是哪一份行为(见 README「已知事项」)
     logging.info("[环境] 悬停判据=光标位置复核(ParamRow) | 界面图标=SVG")

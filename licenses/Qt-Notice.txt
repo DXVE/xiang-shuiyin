@@ -25,12 +25,13 @@ components from the locations above, or by asking whoever distributed the copy.
 
 Replaceability (LGPLv3 section 4(d)(1))
 ---------------------------------------
-  The ready-made Windows build is a single-file executable: the Qt libraries are
-  packed inside it and unpacked to a temporary directory at run time, so end
-  users cannot replace those libraries in place. That is why the source
-  availability above is the mechanism used to satisfy section 4(d). To produce a
-  build whose Qt libraries sit in a normal folder and can be swapped, build with
-  `XSY_ONEDIR=1` (see `packaging/xiangshuiyin-qt.spec`).
+  The distributed Windows build is an installer that lays out a normal folder:
+  the Qt libraries sit next to the application and can be replaced in place by
+  the end user, which is the mechanism of section 4(d)(1). The source
+  availability stated above remains available as the fallback of section
+  4(d)(0). A build that packs the Qt libraries inside a single-file executable
+  cannot be replaced in place and would therefore rely on the source
+  availability alone.
 
 Qt's own notices
 ----------------
@@ -43,6 +44,7 @@ Qt's own notices
 --------
   本程序使用 PySide6（Qt for Python）与 shiboken6 6.11.2，其绑定与随附的 Qt 库以
   LGPLv3 授权（上游同时提供 GPL 与商业许可，本项目取 LGPLv3 一支）。本目录的
-  `LGPL-3.0.txt` 与 `GPL-3.0.txt` 即 LGPLv3 第 4 条 b 项所要求随附的文本；上面列出的
-  源码地址对应第 4 条 d 项 0 款「提供对应源码」。单文件产物无法替换库，因此走的是
-  0 款而非 1 款；需要「可替换库」的分发形态时用 `XSY_ONEDIR=1` 构建目录模式。
+  `LGPL-3.0.txt` 与 `GPL-3.0.txt` 即 LGPLv3 第 4 条 b 项所要求随附的文本。对外分发的
+  Windows 产物是安装器，装出的是常规目录：Qt 的库就在程序目录里、用户可原地替换，
+  对应第 4 条 d 项 1 款；上面列出的源码地址对应 0 款，作为兜底。把 Qt 库封进单文件
+  可执行程序的形态无法原地替换，只能依赖源码地址那一条。
