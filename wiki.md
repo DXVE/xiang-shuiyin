@@ -179,7 +179,7 @@
 | JSON 与路径工具 | `ensure_dir` / `open_path` / `_load_json` / `_save_json`（原子写） |
 | 设置与字体路径 | `load_settings` / `save_settings` / `FONT_SETTING_MAP` / `_ensure_persistent_fonts` / `_repair_font_paths` / `_default_font_path` |
 | EXIF | `_read_exif_exifread`（主）/ `_read_exif_pillow`（兜底）/ `get_exif_data_from_path` / `exposure_to_str` / `aperture_to_str` / `iso_to_str` |
-| 型号与 Logo | `prettify_model` / `find_logo` / `load_special_image` / `load_logo` |
+| 型号与 Logo | `prettify_model` / `find_logo` / `load_logo` |
 | 绘制原语 | `draw_text` / `get_text_height` / `_shadow_offset` / `_strip_orientation` |
 | 形状与蒙版 | `_rounded_rect_vertices` / `_circle_vertices` / `round_corners` / `round_image_circle` / `_cached_mask` |
 | 缓存 | `_layer_cached` / `_src_key` / `_cache_stats_line` 与几个计数器字典 |
@@ -382,7 +382,7 @@ PyInstaller 属可选依赖（`build` 组），不进运行时依赖；打包目
 
 ### 4.8 文字水印
 
-- 行内容：品牌（EXIF 的 make，缺失时显示 `UNKNOWN`，可被 `special/` 下的图替换）、型号（经型号映射美化）、参数行（快门 / 光圈 / ISO，三项都缺时整行显示 `NO EXIF DATA`）；勾选「自定义水印信息」时这三项改用手工值，且对批量同样生效。
+- 行内容：品牌（EXIF 的 make，缺失时显示 `UNKNOWN`，`logos/` 下有匹配图时改用图片）、型号（经型号映射美化）、参数行（快门 / 光圈 / ISO，三项都缺时整行显示 `NO EXIF DATA`）；勾选「自定义水印信息」时这三项改用手工值，且对批量同样生效。
 - 字号由图片高推导并受最小字号约束；品牌 / 型号 / 参数三组各自有缩放与粗斜体开关，因此同一套字体文件按四种字重组合分别加载（`_load_font`，含路径失效时的兜底顺序）。
 - 绘制入口是 `draw_text`，一次调用同时处理描边与阴影：描边交给 Pillow 原生参数（单次调用，不是逐像素偏移）；阴影方向同图片阴影，并**强制一个最小模糊半径**：大字号行的实心硬边看起来像被裁断。
 - **阴影限高**：多行时把每行的阴影裁剪到下一行上边界（最后一行不裁），否则上一行的晕影会压到下一行文字上，看起来像被截断。
@@ -680,7 +680,7 @@ _on_rendered()           成功：上图 + 记录屏上指纹 + 更新耗时文�
 | `DATA_DIR/presets/presets<槽位>.json` | 预设，一槽一文件；槽位数 `MAX_PRESET_SLOTS` | `_save_json` |
 | `DATA_DIR/presets/presets.json` | 旧格式，仅用于一次性迁移 | 迁移后改名为 `.migrated` |
 | `DEFAULT_LOGO_DIR/model_map.json` | 型号美化映射（按 Logo 目录维护） | `_save_json` |
-| `DEFAULT_LOGO_DIR/` | 品牌 logo 素材（用户自备）与可选 `special/` 目录 | 用户维护 |
+| `DEFAULT_LOGO_DIR/` | 品牌 logo 素材（用户自备，按文件名匹配品牌） | 用户维护 |
 | `PERSISTENT_FONT_DIR/` | 内置字体的持久副本 | 启动时按文件大小判断是否需要更新 |
 | `LOG_DIR/log-<启动时刻>.log` | 每次启动一份，保留最近几份 | 日志配置 |
 | `PREVIEW_DIR/` | 预览缩略图与批量临时输出 | 内核写；退出时整目录清空 |

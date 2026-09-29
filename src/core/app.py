@@ -488,22 +488,6 @@ def find_logo(logo_dir, make):
     candidates.sort()
     return candidates[0][1]
 
-# 加载 special 目录下的特殊图(如品牌 Logo 文字图), 统一转为 RGBA
-def load_special_image(special_dir, name):
-    if not os.path.isdir(special_dir):
-        return None
-    for fname in os.listdir(special_dir):
-        path = os.path.join(special_dir, fname)
-        if not os.path.isfile(path):
-            continue
-        stem = os.path.splitext(fname)[0]
-        if stem == name:
-            try:
-                return Image.open(path).convert("RGBA")
-            except Exception:
-                return None
-    return None
-
 def load_logo(path, max_height):
     try:
         img = Image.open(path).convert("RGBA")
@@ -1042,20 +1026,12 @@ def process_single(input_path, output_path, logo_dir,
     font_params = _load_font(font_size_params, bold_params, italic_params,
                              font_path, font_bold_path, font_italic_path, font_bold_italic_path)
 
-    special_dir = os.path.join(logo_dir, "special")
     lines = []
 
     if show_brand:
         make = (manual_exif.get("make") if manual_exif else None) or exif.get("make")
         brand_text = make if make else "UNKNOWN"
-        brand_special_img = load_special_image(special_dir, brand_text) if make else None
-        if brand_special_img:
-            max_h = int(temp_base * 0.45 * scale_logo)
-            ratio = max_h / brand_special_img.height
-            new_w = int(brand_special_img.width * ratio)
-            img = brand_special_img.resize((new_w, max_h), Image.Resampling.LANCZOS)
-            lines.append(("logo", img, None, img.height))
-        elif make:
+        if make:
             logo_file = find_logo(logo_dir, make)
             if logo_file:
                 logo_max_h = int(temp_base * 0.45 * scale_logo)
@@ -1077,21 +1053,11 @@ def process_single(input_path, output_path, logo_dir,
         manual_model = (manual_exif.get("model") if manual_exif else None)
         if manual_model:
             model_disp = manual_model   # 自定义水印信息最高，直接使用不再映射美化
-            has_model = True
         else:
             model_raw = exif.get("model")
             model_disp = prettify_model(model_raw, model_map) if model_raw else "UNKNOWN MODEL"
-            has_model = bool(model_raw)
-        model_special_img = load_special_image(special_dir, model_disp) if has_model else None
-        if model_special_img:
-            max_h = int(temp_base * 0.45 * scale_model)
-            ratio = max_h / model_special_img.height
-            new_w = int(model_special_img.width * ratio)
-            img = model_special_img.resize((new_w, max_h), Image.Resampling.LANCZOS)
-            lines.append(("logo", img, None, img.height))
-        else:
-            h = get_text_height(font_model, model_disp)
-            lines.append(("text", model_disp, font_model, h))
+        h = get_text_height(font_model, model_disp)
+        lines.append(("text", model_disp, font_model, h))
 
     if show_params:
         if manual_exif and any([manual_exif.get(k) for k in ("exposure", "fnumber", "iso")]):
