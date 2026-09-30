@@ -4,8 +4,6 @@ build-backend = "hatchling.build"
 
 [project]
 name = "xiang-shuiyin-qt"
-# 版本号不写死在这里：唯一来源是 src/core/__init__.py 的 __version__（见 [tool.hatch.version]），
-# 使「更新版本只改一处」成立。
 dynamic = ["version"]
 description = "「镶 · 水印」 水印处理工具（Qt6 桌面版）"
 readme = "README.md"
@@ -14,8 +12,6 @@ license = "MIT"
 dependencies = [
     "Pillow>=10.0",
     "exifread>=3.0",
-    # 运行时只用到 QtCore/QtGui/QtWidgets/QtNetwork, 都在 PySide6-Essentials 内;
-    # 不依赖 PySide6 元包(它会带上用不到的 Addons, 体积远超本程序所需)。
     "PySide6-Essentials>=6.11",
 ]
 
@@ -27,13 +23,10 @@ build = [
 [tool.hatch.build.targets.wheel]
 packages = ["src/core", "src/ui"]
 
-# 资源在包外(src/assets), 构建产物中必须显式搬入: 装成 <site-packages>/assets,
-# 与 core/config.py 的定位规则一致(资源目录 = 包目录的上一级)。
 [tool.hatch.build.targets.wheel.force-include]
 "src/assets" = "assets"
 
 [tool.hatch.version]
-# 版本号从内核源码读取，避免在 pyproject 里再写一份（改版本只改 src/core/__init__.py）。
 path = "src/core/__init__.py"
 pattern = '__version__\s*=\s*"(?P<version>[^"]+)"'
 
