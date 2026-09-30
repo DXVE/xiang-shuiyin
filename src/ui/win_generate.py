@@ -1,6 +1,6 @@
 """生成任务与结果事件: 启动生成、消费内核事件、一次性提示。"""
 from PySide6.QtWidgets import QMessageBox
-from core import app as core
+from core.paths import open_path
 from . import i18n
 from .dialogs.base import _message
 from .specs import backend_params
@@ -71,7 +71,7 @@ class GenerateMixin:
                 out_dir = ev.get("out_dir") or self._output_dir
                 self._notify(self.tr("已完成：{msg}").format(msg=i18n.tr_msg(msg)))
                 if out_dir:
-                    core.open_path(out_dir)     # 完成后打开输出目录
+                    open_path(out_dir)     # 完成后打开输出目录
             else:
                 _message(self, QMessageBox.Icon.Warning, self.tr("处理结果"),
                                          msg or self.tr("处理失败"))

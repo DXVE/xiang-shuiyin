@@ -2,7 +2,7 @@
 from PIL import Image as _Image
 from PySide6.QtCore import QT_TRANSLATE_NOOP
 from PySide6.QtWidgets import QDialog, QGridLayout, QLabel, QVBoxLayout
-from core import app as core
+from core.exif import aperture_to_str, exposure_to_str, get_exif_data_from_path, iso_to_str
 from datetime import datetime
 from .. import theme
 from ..dialog import csdify, dlg_button, dlg_button_row, go_frameless
@@ -94,15 +94,15 @@ class ImageInfoDialog(QDialog):
         except Exception:                       # noqa: BLE001 - 读不出尺寸不影响看其它项
             pass
         try:
-            ex = core.get_exif_data_from_path(path) or {}
+            ex = get_exif_data_from_path(path) or {}
         except Exception:                       # noqa: BLE001
             ex = {}
         out["photo"] = {
             "make": (ex.get("make") or "").strip(),
             "model": (ex.get("model") or "").strip(),
-            "exposure": core.exposure_to_str(ex.get("exposure_time"), ex.get("exposure_num"),
+            "exposure": exposure_to_str(ex.get("exposure_time"), ex.get("exposure_num"),
                                             ex.get("exposure_den")),
-            "fnumber": core.aperture_to_str(ex.get("fnumber")),
-            "iso": core.iso_to_str(ex.get("iso")),
+            "fnumber": aperture_to_str(ex.get("fnumber")),
+            "iso": iso_to_str(ex.get("iso")),
         }
         return out

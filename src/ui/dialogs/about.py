@@ -3,7 +3,8 @@ from PySide6 import __version__ as pyside_version
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QFont, QPixmap
 from PySide6.QtWidgets import QDialog, QLabel, QVBoxLayout
-from core import __version__ as app_version, app as core
+from core import __version__ as app_version
+from core.config import BASE_DIR, ICONS_DIR
 from .. import theme
 from ..dialog import csdify, dlg_button, dlg_button_row, go_frameless
 from .base import _DLG_PAD, _prep_dialog
@@ -19,7 +20,7 @@ _ABOUT_ICON = 20            # 「关于」弹窗里 GitHub 标识的显示边长
 
 def _about_logo(size, dpr=1.0):
     # 关于框顶部的 logo: 按设备像素缩放, 避免 Qt 再缩放一次; 素材缺失时返回 None
-    path = os.path.join(core.ICONS_DIR, "exif-watermark-logo-1024.png")
+    path = os.path.join(ICONS_DIR, "exif-watermark-logo-1024.png")
     pm = QPixmap(path)
     if pm.isNull():
         return None
@@ -78,7 +79,7 @@ class AboutDialog(QDialog):
         v.addWidget(_about_label(f"{platform.system()} {platform.release()} · {build}",
                                  "aboutInfo"))
         v.addSpacing(8)
-        v.addWidget(_about_label(self.tr("数据目录：{path}").format(path=core.BASE_DIR),
+        v.addWidget(_about_label(self.tr("数据目录：{path}").format(path=BASE_DIR),
                                  "aboutInfo"))
         v.addSpacing(4)
         v.addWidget(_about_label(self.tr("本次会话统计：{stats}").format(

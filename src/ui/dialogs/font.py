@@ -1,6 +1,6 @@
 """「字体文件」弹窗: 四个字重槽位各自选择与重置。"""
 from PySide6.QtWidgets import QDialog, QLabel, QVBoxLayout
-from core import app as core
+from core.params import default_params
 from ..dialog import csdify, dlg_button, dlg_button_row, go_frameless
 from .base import _prep_dialog
 from ..specs import PARAM_SPECS
@@ -41,7 +41,7 @@ class FontDialog(QDialog):
         # 四个路径恢复出厂默认, 整批计入撤销的一步
         # 须直接改 _params 并回填控件: 走 _on_param 会自开撤销事务, 把整批一步拆成四步
         win = self.parent()
-        defaults = core.default_params()
+        defaults = default_params()
         keys = list(self._rows)
 
         def _do():

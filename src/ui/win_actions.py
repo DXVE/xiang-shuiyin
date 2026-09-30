@@ -2,7 +2,8 @@
 from PySide6.QtCore import QUrl
 from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import QApplication, QMessageBox
-from core import app as core
+from core.config import DATA_DIR, DEFAULT_LOGO_DIR, LOG_DIR
+from core.exif import prettify_model
 from .dialogs.about import AboutDialog
 from .dialogs.base import _message, _open_and_report
 from .dialogs.color import ColorDialog
@@ -46,10 +47,10 @@ class ActionMixin:
         AboutDialog(self).exec()
 
     def _open_log_dir(self):
-        _open_and_report(self, core.LOG_DIR, "日志目录")
+        _open_and_report(self, LOG_DIR, "日志目录")
 
     def _open_data_dir(self):
-        _open_and_report(self, core.DATA_DIR, "数据目录")
+        _open_and_report(self, DATA_DIR, "数据目录")
 
     def _show_image_info(self):
         # 「图片信息」弹窗: 文件信息 + 照片自己的 EXIF(如实报告, 不推算最后会印成什么)
@@ -69,7 +70,7 @@ class ActionMixin:
             name = self._custom_model
         else:
             try:
-                name = core.prettify_model(raw, self._params.get("model_map") or {})
+                name = prettify_model(raw, self._params.get("model_map") or {})
             except Exception:
                 name = raw
         self._effective_model = name or ""
@@ -90,7 +91,7 @@ class ActionMixin:
 
     def _open_logo_dir(self):
         # 「打开目录」: 在资源管理器中打开 Logo 目录(该目录不会自动创建, 首次点击时先建再开)
-        path = self._params.get("logo_dir") or core.DEFAULT_LOGO_DIR
+        path = self._params.get("logo_dir") or DEFAULT_LOGO_DIR
         try:
             os.makedirs(path, exist_ok=True)        # 已存在时不报错
         except Exception as e:                      # noqa: BLE001 - 建不出来就退化成"报一句"

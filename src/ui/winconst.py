@@ -1,12 +1,12 @@
 """主窗常量: 布局节奏、预设槽位、撤销上限与运行期阈值。"""
 from PySide6.QtCore import QT_TRANSLATE_NOOP
-from core import app as core
+from core.config import MAX_PRESET_SLOTS, SLOW_RENDER_MS
 
 # 间距标注的心跳周期(ms): 周期过短会持续唤醒事件循环, 过长则响应迟滞
 _HOVER_POLL_MS = 80
 
 # 槽位 1..10, 每槽一个文件(presets1..10): 文件名只承载槽位号, 回避非法字符与重名
-_PRESET_SLOTS = core.MAX_PRESET_SLOTS
+_PRESET_SLOTS = MAX_PRESET_SLOTS
 # 预设中的绝对路径键：本机存储时保留（同机存取可还原字体），仅在导出时剥离，使导出文件与机器无关。
 _PRESET_MACHINE_KEYS = ("logo_dir", "font_path", "font_bold_path",
                         "font_italic_path", "font_bold_italic_path")
@@ -33,8 +33,8 @@ _WIN_W_RATIO, _WIN_H_RATIO, _WIN_EDGE = 0.8, 0.9, 100
 # 左列占比(左 4 : 右 6)。窗口缩放时按此比例重排; 用户手动拖过分隔条后不再自动分配。
 _SPLIT_LEFT = 0.4
 
-# 慢调用阈值(ms): 超过则把请求日志降级为 WARNING; 这条线只定义在核心(core.SLOW_RENDER_MS), 两处不得各写一个数
-_SLOW_RENDER_MS = core.SLOW_RENDER_MS
+# 慢调用阈值(ms): 超过则把请求日志降级为 WARNING; 这条线只定义在核心(SLOW_RENDER_MS), 两处不得各写一个数
+_SLOW_RENDER_MS = SLOW_RENDER_MS
 
 # 字体样式：每行一种文字(显示 / 粗体 / 斜体 三列)
 FONT_STYLE_COLS = ("显示", "粗体", "斜体")

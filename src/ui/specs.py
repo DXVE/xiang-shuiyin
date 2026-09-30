@@ -1,11 +1,11 @@
 """参数表与内核参数契约: 页签、卡片、控件与默认值的唯一数据源。"""
 from PySide6.QtCore import QT_TRANSLATE_NOOP
-from core import app as core
+from core.pipeline import process_single
 import inspect
 
 
 # process_single 实际接受的形参名 —— backend_params() 据此过滤 UI 侧参数
-_BACKEND_KEYS = set(inspect.signature(core.process_single).parameters)
+_BACKEND_KEYS = set(inspect.signature(process_single).parameters)
 
 
 # canvas_ratio_mode 是 UI 侧概念，后端只接受数值型 canvas_ratio

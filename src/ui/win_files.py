@@ -1,5 +1,5 @@
 """文件与拖放: 选图、输出目录、批量目录、拖放事件与模式切换。"""
-from core import app as core
+from core.jobs import _list_images_in_dir
 from .dialogs.base import _open_dir_dialog, _open_file_dialog
 import os
 
@@ -34,7 +34,7 @@ class FilesMixin:
             self._load_batch_dir(folder)
 
     def _load_batch_dir(self, folder):
-        cand = core._list_images_in_dir(folder, recursive=self._batch_recursive)
+        cand = _list_images_in_dir(folder, recursive=self._batch_recursive)
         images = [p for p in cand if self.state._sniff_image_type(p)]
         if not images:
             self._notify(self.tr("所选目录里没有受支持的图片")

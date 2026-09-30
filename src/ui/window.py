@@ -25,8 +25,8 @@ from PySide6.QtWidgets import (
 
 from PIL import Image
 
-from core import app as core
 
+from core import cache
 from . import i18n, single, theme
 from .dialog import MessageDialog, csdify, dlg_button, dlg_button_row, go_frameless
 from .render import EventWatcher, PreviewWorker, _pil_to_qimage
@@ -95,7 +95,7 @@ class MainWindow(BuildMixin, UndoVisibilityMixin, PresetMixin, PreviewMixin, Fil
         self.setAcceptDrops(True)
         self._split_user_set = False     # 用户是否手动拖过分隔条(拖过就不再自动分配比例)
         self._fitted = False             # 是否已按屏幕可用区定过尺寸(见 _fit_to_screen)
-        self._stats = SessionStats(core)  # 会话统计: 界面右侧显示 + 退出时落一条汇总
+        self._stats = SessionStats(cache)  # 会话统计: 界面右侧显示 + 退出时落一条汇总
         self._fit_to_screen()
         self._build_ui()
         self._sync_visibility()

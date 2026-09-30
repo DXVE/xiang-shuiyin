@@ -25,7 +25,9 @@ os.environ.setdefault("XSY_PREVIEW_DIR",
                       os.path.join(tempfile.gettempdir(), "XiangShuiyin_preview_qt"))
 
 from core import __version__ as app_version   # noqa: E402
-from core import app as core  # noqa: E402
+from core.config import (BASE_DIR, ICONS_DIR, LOG_DIR, LOG_FILE, LOG_TIMESTAMP, PREVIEW_DIR,
+                         PREVIEW_MAX_SIDE, SETTINGS_FILE, _LAYER_CACHE_BUDGET, _LAYER_CACHE_MAX_PX)
+from core.jobs import AppState
 from ui import theme                      # noqa: E402
 from ui.window import MainWindow   # noqa: E402
 from ui.winconst import _SLOW_RENDER_MS   # noqa: E402
@@ -55,19 +57,19 @@ def main():
     app.setApplicationName(QCoreApplication.translate("main", "「镶 · 水印」 水印处理工具"))
     theme.apply_font(app)
     theme.apply_palette(app)
-    icon = os.path.join(core.ICONS_DIR, "exif-watermark-icon.ico")
+    icon = os.path.join(ICONS_DIR, "exif-watermark-icon.ico")
     if os.path.isfile(icon):
         app.setWindowIcon(QIcon(icon))
 
-    state = core.AppState()
+    state = AppState()
     i18n.install(app, state.settings.get("lang") or i18n.DEFAULT_LANG)
     win = MainWindow(state)
     win.show()
     single.wire(srv, win)
-    _say(f"[启动] 数据目录: {core.BASE_DIR}")
-    _say(f"[启动] 预览目录: {core.PREVIEW_DIR}")
-    _say(f"[启动] 日志:     {os.path.join(core.LOG_DIR, 'log-' + core.LOG_TIMESTAMP + '.log')}")
-    if not os.path.exists(core.SETTINGS_FILE):
+    _say(f"[启动] 数据目录: {BASE_DIR}")
+    _say(f"[启动] 预览目录: {PREVIEW_DIR}")
+    _say(f"[启动] 日志:     {os.path.join(LOG_DIR, 'log-' + LOG_TIMESTAMP + '.log')}")
+    if not os.path.exists(SETTINGS_FILE):
         _say("[启动] 未找到设置文件, 使用出厂默认参数")
     _log_environment(win)
     return app.exec()
@@ -92,9 +94,9 @@ def _log_environment(win):
                      f"(逻辑 {geo.width()}x{geo.height()}, 可用 {avail.width()}x{avail.height()})")
         logging.info(f"[环境] 窗口 {win.width()}x{win.height()} 分栏 {sizes} "
                      f"预览区 {win._preview.width()}x{win._preview.height()}")
-    logging.info(f"[环境] 数据目录 {core.BASE_DIR} | 预览目录 {core.PREVIEW_DIR} | 日志 {core.LOG_FILE}")
-    logging.info(f"[环境] 档位 PREVIEW_MAX_SIDE={core.PREVIEW_MAX_SIDE} "
-                 f"层缓存预算={core._LAYER_CACHE_BUDGET >> 20}MB 单层上限={core._LAYER_CACHE_MAX_PX // 1_000_000}MP "
+    logging.info(f"[环境] 数据目录 {BASE_DIR} | 预览目录 {PREVIEW_DIR} | 日志 {LOG_FILE}")
+    logging.info(f"[环境] 档位 PREVIEW_MAX_SIDE={PREVIEW_MAX_SIDE} "
+                 f"层缓存预算={_LAYER_CACHE_BUDGET >> 20}MB 单层上限={_LAYER_CACHE_MAX_PX // 1_000_000}MP "
                  f"慢调用阈值={_SLOW_RENDER_MS}ms")
 
 

@@ -1,6 +1,8 @@
 """预设槽位与设置持久化: 读盘写盘、导入导出、参数收集与恢复默认。"""
 from PySide6.QtWidgets import QMessageBox
-from core import app as core
+from core.config import DEFAULT_LOGO_DIR
+from core.paths import load_model_map, preset_path, save_model_map, save_settings
+from core.params import default_params
 from .dialogs.base import _message, _open_file_dialog, _save_file_dialog
 from .specs import _BACKEND_KEYS, migrate_preset
 import json
@@ -12,13 +14,13 @@ from .winconst import ILLEGAL_FN_CHARS, _NOT_PERSISTED, _PRESET_FORMAT, _PRESET_
 class PresetMixin:
 
     def _load_params(self):
-        p = dict(core.default_params())
+        p = dict(default_params())
         saved = self.state.settings or {}
         for k, v in saved.items():
             if k in p:                      # 只吃已知参数; 未知键留在 settings.json 里不动
                 p[k] = v
         try:
-            p["model_map"] = core.load_model_map(p.get("logo_dir") or core.DEFAULT_LOGO_DIR)
+            p["model_map"] = load_model_map(p.get("logo_dir") or DEFAULT_LOGO_DIR)
         except Exception:
             p["model_map"] = {}
         return p
@@ -26,7 +28,7 @@ class PresetMixin:
     def _reload_presets(self, view):
         # 把 10 个槽位列进 view 的下拉(显示各自存着的方案名, 空槽显示「— 空 —」)
         # view 是 PresetDialog(控件在它那儿); 预设数据缓存在窗口的 self._preset_data
-        # 键是槽位号(字符串), 与 core.preset_path(slot) 的槽位一致
+        # 键是槽位号(字符串), 与 preset_path(slot) 的槽位一致
         try:
             self._preset_data = self.state.load_presets() or {}
         except Exception as e:                      # noqa: BLE001
@@ -93,7 +95,7 @@ class PresetMixin:
             return
         view.reload()
         view.combo.setCurrentIndex(view.combo.findData(key))
-        logging.info(f"[预设] 已保存: 槽位 {key}「{name}」-> {core.preset_path(key)}")
+        logging.info(f"[预设] 已保存: 槽位 {key}「{name}」-> {preset_path(key)}")
         self._notify(self.tr("已保存到槽位 {slot}：{name}").format(slot=key, name=name))
 
     def _export_preset(self, view):
@@ -214,7 +216,7 @@ class PresetMixin:
         if cur == before:
             return
         try:
-            core.save_model_map(self._params.get("logo_dir") or core.DEFAULT_LOGO_DIR, cur)
+            save_model_map(self._params.get("logo_dir") or DEFAULT_LOGO_DIR, cur)
         except Exception as e:                      # noqa: BLE001
             logging.warning(f"[映射] 撤销/铺参数后写盘失败: {e}")
             self._notify(self.tr("映射表没能写回文件：{err}").format(err=e))
@@ -233,7 +235,7 @@ class PresetMixin:
             s = dict(self.state.settings or {})
             s.update(self._collect_settings())
             self.state.settings = s
-            core.save_settings(s)                       # 原子写, 见核心 _save_json
+            save_settings(s)                       # 原子写, 见核心 _save_json
         except Exception as e:                          # noqa: BLE001 - 存不上不该影响使用
             self._notify(self.tr("自动保存失败：{err}").format(err=e))
 
@@ -250,7 +252,7 @@ class PresetMixin:
                     QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
                     QMessageBox.StandardButton.No) != QMessageBox.StandardButton.Yes:
             return
-        d = core.default_params()
+        d = default_params()
 
         def _do():
             self._apply_params(d)
@@ -262,8 +264,8 @@ class PresetMixin:
 
     def _reload_model_map(self):
         try:
-            self._params["model_map"] = core.load_model_map(
-                self._params.get("logo_dir") or core.DEFAULT_LOGO_DIR)
+            self._params["model_map"] = load_model_map(
+                self._params.get("logo_dir") or DEFAULT_LOGO_DIR)
         except Exception:
             self._params["model_map"] = {}
         self._update_effective_model()

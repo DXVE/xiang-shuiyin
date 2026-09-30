@@ -3,7 +3,7 @@ from PySide6.QtCore import QPoint, QT_TRANSLATE_NOOP, Qt
 from PySide6.QtWidgets import (QCheckBox, QFrame, QGridLayout, QHBoxLayout, QLabel, QLineEdit,
                                QMenu, QProgressBar, QPushButton, QScrollArea, QSizePolicy,
                                QSpacerItem, QSplitter, QStackedWidget, QVBoxLayout, QWidget)
-from core import app as core
+from core.config import DATA_DIR, DEFAULT_LOGO_DIR, LOG_DIR
 from . import i18n, theme
 from .specs import PARAM_SPECS
 from .toast import Toast
@@ -120,11 +120,11 @@ class BuildMixin:
         m.addSeparator()
         m.setToolTipsVisible(True)  # 菜单项也带 tooltip, 每个入口指向哪个目录一目了然
         a = m.addAction(self.tr("打开日志目录"), self._open_log_dir)
-        a.setToolTip(core.LOG_DIR)       # 日志就在程序目录下(LOG_DIR == BASE_DIR)
+        a.setToolTip(LOG_DIR)       # 日志就在程序目录下(LOG_DIR == BASE_DIR)
         a = m.addAction(self.tr("打开数据目录"), self._open_data_dir)
-        a.setToolTip(core.DATA_DIR)      # 数据目录是它下面的 watermark_data 子目录
+        a.setToolTip(DATA_DIR)      # 数据目录是它下面的 watermark_data 子目录
         a = m.addAction(self.tr("打开 Logo 目录"), self._open_logo_dir)
-        a.setToolTip(self._params.get("logo_dir") or core.DEFAULT_LOGO_DIR)
+        a.setToolTip(self._params.get("logo_dir") or DEFAULT_LOGO_DIR)
         m.addSeparator()
         lang = m.addMenu(self.tr("语言"))
         # 「语言」入口的可选码跟在文字后面, 两个码都写出来(不是只显示当前那个)

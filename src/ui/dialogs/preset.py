@@ -1,6 +1,6 @@
 """「预设方案」弹窗: 槽位选择与命名。"""
 from PySide6.QtWidgets import QDialog, QHBoxLayout, QLabel, QLineEdit, QVBoxLayout, QWidget
-from core import app as core
+from core.config import PRESETS_DIR
 from .. import theme
 from ..dialog import csdify, dlg_button, dlg_button_row, go_frameless
 from .base import _open_and_report, _prep_dialog
@@ -49,13 +49,13 @@ class PresetDialog(QDialog):
             dlg_button(self.tr("保存"), lambda: win._preset_save(self)),
             dlg_button(self.tr("删除"), lambda: win._preset_delete(self))]))
 
-        self.dir_label = ElidedLabel(core.PRESETS_DIR)
+        self.dir_label = ElidedLabel(PRESETS_DIR)
         self.dir_label.setObjectName("muted")
-        self.dir_label.setToolTip(core.PRESETS_DIR)
+        self.dir_label.setToolTip(PRESETS_DIR)
         v.addWidget(row("目录", [
             self.dir_label,
             dlg_button(self.tr("打开目录"),
-                       lambda: _open_and_report(win, core.PRESETS_DIR, self.tr("预设目录")))]))
+                       lambda: _open_and_report(win, PRESETS_DIR, self.tr("预设目录")))]))
         v.addStretch(1)
         v.addLayout(dlg_button_row(
             dlg_button(self.tr("导入…"), lambda: win._import_preset(self)),

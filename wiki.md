@@ -8,7 +8,7 @@
 ## 0. 阅读约定与术语
 
 - **目标读者**：要把本项目接进工具链、在此基础上改样式或行为、以及负责长期维护与排查的人。
-- **引用约定**：用仓库内相对路径 + 可搜索的符号名（例如 `src/core/app.py` 的 `process_single`、`src/ui/specs.py` 的 `PARAM_SPECS`），不写行号：行号会随增删漂移。不出现任何机器相关的绝对路径。
+- **引用约定**：用仓库内相对路径 + 可搜索的符号名（例如 `src/core/pipeline.py` 的 `process_single`、`src/ui/specs.py` 的 `PARAM_SPECS`），不写行号：行号会随增删漂移。不出现任何机器相关的绝对路径。
 - **三份文档的分工**：
 
 | 文档 | 回答什么 | 读者 |
@@ -42,7 +42,7 @@
 **定位**：相机参数水印工具（读照片 EXIF，把品牌 / 型号 / 快门 / 光圈 / ISO 按版式画到图上）的 Qt6 桌面版。三个可在代码里核对的事实：
 
 - 界面是原生 Qt Widgets（`PySide6`）：单实例进程，四条线程分工固定（见 §2.3 的线程表），运行期不访问网络、不依赖外部服务。
-- 渲染内核（`src/core/app.py`）是纯 PIL 流水线，只依赖 Pillow 与 exifread，可在无 Qt 的环境里单独调用。
+- 渲染内核（`src/core/`）是纯 PIL 流水线，只依赖 Pillow 与 exifread，可在无 Qt 的环境里单独调用。
 - 预览与生成走**同一条渲染函数**，区别只在档位与出参（预览要内存图与几何，生成要落盘文件）。
 
 ### 1.2 依赖与运行环境
@@ -64,8 +64,15 @@
 | 位置 | 职责 | 关键符号 |
 |---|---|---|
 | `main.py` | 入口：注入环境变量 → 单实例闸门 → QApplication → 主题/翻译/主窗 → 环境日志 | `main`、`_log_environment` |
-| `src/core/app.py` | 渲染内核与应用状态：参数、EXIF、图像流水线、持久化、预览/生成线程 | `process_single`、`AppState`、`RenderWorker`、`default_params` |
-| `src/core/__init__.py` | 内核包声明与版本号 | `__version__` |
+| `src/core/config.py` | 内核常量：目录与文件位置、预览与渲染阈值、缓存上限（零副作用） | `BASE_DIR`、`PREVIEW_MAX_SIDE`、`LOW_RES_THRESHOLD`、`SLOW_RENDER_MS` |
+| `src/core/paths.py` | 持久化与环境初始化：settings / 预设 / 型号映射的读写，导入期建日志目录、轮转旧日志、清理临时残留 | `load_settings`、`save_settings`、`preset_path`、`load_model_map` |
+| `src/core/exif.py` | EXIF 与型号：exifread 主路径加 Pillow 兜底、型号映射注入、展示串格式化、Logo 查找 | `get_exif_data_from_path`、`prettify_model`、`find_logo` |
+| `src/core/draw.py` | 绘制与形状：文字绘制与原语、字体加载、方向剥离、圆角与圆形蒙版 | `draw_text`、`_load_font`、`round_corners` |
+| `src/core/cache.py` | 分层渲染缓存与蒙版缓存：命中统计与收益核算（全部缓存状态在这一处） | `_layer_cached`、`_cached_mask`、`cache_saved_ms` |
+| `src/core/params.py` | 内核默认参数表与手动 EXIF 信息的格式化 | `default_params`、`_format_manual_exif` |
+| `src/core/pipeline.py` | 渲染流水线：单张成品的渲染与落盘 | `process_single` |
+| `src/core/jobs.py` | 渲染线程与应用状态：设置/预设/映射表管理、生成与预览调度 | `RenderWorker`、`AppState` |
+| `src/core/__init__.py` | 内核包声明与版本号；导入本包即完成环境初始化 | `__version__` |
 | `src/ui/window.py` | 主窗口 `MainWindow`：组合下列 mixin，自身只留装配点 `__init__` 与类说明 | `MainWindow` |
 | `src/ui/win_build.py` · `win_undo.py` · `win_preset.py` · `win_preview.py` · `win_files.py` · `win_actions.py` · `win_generate.py` · `win_events.py` · `winconst.py` | `MainWindow` 按职责拆成的 8 个 mixin 模块与界面共享常量；逐模块内容见 §2.5 | `BuildMixin`、`UndoVisibilityMixin`、`PresetMixin`、`PreviewMixin`、`FilesMixin`、`ActionMixin`、`GenerateMixin`、`EventMixin` |
 | `src/ui/widgets.py` | 通用控件：参数行、卡片、预览框与状态标识、色块与图标链接、胶囊开关 | `ParamRow`、`Card`、`PreviewBox`、`PreviewStateChip`、`ElidedLabel`、`NoWheelSlider`、`NoWheelComboBox`、`_swatch_qss` |
@@ -135,7 +142,7 @@
 | 2 | `import core` / `ui` | 依赖第 1 步 |
 | 3 | `QApplication` | Qt 要求先有应用对象才能建控件 |
 | 4 | `single.claim()` | 早于 `AppState`：后者构造时会读设置并清理预览残留，两个进程并发就会各写一份设置、互相覆盖 |
-| 5 | 主题（注册内置字体 + 字体装配 + 调色板）与窗口图标 | 控件创建时即取样式，字体族必须在建窗之前定下来；图标取自 `core.ICONS_DIR`（资源定位只有一处定义） |
+| 5 | 主题（注册内置字体 + 字体装配 + 调色板）与窗口图标 | 控件创建时即取样式，字体族必须在建窗之前定下来；图标取自 `config.ICONS_DIR`（资源定位只有一处定义） |
 | 6 | `AppState()` | 状态：设置、预设、映射表、线程与锁 |
 | 7 | `i18n.install()` | 早于 `MainWindow`：窗口文案在构造时就取译文 |
 | 8 | `MainWindow(state)` → `show()` → `single.wire()` | `wire()` 需要窗口句柄，因此在建窗之后 |
@@ -250,7 +257,7 @@ PyInstaller 属可选依赖（`build` 组），不进运行时依赖；打包目
 
 ### 3.3 资源定位的三种形态
 
-资源放在**包外**（`src/assets/` 与 `core`、`ui` 平级）：字体与图标不是代码，放包外便于整体替换，也免得几十 MB 字体被当成模块。代价是定位需要自己算，因此只有**一处**定义：`core/app.py` 的资源段：
+资源放在**包外**（`src/assets/` 与 `core`、`ui` 平级）：字体与图标不是代码，放包外便于整体替换，也免得几十 MB 字体被当成模块。代价是定位需要自己算，因此只有**一处**定义：`core/config.py` 的资源段：
 
 | 运行形态 | `ASSETS_DIR` | 由谁保证 |
 |---|---|---|
@@ -258,7 +265,7 @@ PyInstaller 属可选依赖（`build` 组），不进运行时依赖；打包目
 | 冻结（PyInstaller） | `_MEIPASS/assets` | spec 的 `datas` 映射 |
 | 装成包（pip） | `<site-packages>/assets` | `pyproject.toml` 的 `force-include` |
 
-界面层复用 `core.ICONS_DIR`，不再自己算一份路径。QSS 里的 `url()` 需要绝对路径（相对路径按进程工作目录解析，打包后失效），因此主题模块提供 `theme._asset()` 统一拼装。
+界面层复用 `config.ICONS_DIR`，不再自己算一份路径。QSS 里的 `url()` 需要绝对路径（相对路径按进程工作目录解析，打包后失效），因此主题模块提供 `theme._asset()` 统一拼装。
 
 ### 3.4 内置字体：范围、名称与许可逻辑
 
@@ -691,7 +698,7 @@ _on_rendered()           成功：上图 + 记录屏上指纹 + 更新耗时文�
 ## 7. 持久化与数据模型
 ### 7.1 文件与目录
 
-| 位置（常量在 `core/app.py` 的目录常量段） | 内容 | 写入方式 |
+| 位置（常量在 `core/config.py` 的目录常量段） | 内容 | 写入方式 |
 |---|---|---|
 | 数据根 `BASE_DIR` | `XSY_BASE_DIR` 可覆盖；回退值是本程序专有目录 | — |
 | `DATA_DIR/settings.json` | 界面参数 + 收藏颜色 + 处理模式 | `_save_json`（防抖自动保存） |
@@ -911,7 +918,7 @@ QTranslator 装配（早于主窗口创建）
 
 | 想知道什么 | 权威位置（模块 / 符号） |
 |---|---|
-| 渲染形参与默认值 | `src/core/app.py` 的 `process_single`、`default_params` |
+| 渲染形参与默认值 | `src/core/pipeline.py` 的 `process_single`、`src/core/params.py` 的 `default_params` |
 | 三布局几何与几何收集 | 同上的布局分支与 `_geom` |
 | 缓存分层与键 | 同上的 `_layer_cached` 调用点、`_cached_mask`、`_src_key` |
 | 预览档与缩放规格 | `make_preview`、`_render_preview`、`PREVIEW_MAX_SIDE` |

@@ -3,7 +3,8 @@
 
 import os
 
-from core import app as core
+from core.config import FONT_SETTING_MAP, ICONS_DIR
+from core.paths import _default_font_path
 
 ACCENT = "#6F9C7D"
 ACCENT2 = "#5C8870"
@@ -16,7 +17,7 @@ EMPTY_SLOT = "#C6BEB0"        # 占位语义的中性灰: 预览状态标识的�
 EMPTY_SLOT_BG = "#F1EDE5"     # 「我的颜色」空位格的底色: 比窗口底色 BG 浅、比卡片色 CARD 深
 SCROLL_HANDLE = "#C6BEB0"     # 滚动条 handle 色: 仅在可滚动时显示(见 window._wire_scrollbar)
 
-_ASSETS = core.ICONS_DIR
+_ASSETS = ICONS_DIR
 
 
 # 素材文件名拼成绝对路径, 供 QSS 的 url() 使用
@@ -305,8 +306,8 @@ def load_bundled_fonts():
     from PySide6.QtGui import QFontDatabase
 
     ids = []
-    for _key, fname in core.FONT_SETTING_MAP:
-        path = core._default_font_path(fname)
+    for _key, fname in FONT_SETTING_MAP:
+        path = _default_font_path(fname)
         if not path:
             continue
         fid = QFontDatabase.addApplicationFont(path)

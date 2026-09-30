@@ -1,7 +1,7 @@
 """撤销 / 重做、显隐联动与镜像行、卡片重置。"""
 from PySide6.QtCore import QEvent
 from PySide6.QtWidgets import QApplication
-from core import app as core
+from core.params import default_params
 from .winconst import _UNDO_LIMIT
 
 
@@ -137,7 +137,7 @@ class UndoVisibilityMixin:
                 row.set_value(self._params.get(m[0]))
 
     def _reset_card(self, card):
-        defaults = core.default_params()
+        defaults = default_params()
         keys = set(card.keys)
         for key in card.keys:
             keys.update((self._spec_by_key.get(key) or {}).get("mirror") or ())
@@ -160,7 +160,7 @@ class UndoVisibilityMixin:
 
     def _reset_fx_group(self, name, keys):
         # 重置一个功能组(开关 + 细节行), 整批算撤销的一步
-        defaults = core.default_params()
+        defaults = default_params()
         title = self.tr(name)
 
         def _do():

@@ -1,7 +1,7 @@
 # -*- mode: python ; coding: utf-8 -*-
 """PyInstaller 打包配置（无控制台）。
 
-`datas` 必须把 `src/assets` 放到包根目录下的 `assets/`：冻结后 `core/app.py` 以
+`datas` 必须把 `src/assets` 放到包根目录下的 `assets/`：冻结后 `core/config.py` 以
 `_MEIPASS/assets` 定位资源。位置错误会表现为字体回退到系统字体、界面图标与关于框 logo 缺失。
 
 许可文本：`licenses/` + `LICENSE` + `THIRD_PARTY_LICENSES.md` 既打进产物内部，也在构建结束后

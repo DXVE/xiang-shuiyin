@@ -2,7 +2,8 @@
 from PySide6.QtCore import QT_TRANSLATE_NOOP
 from PySide6.QtWidgets import (QDialog, QHBoxLayout, QLabel, QLineEdit, QListWidget, QMessageBox,
                                QVBoxLayout)
-from core import app as core
+from core.config import DEFAULT_LOGO_DIR
+from core.paths import load_model_map, save_model_map
 from ..dialog import csdify, dlg_button, dlg_button_row, go_frameless
 from .base import _message, _prep_dialog
 
@@ -17,9 +18,9 @@ class MapDialog(QDialog):
         self.resize(560, 460)
         self._data = {}
         try:
-            self._logo_dir = (parent._params.get("logo_dir") if parent else "") or core.DEFAULT_LOGO_DIR
+            self._logo_dir = (parent._params.get("logo_dir") if parent else "") or DEFAULT_LOGO_DIR
         except Exception:
-            self._logo_dir = core.DEFAULT_LOGO_DIR
+            self._logo_dir = DEFAULT_LOGO_DIR
 
         v = QVBoxLayout(self)
         tip = QLabel(self.tr("识别到的原始型号 --> 水印上显示的型号。"
@@ -52,7 +53,7 @@ class MapDialog(QDialog):
 
         self._list.currentItemChanged.connect(self._on_select)
         try:
-            self._data = dict(core.load_model_map(self._logo_dir) or {})
+            self._data = dict(load_model_map(self._logo_dir) or {})
         except Exception:                           # noqa: BLE001 - 读不出就当空表
             self._data = {}
         self._reload()
@@ -154,11 +155,11 @@ class MapDialog(QDialog):
     def _persist(self):
         # 立刻写盘(增 / 改 / 删均即时生效); 写失败时提示并把内存回滚为磁盘内容
         try:
-            core.save_model_map(self._logo_dir, self._data)
+            save_model_map(self._logo_dir, self._data)
         except Exception as e:                      # noqa: BLE001
             _message(self, QMessageBox.Icon.Warning, self.tr("保存失败"), str(e))
             try:
-                self._data = dict(core.load_model_map(self._logo_dir) or {})
+                self._data = dict(load_model_map(self._logo_dir) or {})
             except Exception:                       # noqa: BLE001
                 self._data = {}
             self._reload()
