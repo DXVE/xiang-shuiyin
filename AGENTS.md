@@ -36,7 +36,7 @@
 ### 1.2 参数口径（不对称的地方）
 
 - **不得**用 `**default_params()` 直接调内核，必须经 `window.backend_params()`：`default_params()` 含界面专用的 `canvas_ratio_mode`，而 `process_single` 只接受数值型 `canvas_ratio`（`0` = 跟随原图），直接展开必定 `TypeError`（原理见 wiki §4.1）。
-- 档位表 `_RATIOS` 与反查表 `_RATIO_MODES` 都在 `window.py`：新增档位时两处需同步添加，`migrate_preset()` 依赖反查表还原旧记录。
+- 档位表 `_RATIOS` 与反查表 `_RATIO_MODES` 都在 `src/ui/specs.py`：新增档位时两处需同步添加，`migrate_preset()` 依赖反查表还原旧记录。
 - `model_map` 是内核必填：`backend_params()` 已 `setdefault`，生成路径另有 `_inject_model_map(..., ensure_map=True)` 兜底。`_inject_model_map` 的两种模式**不得合并**：生成用 `ensure_map=True`（原地改），预览用 `copy_on_inject=True`（拷贝，避免污染请求对象）。
 - `manual_exif` 的键固定为 `make` / `model` / `exposure` / `fnumber` / `iso`（字符串），由 `_format_manual_exif()` 归一；`None` = 不启用；**有意不持久化**。
 - `low_res_enhance` 是**常驻入参**、成品恒为开：界面没有控件，`backend_params()` 也不产出该键，成品只走 `process_single()` 的形参默认值 `True`；只有预览显式传 `False`（见 §1.4）。改动这里要同时确认预览与成品两条取值路径都仍成立。

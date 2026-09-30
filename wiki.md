@@ -8,7 +8,7 @@
 ## 0. 阅读约定与术语
 
 - **目标读者**：要把本项目接进工具链、在此基础上改样式或行为、以及负责长期维护与排查的人。
-- **引用约定**：用仓库内相对路径 + 可搜索的符号名（例如 `src/core/app.py` 的 `process_single`、`src/ui/window.py` 的 `PARAM_SPECS`），不写行号：行号会随增删漂移。不出现任何机器相关的绝对路径。
+- **引用约定**：用仓库内相对路径 + 可搜索的符号名（例如 `src/core/app.py` 的 `process_single`、`src/ui/specs.py` 的 `PARAM_SPECS`），不写行号：行号会随增删漂移。不出现任何机器相关的绝对路径。
 - **三份文档的分工**：
 
 | 文档 | 回答什么 | 读者 |
@@ -66,7 +66,12 @@
 | `main.py` | 入口：注入环境变量 → 单实例闸门 → QApplication → 主题/翻译/主窗 → 环境日志 | `main`、`_log_environment` |
 | `src/core/app.py` | 渲染内核与应用状态：参数、EXIF、图像流水线、持久化、预览/生成线程 | `process_single`、`AppState`、`RenderWorker`、`default_params` |
 | `src/core/__init__.py` | 内核包声明与版本号 | `__version__` |
-| `src/ui/window.py` | 主窗口：参数面板、预览区、底栏、撤销、全部弹窗类、预览与生成接线 | `MainWindow`、`PARAM_SPECS`、`ParamRow`、`Card`、`PreviewBox`、`backend_params` |
+| `src/ui/window.py` | 主窗口 `MainWindow`：组合下列 mixin，自身只留装配点 `__init__` 与类说明 | `MainWindow` |
+| `src/ui/win_build.py` · `win_undo.py` · `win_preset.py` · `win_preview.py` · `win_files.py` · `win_actions.py` · `win_generate.py` · `win_events.py` · `winconst.py` | `MainWindow` 按职责拆成的 8 个 mixin 模块与界面共享常量；逐模块内容见 §2.5 | `BuildMixin`、`UndoVisibilityMixin`、`PresetMixin`、`PreviewMixin`、`FilesMixin`、`ActionMixin`、`GenerateMixin`、`EventMixin` |
+| `src/ui/widgets.py` | 通用控件：参数行、卡片、预览框与状态标识、色块与图标链接、胶囊开关 | `ParamRow`、`Card`、`PreviewBox`、`PreviewStateChip`、`ElidedLabel`、`NoWheelSlider`、`NoWheelComboBox`、`_swatch_qss` |
+| `src/ui/specs.py` | 参数表与内核参数契约、画布档位表 | `PARAM_SPECS`、`_RATIOS`、`_RATIO_MODES`、`backend_params`、`migrate_preset` |
+| `src/ui/toast.py` | 一次性提示浮层 | `Toast` |
+| `src/ui/dialogs/` | 弹窗：`base`（无边框壳、显示前准备、按钮与文件选择框工厂）+ 每个弹窗一个模块（关于 / EXIF 信息 / 预设 / 取色 / 型号映射 / 字体） | `_prep_dialog`、`AboutDialog`、`ImageInfoDialog`、`PresetDialog`、`ColorDialog`、`MapDialog`、`FontDialog` |
 | `src/ui/theme.py` | 全局 QSS、调色板、视觉节奏常量、卡片投影、内置字体注册与字体装配 | `QSS`、`apply_palette`、`load_bundled_fonts`、`apply_font`、`FONT_FAMILIES`、`apply_shadow` |
 | `src/ui/dialog.py` | 弹窗壳与按钮工厂 | `go_frameless`、`csdify`、`dlg_button` |
 | `src/ui/render.py` | 预览渲染线程与生成事件轮询线程 | `PreviewWorker`、`EventWatcher`、`_pil_to_qimage` |
@@ -194,7 +199,20 @@
 
 | 模块 | 内容 |
 |---|---|
-| `window.py` | `MainWindow`（组装与接线）、`ParamRow` / `Card`（参数控件）、`PreviewBox` / `PreviewStateChip`（预览与状态标识）、`NoWheelSlider` / `NoWheelComboBox`（避免滚轮误改）、`ElidedLabel`（长路径中间省略）、`Toast`（一次性提示浮层），以及全部弹窗类：`AboutDialog` / `ImageInfoDialog` / `PresetDialog` / `ColorDialog` / `MapDialog` / `FontDialog` |
+| `window.py` | `MainWindow`：组合下列 mixin，自身只有装配点 `__init__`（建状态、连信号）与类说明 |
+| `win_build.py` | `BuildMixin`：顶栏与菜单、预览区与标题条、底栏、页签与分段控件、卡片与行工厂、控件宽度统一 |
+| `win_undo.py` | `UndoVisibilityMixin`：参数变更入口、撤销/重做的事务与快照、显隐联动与镜像行、重置本组 |
+| `win_preset.py` | `PresetMixin`：设置与预设的读写与导入导出、参数回填、映射表落盘、恢复默认、防抖保存 |
+| `win_preview.py` | `PreviewMixin`：取样图、载荷指纹、预览请求与回帧、状态标识 |
+| `win_files.py` | `FilesMixin`：单张/批量模式、选图与输出目录、批量目录载入、拖放四事件 |
+| `win_actions.py` | `ActionMixin`：菜单动作与弹窗入口（关于、日志与数据目录、预设 / Logo / 取色 / 映射 / 字体）、语言切换、型号显示行的同步 |
+| `win_generate.py` | `GenerateMixin`：生成任务的启动、生成事件的消费、一次性提示 |
+| `win_events.py` | `EventMixin`：初始尺寸与分栏比例、手工信息开关联动、悬停心跳、退出收尾 |
+| `winconst.py` | 界面共享常量：页签、预设槽位与文件名规则、撤销、窗口初始比例、滚动条占位、悬停心跳、慢帧阈值、字体样式网格 |
+| `widgets.py` | `ParamRow` / `Card`（参数控件）、`PreviewBox` / `PreviewStateChip`（预览与状态标识）、`NoWheelSlider` / `NoWheelComboBox`（避免滚轮误改）、`ElidedLabel`（长路径中间省略）、`_ColorChip` / `_IconLink`（色块与图标链接）及通用小工具（`_iconify`、`_swatch_qss` 等） |
+| `toast.py` | `Toast`（一次性提示浮层） |
+| `specs.py` | `PARAM_SPECS`（参数表）、`_RATIOS` / `_RATIO_MODES`（画布档位与反查）、`backend_params`（界面参数 → 内核契约）、`migrate_preset`（旧预设记录还原档位） |
+| `dialogs/` | 每个弹窗一个模块：`base`（无边框壳、显示前准备、按钮与文件选择框工厂）、`about`、`image_info`、`preset`、`color`、`map`、`font` |
 | `dialog.py` | 弹窗壳（无边框 + 自绘标题行 + 拖动）与按钮工厂；`MessageDialog` 统一确认/告警形态 |
 | `theme.py` | 调色板常量、`QSS`、视觉节奏常量（圆角/间距/控件高度/对齐线）、`apply_*` 装配函数、`_asset()` |
 | `render.py` | `PreviewWorker`（槽语义）、`EventWatcher`、PIL→QImage 转换 |
@@ -899,7 +917,7 @@ QTranslator 装配（早于主窗口创建）
 | 预览档与缩放规格 | `make_preview`、`_render_preview`、`PREVIEW_MAX_SIDE` |
 | 设置/预设/映射的读写 | `AppState` 的相应方法、`_save_json`、`preset_path` |
 | 生成事件与取消语义 | `RenderWorker`、`AppState.start_generate` / `stop` |
-| 参数表结构与显隐条件 | `src/ui/window.py` 的 `PARAM_SPECS` |
+| 参数表结构与显隐条件 | `src/ui/specs.py` 的 `PARAM_SPECS` |
 | 界面到内核的参数转换 | 同上的 `backend_params` 与界面专有键 |
 | 撤销与快照 | 同上的 `_snapshot` / `_begin_undo` / `_commit_undo` / `_apply_params` |
 | 预览状态机与指纹 | 同上的 `_preview_payload` / `_preview_token` / `_preview_state` |

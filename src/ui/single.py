@@ -1,50 +1,32 @@
 # -*- coding: utf-8 -*-
-"""单实例: 已有实例在运行时, 第二个进程通知它激活窗口, 然后自身退出。
-
-机制为 QLocalServer/QLocalSocket: 不依赖窗口标题, 且跨平台。
-抢前台由第二个进程负责 —— SetForegroundWindow 只对当前前台进程或其启动的进程放行, 主实例
-在后台自行 activateWindow() 常被系统拒绝; 第二个进程刚由用户启动, 更可能持有前台权限, 因此
-由它先 AllowSetForegroundWindow(ASFW_ANY) 放开权限, 再按主实例回传的窗口句柄调用
-SetForegroundWindow。主实例的 activate() 无论如何都会执行, 句柄未回传时窗口仍会被还原并抬起。
-
-调用顺序约束: 必须在构造 AppState 之前调用 claim() —— AppState 构造时会读取设置并清理预览
-残留, 而两个进程各写一份 settings.json、后写的覆盖先写的正是单实例要防止的情况。
-"""
+"""单实例: 已有实例在运行时, 第二个进程通知它激活窗口, 然后自身退出"""
 import logging
 import os
 
 from PySide6.QtCore import Qt
 from PySide6.QtNetwork import QLocalServer, QLocalSocket
 
-# 第二个进程的两次等待(ms): 连接 / 等主实例回句柄。取值较短 —— 它通知完即退出, 主实例忙时
-# 也不应让用户久等; 等不到就照常退出(主实例仍会自行激活一次)。
+# 第二个进程的两次等待(ms): 连接 / 等主实例回传句柄; 等不到即照常退出(主实例仍会自行激活)
 _CONNECT_MS = 400
 _REPLY_MS = 400
 
-# 主实例侧: 连接需要保留引用, 否则 Python 回收对象时套接字被销毁。
-# 不主动回收也不调用 deleteLater: 断开与读取可能同批到达, 当场回收会连带尚未投递的事件;
-# 对象数等于用户重复启动的次数, 量级可忽略(应用退出时一并释放)。
+# 主实例侧的连接表: 保留引用(回收后套接字被销毁)
+# 不当场回收也不 deleteLater: 断开与读取可能同批到达, 回收会丢掉尚未投递的事件
 _RETIRED = set()
 
 def _user():
-    """管道名中的用户名片段: 同一台机器多用户登录时, 各自实例互不干扰。"""
+    # 管道名中的用户名片段: 同一台机器多用户登录时, 各自实例互不干扰
     raw = os.environ.get("USERNAME") or os.environ.get("USER") or "default"
     return "".join(c if (c.isalnum() or c in "-_") else "_" for c in raw) or "default"
 
 
 def server_name():
-    """管道名。`XSY_IPC_NAME` 可覆盖, 供工具/自检使用(避免与用户正在运行的实例冲突)。"""
+    # 管道名: XSY_IPC_NAME 可覆盖, 供工具/自检使用(避免与运行中的实例冲突)
     return os.environ.get("XSY_IPC_NAME") or f"ShuiYin-QT6-{_user()}"
 
 
 def claim(name):
-    """检测已有实例: 返回 (本进程是否继续运行, server 或 None)。
-
-    已有实例 -> (False, None), 且已通知其激活窗口; 无实例 -> 占位成功返回 (True, server),
-    由调用方在建窗后交给 `wire()`。
-
-    占位失败或异常时一律返回 (True, None): 单实例保护不应阻断程序启动(fail-open)。
-    """
+    # 检测已有实例: 返回 (本进程是否继续运行, server 或 None); 已有实例时已通知其激活窗口
     sock = QLocalSocket()
     sock.connectToServer(name)
     if not sock.waitForConnected(_CONNECT_MS):
@@ -76,7 +58,7 @@ def claim(name):
 
 
 def wire(server, win):
-    """把 server 接上主窗口: 之后再有实例启动, 即把该窗口提到前台。建窗后调用。"""
+    # 把 server 接上主窗口: 之后再有实例启动, 即把该窗口提到前台(建窗后调用)
     if server is None:
         return
     server.newConnection.connect(lambda: _accept(server, win))
@@ -96,12 +78,7 @@ def _accept(server, win):
 
 
 def _answer(sock, win, once):
-    """收到通知: 把窗口提到前台, 并回传窗口句柄(第二个进程据此抢前台)。
-
-    不能只等 readyRead: 第二个进程常常发完通知即退出, 主实例处理连接时它已不在 —— 该时序下
-    readyRead 不触发、缓冲字节也读不到(断开与读取同批到达, `bytesAvailable()` 为 0)。
-    消息内容不重要(只有一种语义: 激活窗口), 因此连接一有动静即视为有效。
-    """
+    # 收到通知: 把窗口提到前台, 并回传窗口句柄(第二个进程据此抢前台)
     if once["done"]:
         return
     once["done"] = True
@@ -118,11 +95,7 @@ def _answer(sock, win, once):
 
 
 def activate(win):
-    """把主窗口提到前台: 最小化时先还原, 被隐藏时也拉回。
-
-    清除 WindowMinimized 位 + show + raise_ + activateWindow 即可生效; 不要再补 showNormal()
-    —— 它等于重新 show 一次, 会丢失刚获得的激活状态。
-    """
+    # 把主窗口提到前台: 最小化时先还原, 被隐藏时也拉回
     try:
         if win.isMinimized():
             win.setWindowState(win.windowState() & ~Qt.WindowState.WindowMinimized)
@@ -134,11 +107,7 @@ def activate(win):
 
 
 def _allow_foreground():
-    """Windows: 放开"谁可以设置前台窗口"的限制。
-
-    第二个进程刚由用户启动、更有前台资格, 但它手上没有主窗口, 因此由它放权, 主实例随后的
-    activateWindow() 才能把窗口提到前面。
-    """
+    # Windows: 放开"谁可以设置前台窗口"的限制(由第二个进程放权)
     if os.name != "nt":
         return
     try:
@@ -153,7 +122,7 @@ def _allow_foreground():
 
 
 def _set_foreground(hwnd):
-    """Windows: 直接调用 SetForegroundWindow(第二个进程持有前台权限时才有效)。"""
+    # Windows: 直接调用 SetForegroundWindow(第二个进程持有前台权限时才有效)
     if os.name != "nt":
         return
     try:

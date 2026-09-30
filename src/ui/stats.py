@@ -1,10 +1,5 @@
 # -*- coding: utf-8 -*-
-"""会话统计: 累计本次运行中预览/生成链路的耗时与缓存命中, 供界面显示与退出时落一条汇总。
-
-统计只做加法, 分位数仅在界面刷新与退出时计算; 样本用有界 deque(内存固定), 不随会话时长增长。
-采集可能发生在预览线程/批量线程/GUI 线程, 因此全部加锁。不在任何热路径上做统计(逐帧绘制、
-逐层缓存查找都不进入本模块)。
-"""
+"""会话统计: 累计本次运行中预览/生成链路的耗时与缓存命中, 供界面显示与退出时落一条汇总"""
 import threading
 
 from PySide6.QtCore import QCoreApplication, QT_TRANSLATE_NOOP
@@ -14,12 +9,12 @@ _SAMPLES = 200      # 每类耗时最多保留最近 200 个样本: 计算 p50/p
 
 
 def _t(text):
-    """取译文(中文是源语言)。使用时才调用 —— import 期翻译器尚未安装(见 ui/i18n.py)。"""
+    # 取译文(中文是源语言): 使用时才调用, import 期翻译器尚未安装
     return QCoreApplication.translate("stats", text)
 
 
 def _pct(vals, q):
-    """分位数(最近邻取法, 不做插值): vals 需已排序"""
+    # 分位数(最近邻取法, 不做插值), 要求 vals 已排序
     if not vals:
         return 0.0
     i = min(len(vals) - 1, max(0, int(round(q * (len(vals) - 1)))))
@@ -27,7 +22,7 @@ def _pct(vals, q):
 
 
 def _fmt_deque(vals):
-    """(p50, p95, max) —— 只在刷新/退出时调用"""
+    # (p50, p95, max), 只在界面刷新与退出时调用
     if not vals:
         return 0.0, 0.0, 0.0
     s = sorted(vals)
@@ -35,7 +30,7 @@ def _fmt_deque(vals):
 
 
 class SessionStats:
-    """一次运行(一个主窗口)的累计统计。线程安全。"""
+    # 一次运行(一个主窗口)的累计统计, 线程安全
 
     def __init__(self, core):
         self._lock = threading.Lock()
@@ -48,7 +43,6 @@ class SessionStats:
         self.generated = 0           # 生成张数(单张 + 批量)
         self.gen_ms = 0.0            # 生成累计耗时
 
-    # ---------- 采集 ----------
     def add_preview(self, ms=0.0, queue_ms=0.0, e2e_ms=0.0, arrived=0):
         with self._lock:
             self.previews += 1
@@ -62,19 +56,15 @@ class SessionStats:
             self.generated += int(count or 1)
             self.gen_ms += float(ms or 0.0)
 
-    # ---------- 汇总 ----------
     def cache_saved(self):
-        """缓存命中省下的时间(毫秒, 估算): 层 / 蒙版 / 缩略图 各自累计 + 合计。
-
-        口径见核心的 cache_saved_ms(); 取不到时返回全 0(统计出错不该让界面打不开)。
-        """
+        # 缓存命中省下的时间(毫秒, 估算): 层 / 蒙版 / 缩略图各自累计 + 合计
         try:
             return self._core.cache_saved_ms()
         except Exception:
             return {"层": 0.0, "蒙版": 0.0, "缩略图": 0.0, "合计": 0.0}
 
     def cache_rates(self):
-        """三个缓存的命中率与层缓存占用。读取核心模块级计数器, 加锁保证同一时刻读数一致。"""
+        # 三个缓存的命中率与层缓存占用(读核心的模块级计数器)
         c = self._core
         out = {}
         for name, stats in (("层", getattr(c, "_LAYER_CACHE_STATS", {})),
@@ -90,7 +80,7 @@ class SessionStats:
         return out
 
     def summary(self, compact=False):
-        """compact=True 返回单行摘要(「关于」弹窗用); 否则返回退出日志用的多行全文(每行一件事)。"""
+        # compact=True 返回单行摘要(「关于」弹窗用), 否则返回退出日志用的多行全文
         with self._lock:
             n = self.previews
             renders = list(self.renders)

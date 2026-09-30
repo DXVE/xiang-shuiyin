@@ -131,4 +131,4 @@ if not os.environ.get("XSY_SKIP_LICENSE_COPY") == "1":
     for src_name, dst_name in (("OFL.txt", "Sarasa-Gothic-OFL-1.1.txt"),
                                ("NOTICE.txt", "Sarasa-Gothic-NOTICE.txt")):
         shutil.copy2(ROOT / "src" / "assets" / "fonts" / src_name, dst / dst_name)
-    print("[licenses] 已把许可文本复制到: %s" % dst)
+    print("[licenses] copied to: %s" % dst)
