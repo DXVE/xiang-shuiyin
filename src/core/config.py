@@ -11,6 +11,9 @@ PREVIEW_DIR = os.environ.get("XSY_PREVIEW_DIR") or os.path.join(tempfile.gettemp
 # 实时预览缩略渲染的最大边长(px): 0 表示全量加载(不缩图, 画布/字号/圆角/模糊半径均按原图尺寸计算), 仅用于画质排查
 PREVIEW_MAX_SIDE = 3400
 
+# 先导帧缩略渲染的最大边长(px): 首次看一张大图时先按这一档渲一帧低分辨率画面即时上屏, 全分辨率帧随后覆盖
+PREVIEW_FAST_MAX_SIDE = 1200
+
 
 # 背景模糊工作图的最小边长(px): 工作图边长为画布的 1/4, 模糊/噪声/增强在小图上完成后再放大回画布, 设下限避免小画布下画质损失过大
 BLUR_WORK_MIN_SIDE = 400

@@ -84,7 +84,7 @@
         </message>
         <message>
             <location filename="../win_actions.py" line="85" />
-            <location filename="../win_actions.py" line="130" />
+            <location filename="../win_actions.py" line="138" />
             <source>未识别到型号（请先选择图片）</source>
             <translation>No model detected yet (select an image first)</translation>
         </message>
@@ -104,7 +104,7 @@
             <translation>Could not open the Logo folder: {path}</translation>
         </message>
         <message>
-            <location filename="../win_actions.py" line="127" />
+            <location filename="../win_actions.py" line="135" />
             <source>已复制原始型号到剪贴板</source>
             <translation>Raw model copied to clipboard</translation>
         </message>
@@ -124,7 +124,7 @@
         </message>
         <message>
             <location filename="../win_build.py" line="81" />
-            <location filename="../win_build.py" line="485" />
+            <location filename="../win_build.py" line="490" />
             <source>未选择图片</source>
             <translation>No image selected</translation>
         </message>
@@ -225,52 +225,52 @@
             <translation>Start</translation>
         </message>
         <message>
-            <location filename="../win_build.py" line="433" />
+            <location filename="../win_build.py" line="438" />
             <source>重置</source>
             <translation>Reset</translation>
         </message>
         <message>
-            <location filename="../win_build.py" line="436" />
+            <location filename="../win_build.py" line="441" />
             <source>将本组参数恢复为出厂默认值</source>
             <translation>Restore this group's parameters to factory defaults</translation>
         </message>
         <message>
-            <location filename="../win_build.py" line="489" />
+            <location filename="../win_build.py" line="494" />
             <source>未选择目录</source>
             <translation>No folder selected</translation>
         </message>
         <message>
-            <location filename="../win_build.py" line="491" />
+            <location filename="../win_build.py" line="496" />
             <source>选择文件夹</source>
             <translation>Choose folder</translation>
         </message>
         <message>
-            <location filename="../win_build.py" line="494" />
+            <location filename="../win_build.py" line="499" />
             <source>包含子文件夹</source>
             <translation>Include subfolders</translation>
         </message>
         <message>
-            <location filename="../win_build.py" line="521" />
+            <location filename="../win_build.py" line="526" />
             <source>临时美化型号（仅本次有效）</source>
             <translation>Temporary pretty model (this run only)</translation>
         </message>
         <message>
-            <location filename="../win_build.py" line="522" />
+            <location filename="../win_build.py" line="527" />
             <source>留空则使用映射表；填写后强制使用该名称</source>
             <translation>Leave empty to use the mapping table; if filled, this name is forced for this run</translation>
         </message>
         <message>
-            <location filename="../win_build.py" line="524" />
+            <location filename="../win_build.py" line="529" />
             <source>管理所有型号映射</source>
             <translation>Manage model mappings</translation>
         </message>
         <message>
-            <location filename="../win_build.py" line="530" />
+            <location filename="../win_build.py" line="535" />
             <source>复制原始型号</source>
             <translation>Copy raw model</translation>
         </message>
         <message>
-            <location filename="../win_build.py" line="538" />
+            <location filename="../win_build.py" line="543" />
             <source>启用（启用后强制使用下列信息，忽略照片 EXIF）</source>
             <translation>Enable (force the values below, ignore the photo's EXIF)</translation>
         </message>
@@ -278,7 +278,7 @@
     <context>
         <name>Card</name>
         <message>
-            <location filename="../widgets.py" line="365" />
+            <location filename="../widgets.py" line="377" />
             <source>重置本组</source>
             <translation>Reset group</translation>
         </message>
@@ -345,7 +345,7 @@
             <location filename="../specs.py" line="160" />
             <location filename="../specs.py" line="163" />
             <location filename="../specs.py" line="166" />
-            <location filename="../win_build.py" line="394" />
+            <location filename="../win_build.py" line="398" />
             <source>描边与投影</source>
             <translation>Stroke and shadow</translation>
         </message>
@@ -359,37 +359,37 @@
         </message>
         <message>
             <location filename="../specs.py" line="111" />
-            <location filename="../win_build.py" line="356" />
+            <location filename="../win_build.py" line="360" />
             <source>水印开关</source>
             <translation>Watermark switches</translation>
         </message>
         <message>
-            <location filename="../widgets.py" line="368" />
+            <location filename="../widgets.py" line="380" />
             <source>将本卡片参数恢复为出厂默认值</source>
             <translation>Restore this card's parameters to factory defaults</translation>
         </message>
         <message>
-            <location filename="../widgets.py" line="404" />
+            <location filename="../widgets.py" line="416" />
             <source>展开本组</source>
             <translation>Expand this group</translation>
         </message>
         <message>
-            <location filename="../widgets.py" line="404" />
+            <location filename="../widgets.py" line="416" />
             <source>收起本组</source>
             <translation>Collapse this group</translation>
         </message>
         <message>
-            <location filename="../win_build.py" line="465" />
+            <location filename="../win_build.py" line="470" />
             <source>处理模式</source>
             <translation>Mode</translation>
         </message>
         <message>
-            <location filename="../win_build.py" line="518" />
+            <location filename="../win_build.py" line="523" />
             <source>型号美化</source>
             <translation>Model naming</translation>
         </message>
         <message>
-            <location filename="../win_build.py" line="536" />
+            <location filename="../win_build.py" line="541" />
             <source>自定义水印信息</source>
             <translation>Custom watermark info</translation>
         </message>
@@ -397,106 +397,106 @@
     <context>
         <name>ColorDialog</name>
         <message>
-            <location filename="../dialogs/color.py" line="35" />
-            <location filename="../dialogs/color.py" line="64" />
-            <location filename="../dialogs/color.py" line="223" />
+            <location filename="../dialogs/color.py" line="47" />
+            <location filename="../dialogs/color.py" line="76" />
+            <location filename="../dialogs/color.py" line="233" />
             <source>选择颜色</source>
             <translation>Pick a color</translation>
         </message>
         <message>
-            <location filename="../dialogs/color.py" line="51" />
+            <location filename="../dialogs/color.py" line="63" />
             <source>保存当前颜色</source>
             <translation>Save current color</translation>
         </message>
         <message>
-            <location filename="../dialogs/color.py" line="52" />
+            <location filename="../dialogs/color.py" line="64" />
             <source>将当前颜色保存到「我的颜色」，下次可直接使用</source>
             <translation>Save the current color to "My colors" for one-click reuse</translation>
         </message>
         <message>
-            <location filename="../dialogs/color.py" line="55" />
+            <location filename="../dialogs/color.py" line="67" />
             <source>关闭</source>
             <translation>Close</translation>
         </message>
         <message>
-            <location filename="../dialogs/color.py" line="96" />
-            <location filename="../dialogs/color.py" line="102" />
+            <location filename="../dialogs/color.py" line="108" />
+            <location filename="../dialogs/color.py" line="114" />
             <source>当前颜色</source>
             <translation>Current color</translation>
         </message>
         <message>
-            <location filename="../dialogs/color.py" line="103" />
+            <location filename="../dialogs/color.py" line="115" />
             <source>点击打开系统取色器（可拖动取色、调透明度）</source>
             <translation>Click to open the system color picker (drag to sample, adjust opacity)</translation>
         </message>
         <message>
-            <location filename="../dialogs/color.py" line="109" />
+            <location filename="../dialogs/color.py" line="121" />
             <source>色号</source>
             <translation>Hex</translation>
         </message>
         <message>
-            <location filename="../dialogs/color.py" line="110" />
+            <location filename="../dialogs/color.py" line="122" />
             <source>直接输入色号（如 #6F9C7D），回车生效</source>
             <translation>Type a hex value (e.g. #6F9C7D) and press Enter</translation>
         </message>
         <message>
-            <location filename="../dialogs/color.py" line="115" />
+            <location filename="../dialogs/color.py" line="127" />
             <source>点击色块打开取色器，也可直接输入色号</source>
             <translation>Click a swatch to open the picker, or type a hex value</translation>
         </message>
         <message>
-            <location filename="../dialogs/color.py" line="133" />
+            <location filename="../dialogs/color.py" line="145" />
             <source>点击色块即应用；双击修改颜色，右键删除</source>
             <translation>Click to apply; double-click to edit, right-click to delete</translation>
         </message>
         <message>
-            <location filename="../dialogs/color.py" line="141" />
+            <location filename="../dialogs/color.py" line="153" />
             <source>已保存 {n} / {total}</source>
             <translation>{n} / {total} saved</translation>
         </message>
         <message>
-            <location filename="../dialogs/color.py" line="167" />
-            <location filename="../dialogs/color.py" line="168" />
+            <location filename="../dialogs/color.py" line="179" />
+            <location filename="../dialogs/color.py" line="180" />
             <source>未使用</source>
             <translation>Empty</translation>
         </message>
         <message>
-            <location filename="../dialogs/color.py" line="176" />
+            <location filename="../dialogs/color.py" line="188" />
             <source>　双击修改颜色 · 右键删除</source>
             <translation> Double-click to edit · Right-click to delete</translation>
         </message>
         <message>
-            <location filename="../dialogs/color.py" line="271" />
+            <location filename="../dialogs/color.py" line="276" />
             <source>修改该位置的颜色…</source>
             <translation>Change this color…</translation>
         </message>
         <message>
-            <location filename="../dialogs/color.py" line="121" />
+            <location filename="../dialogs/color.py" line="133" />
             <source>预设颜色</source>
             <translation>Preset colors</translation>
         </message>
         <message>
-            <location filename="../dialogs/color.py" line="126" />
+            <location filename="../dialogs/color.py" line="138" />
             <source>我的颜色</source>
             <translation>My colors</translation>
         </message>
         <message>
-            <location filename="../dialogs/color.py" line="175" />
+            <location filename="../dialogs/color.py" line="187" />
             <source>颜色 {color}</source>
             <translation>Color {color}</translation>
         </message>
         <message>
-            <location filename="../dialogs/color.py" line="177" />
+            <location filename="../dialogs/color.py" line="189" />
             <source>　点击应用</source>
             <translation> Click to apply</translation>
         </message>
         <message>
-            <location filename="../dialogs/color.py" line="239" />
+            <location filename="../dialogs/color.py" line="244" />
             <source>保存失败</source>
             <translation>Save failed</translation>
         </message>
         <message>
-            <location filename="../dialogs/color.py" line="272" />
+            <location filename="../dialogs/color.py" line="277" />
             <source>删除该颜色</source>
             <translation>Delete this color</translation>
         </message>
@@ -741,22 +741,22 @@
     <context>
         <name>MainWindow</name>
         <message>
-            <location filename="../winconst.py" line="22" />
+            <location filename="../winconst.py" line="25" />
             <source>文件与美化</source>
             <translation>Files and beautify</translation>
         </message>
         <message>
-            <location filename="../winconst.py" line="23" />
+            <location filename="../winconst.py" line="26" />
             <source>字体与画布</source>
             <translation>Fonts and canvas</translation>
         </message>
         <message>
-            <location filename="../winconst.py" line="24" />
+            <location filename="../winconst.py" line="27" />
             <source>水印与效果</source>
             <translation>Watermark and effects</translation>
         </message>
         <message>
-            <location filename="../win_build.py" line="531" />
+            <location filename="../win_build.py" line="536" />
             <source>识别型号</source>
             <translation>Model</translation>
         </message>
@@ -800,98 +800,98 @@
             <translation>「ShuiYin · Watermark」 Watermark Tool</translation>
         </message>
         <message>
-            <location filename="../win_build.py" line="474" />
+            <location filename="../win_build.py" line="479" />
             <source>单张图片</source>
             <translation>Single image</translation>
         </message>
         <message>
-            <location filename="../win_build.py" line="475" />
+            <location filename="../win_build.py" line="480" />
             <source>批量目录</source>
             <translation>Batch folder</translation>
         </message>
         <message>
-            <location filename="../win_build.py" line="482" />
+            <location filename="../win_build.py" line="487" />
             <source>模式</source>
             <translation>Mode</translation>
         </message>
         <message>
-            <location filename="../win_build.py" line="486" />
+            <location filename="../win_build.py" line="491" />
             <source>输入图片</source>
             <translation>Input image</translation>
         </message>
         <message>
-            <location filename="../win_build.py" line="490" />
+            <location filename="../win_build.py" line="495" />
             <source>图片目录</source>
             <translation>Image folder</translation>
         </message>
         <message>
-            <location filename="../win_build.py" line="525" />
+            <location filename="../win_build.py" line="530" />
             <source>美化型号</source>
             <translation>Pretty model</translation>
         </message>
         <message>
-            <location filename="../win_build.py" line="545" />
+            <location filename="../win_build.py" line="550" />
             <source>品牌</source>
             <translation>Make</translation>
         </message>
         <message>
-            <location filename="../win_build.py" line="546" />
+            <location filename="../win_build.py" line="551" />
             <source>如 Canon</source>
             <translation>e.g. Canon</translation>
         </message>
         <message>
-            <location filename="../win_build.py" line="547" />
-            <location filename="../win_build.py" line="550" />
+            <location filename="../win_build.py" line="552" />
+            <location filename="../win_build.py" line="555" />
             <source>原样输出</source>
             <translation>Used as-is</translation>
         </message>
         <message>
-            <location filename="../win_build.py" line="548" />
+            <location filename="../win_build.py" line="553" />
             <source>型号</source>
             <translation>Model</translation>
         </message>
         <message>
-            <location filename="../win_build.py" line="549" />
+            <location filename="../win_build.py" line="554" />
             <source>如 EOS R5</source>
             <translation>e.g. EOS R5</translation>
         </message>
         <message>
-            <location filename="../win_build.py" line="551" />
+            <location filename="../win_build.py" line="556" />
             <source>快门</source>
             <translation>Shutter</translation>
         </message>
         <message>
-            <location filename="../win_build.py" line="552" />
+            <location filename="../win_build.py" line="557" />
             <source>如 1/125</source>
             <translation>e.g. 1/125</translation>
         </message>
         <message>
-            <location filename="../win_build.py" line="554" />
+            <location filename="../win_build.py" line="559" />
             <source>光圈</source>
             <translation>Aperture</translation>
         </message>
         <message>
-            <location filename="../win_build.py" line="555" />
+            <location filename="../win_build.py" line="560" />
             <source>如 2.8</source>
             <translation>e.g. 2.8</translation>
         </message>
         <message>
-            <location filename="../win_build.py" line="557" />
+            <location filename="../win_build.py" line="562" />
             <source>如 100</source>
             <translation>e.g. 100</translation>
         </message>
         <message>
-            <location filename="../win_build.py" line="553" />
+            <location filename="../win_build.py" line="558" />
             <source>自动补充 s 后缀</source>
             <translation>Adds the "s" suffix</translation>
         </message>
         <message>
-            <location filename="../win_build.py" line="556" />
+            <location filename="../win_build.py" line="561" />
             <source>自动补充 f/ 前缀</source>
             <translation>Adds the "f/" prefix</translation>
         </message>
         <message>
-            <location filename="../win_build.py" line="558" />
+            <location filename="../win_build.py" line="563" />
             <source>自动补充 ISO 前缀</source>
             <translation>Adds the "ISO" prefix</translation>
         </message>
@@ -1333,17 +1333,22 @@
             <translation>0–30 px, default 5</translation>
         </message>
         <message>
-            <location filename="../widgets.py" line="150" />
+            <location filename="../widgets.py" line="153" />
             <source>点击选择颜色</source>
             <translation>Click to pick a color</translation>
         </message>
         <message>
-            <location filename="../widgets.py" line="159" />
+            <location filename="../widgets.py" line="156" />
+            <source>颜色管理</source>
+            <translation>Color library</translation>
+        </message>
+        <message>
+            <location filename="../widgets.py" line="167" />
             <source>选择字体</source>
             <translation>Choose font</translation>
         </message>
         <message>
-            <location filename="../widgets.py" line="295" />
+            <location filename="../widgets.py" line="303" />
             <source>选择字体文件</source>
             <translation>Choose a font file</translation>
         </message>
@@ -1577,7 +1582,7 @@
     <context>
         <name>PreviewBox</name>
         <message>
-            <location filename="../widgets.py" line="478" />
+            <location filename="../widgets.py" line="490" />
             <source>请拖入图片，或点击「打开图片」</source>
             <translation>Drop an image, or click "Open image"</translation>
         </message>
@@ -1610,22 +1615,22 @@
             <translation>Select an image first (or drop one), then refresh</translation>
         </message>
         <message>
-            <location filename="../win_preview.py" line="131" />
+            <location filename="../win_preview.py" line="141" />
             <source>预览失败：</source>
             <translation>Preview failed: </translation>
         </message>
         <message>
-            <location filename="../win_preview.py" line="144" />
+            <location filename="../win_preview.py" line="154" />
             <source>渲染 {ms:.0f} ms · 请求 &gt; 显示 {e2e:.0f} ms · 缓存命中 -{hit:.0f}ms</source>
             <translation>Render {ms:.0f} ms · request &gt; shown {e2e:.0f} ms · cached -{hit:.0f}ms</translation>
         </message>
         <message>
-            <location filename="../win_preview.py" line="176" />
+            <location filename="../win_preview.py" line="186" />
             <source>渲染分段({tag}) 合计 {total:.0f}ms</source>
             <translation>Render stages ({tag}), total {total:.0f} ms</translation>
         </message>
         <message>
-            <location filename="../win_preview.py" line="179" />
+            <location filename="../win_preview.py" line="189" />
             <source>参数指纹:</source>
             <translation>Parameter fingerprint:</translation>
         </message>
@@ -1633,52 +1638,52 @@
     <context>
         <name>PreviewStateChip</name>
         <message>
-            <location filename="../widgets.py" line="72" />
+            <location filename="../widgets.py" line="73" />
             <source>无预览</source>
             <translation>No preview</translation>
         </message>
         <message>
-            <location filename="../widgets.py" line="73" />
+            <location filename="../widgets.py" line="74" />
             <source>渲染中…</source>
             <translation>Rendering…</translation>
         </message>
         <message>
-            <location filename="../widgets.py" line="74" />
+            <location filename="../widgets.py" line="75" />
             <source>已按当前参数渲染</source>
             <translation>Rendered with current settings</translation>
         </message>
         <message>
-            <location filename="../widgets.py" line="75" />
+            <location filename="../widgets.py" line="76" />
             <source>参数已改，待渲染</source>
             <translation>Settings changed, not rendered yet</translation>
         </message>
         <message>
-            <location filename="../widgets.py" line="76" />
+            <location filename="../widgets.py" line="77" />
             <source>渲染失败，未更新</source>
             <translation>Render failed, not updated</translation>
         </message>
         <message>
-            <location filename="../widgets.py" line="79" />
+            <location filename="../widgets.py" line="80" />
             <source>未选择图片</source>
             <translation>No image selected</translation>
         </message>
         <message>
-            <location filename="../widgets.py" line="80" />
+            <location filename="../widgets.py" line="81" />
             <source>正在渲染，完成后自动更新</source>
             <translation>Rendering; the preview updates automatically</translation>
         </message>
         <message>
-            <location filename="../widgets.py" line="81" />
+            <location filename="../widgets.py" line="82" />
             <source>预览已与当前参数一致（缩略档渲染，细节请用放大镜查看）</source>
             <translation>The preview matches the current settings (rendered at reduced size; use the magnifier for detail)</translation>
         </message>
         <message>
-            <location filename="../widgets.py" line="82" />
+            <location filename="../widgets.py" line="83" />
             <source>预览尚未更新到当前参数，渲染完成后自动更新</source>
             <translation>The preview has not been updated to the current settings yet; it refreshes when rendering finishes</translation>
         </message>
         <message>
-            <location filename="../widgets.py" line="83" />
+            <location filename="../widgets.py" line="84" />
             <source>上次预览渲染失败，当前显示的是上一张成功的预览</source>
             <translation>The last preview render failed; the preview shown is the previous successful one</translation>
         </message>

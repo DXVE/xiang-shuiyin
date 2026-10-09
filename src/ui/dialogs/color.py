@@ -23,6 +23,18 @@ PRESET_COLORS = [
 MAX_USER_COLORS = 10
 
 
+# 开系统取色器取一个色号(取消返回 None); title 由调用方按自己的语境给
+# 自行构造对话框并经 _prep_dialog 固定位置: QColorDialog.getColor() 这类静态函数显示后 Qt 会再调一次位置
+def pick_native_color(parent, initial, title):
+    dlg = QColorDialog(QColor(initial or "#FFFFFF"), parent)
+    dlg.setWindowTitle(title)
+    _prep_dialog(dlg)
+    if dlg.exec() != QDialog.DialogCode.Accepted:
+        return None
+    c = dlg.currentColor()
+    return c.name() if c.isValid() else None
+
+
 class ColorDialog(QDialog):
     # 取色弹窗(点参数行的色块打开): 当前颜色 + 预设颜色 + 我的颜色 三张卡片
     # 点色块即时应用(弹窗不关, 可边点边看效果); 收藏色存 settings.json 的 custom_colors(核心截到 10 个)
@@ -218,14 +230,7 @@ class ColorDialog(QDialog):
 
     def _pick_native(self, initial=None):
         # 开系统取色器, 返回选中的色号(取消返回 None)
-        # 自行构造对话框并经 _prep_dialog 固定位置: QColorDialog.getColor() 这类静态函数显示后 Qt 会再调一次位置
-        dlg = QColorDialog(QColor(initial or self._current), self)
-        dlg.setWindowTitle(self.tr("选择颜色"))
-        _prep_dialog(dlg)
-        if dlg.exec() != QDialog.DialogCode.Accepted:
-            return None
-        c = dlg.currentColor()
-        return c.name() if c.isValid() else None
+        return pick_native_color(self, initial or self._current, self.tr("选择颜色"))
 
     def _native(self):
         c = self._pick_native()

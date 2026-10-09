@@ -17,6 +17,7 @@ class MapDialog(QDialog):
         self.setWindowTitle(self.tr("型号映射管理"))
         self.resize(560, 460)
         self._data = {}
+        self.changed = False               # 本次弹窗是否真的增删改过映射表: 主窗据此决定关窗后要不要补一次重渲
         try:
             self._logo_dir = (parent._params.get("logo_dir") if parent else "") or DEFAULT_LOGO_DIR
         except Exception:
@@ -97,15 +98,18 @@ class MapDialog(QDialog):
 
     def _apply_change(self, label, fn):
         # 执行一次改动并单独记一步撤销(增 / 改 / 删各一步, 步名进入撤销按钮 tooltip)
+        # 同时置 changed: 只有真改过, 主窗关窗后才有必要重渲
         win = self.parent()
         begin = getattr(win, "_begin_undo", None) if win is not None else None
         commit = getattr(win, "_commit_undo", None) if win is not None else None
         if begin is None or commit is None:          # 无主窗口时退化为直接执行
             fn()
+            self.changed = True
             return
         begin("__model_map__", label)
         try:
             fn()
+            self.changed = True
         finally:
             commit()
 

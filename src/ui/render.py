@@ -23,6 +23,7 @@ class PreviewWorker(QThread):
     # 预览渲染器: 请求只覆盖待渲染槽(latest-wins), 线程每轮取最新一份
 
     rendered = Signal(dict)
+    fast = Signal(dict)      # 先导帧: 低分辨率画面即时上屏, 全分辨率帧随后经 rendered 覆盖
 
     def __init__(self, state, parent=None):
         super().__init__(parent)
@@ -73,7 +74,8 @@ class PreviewWorker(QThread):
                 my_seq = self._seq              # 本轮代号: 期间来了更新的请求就作废
             # 排队 = 从发起请求到真正开渲的等待(只可能来自等上一轮跑完), 与渲染耗时分开统计
             resp = self._render(req, queue_ms=(time.perf_counter() - t0) * 1000,
-                                cancel_check=self._stale_check(my_seq))
+                                cancel_check=self._stale_check(my_seq),
+                                on_fast=self._fast_cb(my_seq, req))
             with self._cv:
                 # 这两个值在回传时刻读取: 本轮开始时读到的是上一轮的到达数, 会把最新一帧标成过期
                 arrived = self._arrived_during
@@ -91,40 +93,59 @@ class PreviewWorker(QThread):
             resp["queued"] = queued
             self.rendered.emit(resp)
 
-    def _render(self, req, queue_ms=0.0, cancel_check=None):
+    def _fast_cb(self, seq, req):
+        # 先导帧回调(在渲染线程内被核心调用): 本轮已被更新的请求取代时不推, 屏上那一帧比它新
+        def cb(resp):
+            if self._seq != seq:      # 读 int 不加锁(GIL 内原子), 与 _stale_check 同口径
+                return
+            out = self._finalize(req, resp)
+            if out.get("ok"):
+                out["fast"] = True
+                self.fast.emit(out)
+        return cb
+
+    def _render(self, req, queue_ms=0.0, cancel_check=None, on_fast=None):
         t0 = time.perf_counter()
         try:
-            resp = self._state.make_preview(req, cancel_check=cancel_check)
+            resp = self._state.make_preview(req, cancel_check=cancel_check, on_fast=on_fast)
         except Exception as e:                     # noqa: BLE001 - 任何异常都要回给界面
             traceback.print_exc()
             return {"ok": False, "error": f"预览失败: {e}", "ms": 0, "queue_ms": queue_ms}
-        resp = dict(resp or {})
-        resp["ms"] = (time.perf_counter() - t0) * 1000
+        # 渲染耗时不含转图与上屏缩放: 两者由 _finalize 各自计时, 合成一个数会让"渲染偏慢"误报
+        ms = (time.perf_counter() - t0) * 1000
+        resp = self._finalize(req, resp)
+        resp["ms"] = ms
         resp["queue_ms"] = queue_ms
+        return resp
+
+    def _finalize(self, req, resp):
+        # 把核心回传的整幅画布 PIL 图转成 QImage, 并按请求时的可用区尺寸缩出一张上屏位图
+        resp = dict(resp or {})
         pil = resp.get("image")
-        if resp.get("ok") and pil is not None:
+        if not resp.get("ok") or pil is None:
+            return resp
+        t_conv = time.perf_counter()
+        # 整幅画布仍要一份 QImage: 放大镜按像素从它重采样, 窗口尺寸变化时也由它回落重采样
+        resp["source"] = _pil_to_qimage(pil)
+        resp["canvas"] = pil.size
+        conv_ms = (time.perf_counter() - t_conv) * 1000
+        box = req.get("display")      # (可用区设备宽, 设备高, dpr): 界面预览框请求时的上屏尺寸
+        if box:
+            # 与界面 _fit_dev 同一算法(同一个 QSize.scaled), 保证界面拿到就能 1:1 直贴
+            target = QSize(pil.width, pil.height).scaled(
+                QSize(int(box[0]), int(box[1])), Qt.AspectRatioMode.KeepAspectRatio)
+            t_scale = time.perf_counter()
+            small = pil.resize((target.width(), target.height()), Image.LANCZOS)
+            resp["scale_ms"] = (time.perf_counter() - t_scale) * 1000
             t_conv = time.perf_counter()
-            # 整幅画布仍要一份 QImage: 放大镜按像素从它重采样, 窗口尺寸变化时也由它回落重采样
-            resp["source"] = _pil_to_qimage(pil)
-            resp["canvas"] = pil.size
-            conv_ms = (time.perf_counter() - t_conv) * 1000
-            box = req.get("display")      # (可用区设备宽, 设备高, dpr): 界面预览框请求时的上屏尺寸
-            if box:
-                # 与界面 _fit_dev 同一算法(同一个 QSize.scaled), 保证界面拿到就能 1:1 直贴
-                target = QSize(pil.width, pil.height).scaled(
-                    QSize(int(box[0]), int(box[1])), Qt.AspectRatioMode.KeepAspectRatio)
-                t_scale = time.perf_counter()
-                small = pil.resize((target.width(), target.height()), Image.LANCZOS)
-                resp["scale_ms"] = (time.perf_counter() - t_scale) * 1000
-                t_conv = time.perf_counter()
-                resp["image"] = _pil_to_qimage(small)
-                conv_ms += (time.perf_counter() - t_conv) * 1000
-                resp["display"] = (target.width(), target.height())
-                resp["display_dpr"] = float(box[2])
-            else:
-                resp["image"] = resp["source"]
-            # PIL->QImage 的两次内存拷贝(整幅 + 上屏小图): 与渲染、缩放各自分开统计
-            resp["qimg_ms"] = conv_ms
+            resp["image"] = _pil_to_qimage(small)
+            conv_ms += (time.perf_counter() - t_conv) * 1000
+            resp["display"] = (target.width(), target.height())
+            resp["display_dpr"] = float(box[2])
+        else:
+            resp["image"] = resp["source"]
+        # PIL->QImage 的两次内存拷贝(整幅 + 上屏小图): 与渲染、缩放各自分开统计
+        resp["qimg_ms"] = conv_ms
         return resp
 
 

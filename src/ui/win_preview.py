@@ -123,6 +123,16 @@ class PreviewMixin:
         self._preview_worker.request(req)
         self._sync_chip()
 
+    def _on_fast(self, resp):
+        # 先导帧: 只上屏, 不动身份标识、状态标识与完成指标(全分辨率帧随后经 _on_rendered 覆盖)
+        img = resp.get("image")
+        if img is None:
+            return
+        self._preview.set_image(img, source=resp.get("source"), canvas=resp.get("canvas"),
+                                shown=resp.get("display"), shown_dpr=resp.get("display_dpr"))
+        self._preview.set_geo(resp.get("geom"))
+        logging.info(f"[预览] 先导帧上屏 {resp.get('ms', 0):.0f}ms 画布 {resp.get('canvas')}")
+
     def _on_rendered(self, resp):
         if not resp.get("ok"):
             err = i18n.tr_msg(str(resp.get("error") or ""))

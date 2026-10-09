@@ -2,7 +2,8 @@
 from PIL import Image
 from .cache import _LAYER_CACHE_TLS, _THUMB_SAVED_MS, _THUMB_STATS, cache_saved_ms
 from .config import (DEFAULT_LOGO_DIR, FONT_SETTING_MAP, LOW_RES_THRESHOLD, MAX_PRESET_SLOTS,
-                     PRESETS_DIR, PRESETS_FILE, PREVIEW_DIR, PREVIEW_MAX_SIDE)
+                     PRESETS_DIR, PRESETS_FILE, PREVIEW_DIR, PREVIEW_FAST_MAX_SIDE,
+                     PREVIEW_MAX_SIDE)
 from .exif import _inject_model_map, get_exif_data_from_path
 from .params import _format_manual_exif
 from .paths import (_default_font_path, _load_json, _repair_font_paths, _save_json, ensure_dir,
@@ -144,6 +145,23 @@ class RenderWorker(threading.Thread):
         self.events.put({"type": "log", "msg": result_msg, "level": "INFO" if success == total else "WARNING"})
         self.events.put({"type": "finished", "message": result_msg, "success": success == total,
                          "out_dir": out_dir, "ms": batch_ms, "count": success})
+
+
+# 预览档位对应的输入缩放比: None 表示不缩(原图本身短于该档位), 档位为 0 时按全量加载
+def _preview_scale_for(max_side, long_side):
+    if max_side <= 0:
+        logging.info(f"预览: 全量加载 {long_side}px(不缩略, 单次渲染会明显变慢)")
+        return None
+    scale = max_side / long_side
+    return scale if scale < 1.0 else None
+
+
+# 摘取渲染线程给的过期判据: 判据本身抛错时按"未过期"处理, 不因此中断回帧
+def _cancel_requested(cancel_check):
+    try:
+        return bool(cancel_check()) if callable(cancel_check) else False
+    except Exception:
+        return False
 
 
 class AppState:
@@ -459,6 +477,54 @@ class AppState:
         return src, src_h
 
 
+    # 该原图在指定档位的缩略图是否已生成: 只查缓存不触发生成, 与 _preview_src_for 共用同一套键
+    def _preview_src_cached(self, input_path, max_side):
+        try:
+            st = os.stat(input_path)
+            key = (os.path.normcase(os.path.abspath(input_path)), st.st_mtime_ns, st.st_size, max_side)
+        except Exception:
+            return False
+        with self._thumb_lock:
+            ent = self._thumb_cache.get(key)
+        return bool(ent and os.path.isfile(ent[0]))
+
+    # 先导帧条件: 首次看这张大图(全档缩略图尚未生成)才先渲一帧小图, 之后每帧调参都不再付这份开销
+    def _want_pilot(self, on_fast, input_path, long_side):
+        if not callable(on_fast) or long_side <= PREVIEW_FAST_MAX_SIDE:
+            return False
+        return not self._preview_src_cached(input_path, PREVIEW_MAX_SIDE)
+
+    # 一档预览渲染: 缩略到 max_side 后渲染, 返回 (ok, resp); resp 的 image 是整幅画布的 PIL 图(不落盘), 由渲染线程转 QImage 并缩到上屏尺寸
+    def _render_tier(self, input_path, params, req, src_image, max_side, preview_scale, cancel_check):
+        geom_out, image_out, stage_out = {}, [], []
+        t0 = time.perf_counter()
+        try:
+            success, _ = self._render_preview(
+                input_path, params, req.get("manual_exif"),
+                req.get("raw_model"), req.get("custom_model"),
+                None, preview_scale=preview_scale,
+                geom_out=geom_out, src_image=src_image, image_out=image_out,
+                stage_out=stage_out, max_side=max_side,
+                cancel_check=cancel_check)
+        except PreviewCancelled:
+            raise
+        except Exception as e:
+            logging.error(f"预览生成失败: {e}")
+            return False, {"ok": False, "error": f"预览生成失败: {e}"}
+        if not success or not image_out:
+            return False, {"ok": False, "error": "预览生成失败"}
+        resp = {"ok": True, "image": image_out[0],
+                # 全量档(max_side=0)返回真实画布边长, 避免调用方与日志读到 0
+                "max_side": max_side or max(image_out[0].size),
+                # 本档从开渲到出图的耗时: 全档会被渲染线程的请求级耗时覆盖, 先导帧则据此报告即时上屏的代价
+                "ms": (time.perf_counter() - t0) * 1000}
+        if geom_out:
+            resp["geom"] = geom_out   # 间距段坐标, 预览图叠加标注用
+        if stage_out:
+            resp["stage"] = stage_out[0]   # 渲染分段: 界面显示 + 请求级日志复用, 不必读日志文件
+        return True, resp
+
+
     # 统一渲染入口: preview_scale 给定时先缩略输入图, geom_out 收集间距段几何, src_image 复用调用方已打开的句柄, stage_out 回传渲染分段
     def _render_preview(self, input_path, params, manual_exif, raw_model, custom_model,
                         out_path, preview_scale=None, pv="", geom_out=None, src_image=None,
@@ -493,14 +559,12 @@ class AppState:
                               **params)
 
     # 实时预览: 输入图缩略到 PREVIEW_MAX_SIDE 后渲染, 画布 PIL 图经 image_out 回给调用方(不落盘)
-    def make_preview(self, req, cancel_check=None):
+    # on_fast: 可选回调, 传入时先渲一帧低分辨率画面交它即时上屏(仅首次看这张大图, 见 _want_pilot)
+    def make_preview(self, req, cancel_check=None, on_fast=None):
         input_path = (req.get("input_path") or "").strip()
         if not input_path or not os.path.isfile(input_path) or not self._is_allowed_input(input_path):
             return {"ok": False, "error": "请先选择一张输入图片"}
         params = req.get("params") or {}
-        geom_out = {}
-        image_out = []
-        stage_out = []          # 渲染分段结果: 随 resp 回给调用方(界面 tooltip 用), 成本可忽略
         with self._render_lock:
             self._rendering_count += 1
         # 本帧靠缓存命中省下的时间: 取渲染前后的差值(读的是已有计数器, 不是新加的计时点)
@@ -508,23 +572,23 @@ class AppState:
         try:
             # 只打开一次原图: 尺寸计算与缩略图生成共用同一句柄
             with Image.open(input_path) as im:
-                w, h = im.size
-                long_side = max(w, h) or 1
-                # PREVIEW_MAX_SIDE=0 时走全量: preview_scale=None, 各像素参数比例等于 1, 预览与成品同源。
-                max_side = PREVIEW_MAX_SIDE
-                preview_scale = None
-                if max_side > 0:
-                    scale = max_side / long_side
-                    preview_scale = scale if scale < 1.0 else None
-                else:
-                    logging.info(f"预览: 全量加载 {w}x{h}(不缩略, 单次渲染会明显变慢)")
-                success, _ = self._render_preview(
-                    input_path, params, req.get("manual_exif"),
-                    req.get("raw_model"), req.get("custom_model"),
-                    None, preview_scale=preview_scale,
-                    geom_out=geom_out, src_image=im, image_out=image_out,
-                    stage_out=stage_out, max_side=max_side,
-                    cancel_check=cancel_check)
+                long_side = max(im.size) or 1
+                if self._want_pilot(on_fast, input_path, long_side):
+                    # 先导帧缩"解码后原图的副本": 两档共用这一次解码(24MP 图上省约 450ms),
+                    # 副本不可省 —— _write_preview_src 用 thumbnail() 原地缩小, 借用原句柄会把随后的全档缩略图也缩成小档
+                    im.load()
+                    ok_p, pilot = self._render_tier(
+                        input_path, params, req, im.copy(), PREVIEW_FAST_MAX_SIDE,
+                        _preview_scale_for(PREVIEW_FAST_MAX_SIDE, long_side), cancel_check)
+                    if ok_p:
+                        pilot["fast"] = True
+                        on_fast(pilot)
+                    if _cancel_requested(cancel_check):
+                        # 先导帧期间已被更新的请求取代: 全分辨率帧不必再渲
+                        return {"ok": False, "cancelled": True}
+                ok, resp = self._render_tier(
+                    input_path, params, req, im, PREVIEW_MAX_SIDE,
+                    _preview_scale_for(PREVIEW_MAX_SIDE, long_side), cancel_check)
         except PreviewCancelled as e:
             # 本轮已过期: 不回帧、不当失败, 线程随即去渲待渲染槽里的最新一份
             logging.info(f"预览: 上一轮在「{e}」处让位给更新的请求")
@@ -535,19 +599,11 @@ class AppState:
         finally:
             with self._render_lock:
                 self._rendering_count -= 1
-        if not success or not image_out:
-            return {"ok": False, "error": "预览生成失败"}
+        if not ok:
+            return resp
         # 这一帧的缓存收益: 与本帧渲染耗时并列显示, 才有"对照"的意义(累计值只会一直变大)
         # 口径: 命中次数 × 各条目上次构建耗时。生成线程同时在跑时, 它的命中会算进来, 略有偏差。
-        hit_ms = max(0.0, cache_saved_ms()["合计"] - saved_before)
-        resp = {"ok": True, "image": image_out[0],
-                "cache_hit_ms": hit_ms,
-                # 全量档(max_side=0)返回真实画布边长, 避免调用方与日志读到 0
-                "max_side": max_side or max(image_out[0].size)}
-        if geom_out:
-            resp["geom"] = geom_out   # 间距段坐标, 预览图叠加标注用
-        if stage_out:
-            resp["stage"] = stage_out[0]   # 渲染分段: 界面显示 + 请求级日志复用, 不必读日志文件
+        resp["cache_hit_ms"] = max(0.0, cache_saved_ms()["合计"] - saved_before)
         return resp
 
     def cleanup(self):

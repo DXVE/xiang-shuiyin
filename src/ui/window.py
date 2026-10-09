@@ -137,6 +137,7 @@ class MainWindow(BuildMixin, UndoVisibilityMixin, PresetMixin, PreviewMixin, Fil
 
         self._preview_worker = PreviewWorker(state, self)
         self._preview_worker.rendered.connect(self._on_rendered)
+        self._preview_worker.fast.connect(self._on_fast)
         self._preview_worker.start()
         self._event_watcher = EventWatcher(state, self)
         self._event_watcher.event.connect(self._on_event)

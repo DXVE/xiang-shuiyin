@@ -6,7 +6,7 @@ from core.config import DATA_DIR, DEFAULT_LOGO_DIR, LOG_DIR
 from core.exif import prettify_model
 from .dialogs.about import AboutDialog
 from .dialogs.base import _message, _open_and_report
-from .dialogs.color import ColorDialog
+from .dialogs.color import ColorDialog, pick_native_color
 from .dialogs.font import FontDialog
 from .dialogs.image_info import ImageInfoDialog
 from .dialogs.map import MapDialog
@@ -103,12 +103,20 @@ class ActionMixin:
         else:
             self._notify(self.tr("无法打开 Logo 目录：{path}").format(path=path))
 
+    def _pick_native_color(self, row):
+        # 点色块: 直接开系统取色器, 改一次颜色只要一步(不必先进「颜色管理」再点一次色块)
+        # 取色器标题用本行标签, 一眼看出在改哪种颜色
+        c = pick_native_color(self, row.value(), row.color_pick_title())
+        if c:
+            row.set_value(c)
+            self._on_param(row.key, c)
+
     def _open_color_dialog(self, row):
-        # 点「选择颜色」开弹窗(与「管理所有型号映射」同一形态); 弹窗里点色块即时应用
+        # 点「颜色管理」开弹窗(预设色 + 我的颜色); 弹窗内点色块即时应用, 由 _on_param 一并负责保存与预览
+        # 关闭后不再补一次渲染: 没有改动也重渲会让"开窗看一眼"白付一整帧
         dlg = ColorDialog(self.state, row.value(), self)
         dlg.picked.connect(lambda c, r=row: (r.set_value(c), self._on_param(r.key, c)))
         dlg.exec()
-        self.request_preview()
 
     def _open_font_dialog(self):
         # ☰ →「字体文件…」: 字体文件收进弹窗管理; 弹窗内每次改文件都走 _on_param, 已是即时生效
@@ -117,6 +125,9 @@ class ActionMixin:
     def _open_map_dialog(self):
         dlg = MapDialog(self.state, self)
         dlg.exec()
+        if not dlg.changed:
+            # 一行没改就关窗: 内存与文件本来就一致, 也不必重渲(开窗看一眼不该白付一整帧)
+            return
         # 撤销由弹窗逐步记录(见 MapDialog._apply_change), 此处收尾: 对齐内存与文件(写盘失败时以文件为准)并重渲预览
         self._reload_model_map()
         self._touch()

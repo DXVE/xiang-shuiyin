@@ -5,6 +5,9 @@ from core.config import MAX_PRESET_SLOTS, SLOW_RENDER_MS
 # 间距标注的心跳周期(ms): 周期过短会持续唤醒事件循环, 过长则响应迟滞
 _HOVER_POLL_MS = 80
 
+# 预览换帧的淡入时长(ms): 换帧统一按这个时长补间, 不宜过长, 否则等于让用户看着旧帧慢慢消失
+_PV_FADE_MS = 200
+
 # 槽位 1..10, 每槽一个文件(presets1..10): 文件名只承载槽位号, 回避非法字符与重名
 _PRESET_SLOTS = MAX_PRESET_SLOTS
 # 预设中的绝对路径键：本机存储时保留（同机存取可还原字体），仅在导出时剥离，使导出文件与机器无关。

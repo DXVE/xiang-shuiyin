@@ -261,6 +261,7 @@ class BuildMixin:
                 row.changed.connect(self._on_param)
                 if s["kind"] == "color":
                     row.colorClicked.connect(lambda r=row: self._open_color_dialog(r))
+                    row.nativeColorClicked.connect(lambda r=row: self._pick_native_color(r))
                 self._rows[s["key"]] = row
                 card.keys.append(s["key"])
                 card.body.addWidget(row)
@@ -320,6 +321,9 @@ class BuildMixin:
         for r in self._rows.values():
             if getattr(r, "kind", "") == "path" and hasattr(r, "_path_btn"):
                 r._path_btn.setFixedWidth(grp)
+            # 色块行的「颜色管理」入口占的正是数值行步进器组那一段: 与它同宽, 色块右缘才与滑块列右缘对齐
+            if getattr(r, "kind", "") == "color" and hasattr(r, "color_btn"):
+                r.color_btn.setFixedWidth(grp)
 
     def _build_segbar(self):
         # 页签实现为分段控件: 外层一张卡片, 内含三个胶囊
@@ -415,6 +419,7 @@ class BuildMixin:
                 row.changed.connect(self._on_param)
                 if s["kind"] == "color":
                     row.colorClicked.connect(lambda r=row: self._open_color_dialog(r))
+                    row.nativeColorClicked.connect(lambda r=row: self._pick_native_color(r))
                 self._rows[s["key"]] = row
                 card.keys.append(s["key"])
                 card.body.addWidget(row)

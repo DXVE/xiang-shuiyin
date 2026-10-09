@@ -1,6 +1,6 @@
 """通用控件: 参数行、卡片、预览框、色块与胶囊开关等。"""
 from PIL import Image
-from PySide6.QtCore import QPointF, QRectF, QSize, QT_TRANSLATE_NOOP, QUrl, Qt, Signal
+from PySide6.QtCore import (QPointF, QRectF, QSize, QT_TRANSLATE_NOOP, QTimer, QUrl, Qt, Signal)
 from PySide6.QtGui import (QColor, QDesktopServices, QIcon, QImage, QPainter, QPainterPath, QPen,
                            QPixmap)
 from PySide6.QtWidgets import (QAbstractSpinBox, QCheckBox, QComboBox, QDoubleSpinBox, QFrame,
@@ -9,6 +9,7 @@ from PySide6.QtWidgets import (QAbstractSpinBox, QCheckBox, QComboBox, QDoubleSp
 from . import theme
 from .dialogs.base import _open_file_dialog
 from .render import _pil_to_qimage
+from .winconst import _PV_FADE_MS
 import logging
 import math
 import os
@@ -104,7 +105,8 @@ class ParamRow(QWidget):
     # 一行参数控件。按 kind 组装, 对外统一的 changed(key, value) / set_value() / value()。
 
     changed = Signal(str, object)
-    colorClicked = Signal()      # 点「选择颜色」: 取色弹窗由主窗提供(需读取用户保存的颜色)
+    colorClicked = Signal()          # 点「颜色管理」: 打开预设与收藏弹窗(取色弹窗由主窗提供, 需读取用户保存的颜色)
+    nativeColorClicked = Signal()    # 点色块: 打开系统取色器(弹窗不参与, 故不经过主窗的取色弹窗)
 
     def __init__(self, spec, value, parent=None):
         super().__init__(parent)
@@ -144,12 +146,18 @@ class ParamRow(QWidget):
                 lay.addWidget(self.combo, 1)
 
             elif self.kind == "color":
-                # 色块**本身就是按钮**: 直接点色块开取色弹窗, 右边缘仍与数值行的步进器组对齐(宽度由布局拉伸给出)。
+                # 双入口: 色块本身是按钮, 点它直接开系统取色器(改一次颜色只要一步); 行尾「颜色管理」进预设与收藏
+                # 两段的宽度由主窗给: 色块按拉伸吃掉滑块列, 管理入口与步进器组同宽(见 _unify_spins), 故本行与数值行左右都对齐
                 self.swatch = QPushButton()
                 self.swatch.setCursor(Qt.PointingHandCursor)
                 self.swatch.setToolTip(self.tr("点击选择颜色"))
-                self.swatch.clicked.connect(self.colorClicked.emit)
+                self.swatch.clicked.connect(self.nativeColorClicked.emit)
                 lay.addWidget(self.swatch, 1)
+                self.color_btn = QPushButton(self.tr("颜色管理"))
+                self.color_btn.setObjectName("mini")
+                self.color_btn.setCursor(Qt.PointingHandCursor)
+                self.color_btn.clicked.connect(self.colorClicked.emit)
+                lay.addWidget(self.color_btn)
 
             elif self.kind == "path":
                 self.edit = QLineEdit()
@@ -297,6 +305,10 @@ class ParamRow(QWidget):
         if path:
             self.set_value(path)
             self.changed.emit(self.key, path)
+
+    def color_pick_title(self):
+        # 系统取色器的标题取本行标签: 与参数行同语境(ParamRow), 不必为标题另立一条文案
+        return self.tr(self._spec["label"])
 
 
 def _fx_divider():
@@ -479,6 +491,15 @@ class PreviewBox(QWidget):
         self._geom = None      # 间距段几何(画布像素坐标), 由 make_preview 的 resp.geom 回传
         self._hl = set()       # 当前要高亮的间距段键
         self._mag_pos = None   # 放大镜: 光标在控件内的位置(None=不显示)
+        self._prev_pm = None   # 沉底作淡入的那一帧位图, 收尾必须清掉; 为空表示从底色浮出(首次预览)
+        self._prev_box = None  # 底层帧上一次的显示矩形(与 _prev_pm 配对)
+        self._last_pm = None   # 最近一次真正画出的位图与矩形: 新帧据此沉底
+        self._last_box = None
+        self._fade_active = False
+        self._fade_t0 = 0.0
+        self._fade_timer = QTimer(self)
+        self._fade_timer.setInterval(16)
+        self._fade_timer.timeout.connect(self._fade_tick)
         self.setMouseTracking(True)
 
     def avail_dev(self):
@@ -491,6 +512,7 @@ class PreviewBox(QWidget):
     def set_image(self, image: QImage, source=None, canvas=None, shown=None, shown_dpr=None):
         # 接收一帧: image 已是上屏尺寸, source 是整幅画布(放大镜与回落路径用)
         # shown 为渲染线程缩图时用的可用区设备尺寸; 与本控件当前尺寸一致才 1:1 直贴
+        self._begin_fade()
         self._pix = QPixmap.fromImage(image)
         self._src = source if source is not None else image
         self._canvas = tuple(canvas) if canvas else (image.width(), image.height())
@@ -498,6 +520,38 @@ class PreviewBox(QWidget):
         self._pil = None
         self._scaled = None
         self._scaled_for = None
+        self.update()
+
+    def _begin_fade(self):
+        # 起淡入: 每次换帧都走同一条过渡, 不按间隔或宽高比分岔(否则同类操作有时淡入有时硬切)
+        # 唯一例外是没有可信的上一帧(首帧尚未画出/窗口刚变过尺寸), 那时只能原子替换
+        if self._fade_active:
+            # 淡入还没结束又来一帧: 沿用底层与进度, 只把最上面那帧换掉
+            # 重开一次会让画面往回跳(刚混进来那帧被撤掉), 连续调参时每帧都会这样
+            self.update()
+            return
+        if self._last_pm is None and self._pix is not None:
+            return
+        # 框里本来就是空的时候(首次预览)没有上一帧, 底就是背景色, 等于让画面从底色里浮出来
+        self._prev_pm, self._prev_box = (None, None) if self._pix is None else (self._last_pm, self._last_box)
+        self._fade_t0 = time.perf_counter()
+        self._fade_active = True
+        self._fade_timer.start()
+
+    def _stop_fade(self):
+        # 收起底层: 清空与淡入结束都要走这里, 漏一处旧帧就会留在屏上成重影
+        self._fade_timer.stop()
+        self._fade_active = False
+        self._prev_pm = None
+        self._prev_box = None
+
+    def _fade_progress(self):
+        # 淡入进度 0~1
+        return min(1.0, (time.perf_counter() - self._fade_t0) * 1000 / _PV_FADE_MS)
+
+    def _fade_tick(self):
+        if self._fade_progress() >= 1.0:
+            self._stop_fade()
         self.update()
 
     def _fit_dev(self):
@@ -546,7 +600,15 @@ class PreviewBox(QWidget):
             self._mag_pos = None
             self.update()
 
+    def resizeEvent(self, e):      # noqa: N802 - Qt 命名
+        # 尺寸一变, 上一帧的位图与矩形都失效: 收起底层并忘掉它, 之后一帧走原子替换
+        self._stop_fade()
+        self._last_pm = None
+        self._last_box = None
+        super().resizeEvent(e)
+
     def clear(self):
+        self._stop_fade()
         self._pix = None
         self._src = None
         self._canvas = None
@@ -554,6 +616,8 @@ class PreviewBox(QWidget):
         self._pil = None
         self._scaled = None
         self._scaled_for = None
+        self._last_pm = None
+        self._last_box = None
         self.update()
 
     def paintEvent(self, _e):
@@ -585,11 +649,26 @@ class PreviewBox(QWidget):
         # 原点取整到**设备像素**: 位图不设 dpr, 由这里按设备几何给出目标矩形, 与屏幕 1:1。
         ox = round((self.width() * dpr - pm.width()) / 2) / dpr
         oy = round((self.height() * dpr - pm.height()) / 2) / dpr
-        p.drawPixmap(QRectF(ox, oy, pm.width() / dpr, pm.height() / dpr), pm,
-                     QRectF(0, 0, pm.width(), pm.height()))
         box = QRectF(ox, oy, pm.width() / dpr, pm.height() / dpr)
+        if self._fade_active:
+            # 交叉淡入: 底层在上、新帧在上层, 两者一起按进度补间(底层可能为空, 那就是从底色浮出来)
+            t = self._fade_progress()
+            if self._prev_pm is not None:
+                p.setOpacity(1.0 - t)
+                self._draw_frame(p, self._prev_pm, self._prev_box)
+            p.setOpacity(t)
+            self._draw_frame(p, pm, box)
+            p.setOpacity(1.0)
+        else:
+            self._draw_frame(p, pm, box)
+        # 记下这一帧实际画出的位图与矩形: 下一帧据此沉底
+        self._last_pm, self._last_box = pm, box
         self._paint_geom(p, box)
         self._paint_magnifier(p, box)
+
+    def _draw_frame(self, p, pm, box):
+        # 贴一帧: 位图不设 dpr, 目标矩形由调用方按设备几何给出
+        p.drawPixmap(box, pm, QRectF(0, 0, pm.width(), pm.height()))
 
     def _paint_magnifier(self, p, target):
         # 放大镜: 固定预览框右上角, 内容随光标平移(光标所指的源点居中)
