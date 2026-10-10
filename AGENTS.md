@@ -315,12 +315,12 @@
 - 界面槽位里的中文（标签、按钮、复选框、tooltip、菜单项、下拉选项、窗口标题）**必须**用 `tr()` / `QCoreApplication.translate()` 包裹；参数表里的中文**不逐条包**，只在显示时由参数行与卡片各包一次。
 - 给 lupdate 的标记**必须**写成字面量，且 context 与消费处的类名一致（如 `PreviewStateChip`、`stats`、`dialog`、`main`）；**不得**写变量（会归到空 context，表现为“翻译了但界面不生效”）。
 - 内核 f-string 拼的中文**不得**在核心里逐个 `tr()`：登记进 `ui/i18n._CORE_MSG_TEMPLATES`，在显示边界过 `tr_msg()`（匹配不到时降级为中文）。
-- 改动文案 / 加控件 / 动参数表之后**必须**按序执行：`tools/build_i18n.py`（演练，只报差异）→ 确认无误 → `tools/build_i18n.py --write` → `tools/check_i18n.py`。校验三项（未包裹的界面中文、`.ts` 未完成条目、内核模板覆盖率）**任一不过即视为未完成**。
+- 改动文案 / 加控件 / 动参数表之后**必须**按序执行：`scripts/build_i18n.py`（演练，只报差异）→ 确认无误 → `scripts/build_i18n.py --write` → `scripts/check_i18n.py`。校验三项（未包裹的界面中文、`.ts` 未完成条目、内核模板覆盖率）**任一不过即视为未完成**。
 - `.ts` 与 `.qm` 都随仓库提交；**不得**手改 `.qm`，也**不得**只改 `.qm`。
 - 切语言**必须**重启生效：**不得**实现热切换（原因见 wiki §8）。
 - 不翻译：只进日志与控制台的诊断串、耗时提示里的参数指纹。
 - Qt 自带的那部分文案（系统原生文件选择界面的按钮与列名）由 `i18n._install_qt_translations()` 装载：按 `_QT_LOCALE` 把语言码换成地区码，从 Qt 的翻译目录取 `qtbase_<locale>` 与 `qt_<locale>`，**中文（源语言）这一路也要装**；新增语言时**必须**同步该映射，否则该语言下这部分文案仍是英文。
-- **验收**：`tools/check_i18n.py` 通过；切到英文并重启后界面无残留中文；失败 / 进度 / 取消这类内核消息也被翻译；打包产物同样能切英文（否则是 `datas` 少了 `ui/i18n`）。
+- **验收**：`scripts/check_i18n.py` 通过；切到英文并重启后界面无残留中文；失败 / 进度 / 取消这类内核消息也被翻译；打包产物同样能切英文（否则是 `datas` 少了 `ui/i18n`）。
 
 ## 6. 按任务索引：改什么 → 做什么 → 怎么验收
 
@@ -361,7 +361,7 @@
 
 在语言表加一项 → 产出该语言的 `.qm` → 按 §5 的流水线重建与校验；覆盖率必须包含界面槽位文案、参数表标签与提示、内核消息模板三类。
 
-验收：`tools/check_i18n.py` 通过；切到该语言并重启后界面无残留中文；进度 / 失败 / 取消消息也被翻译。**不得**附带实现热切换。
+验收：`scripts/check_i18n.py` 通过；切到该语言并重启后界面无残留中文；进度 / 失败 / 取消消息也被翻译。**不得**附带实现热切换。
 
 ### 6.7 接入“停止生成”
 
@@ -410,9 +410,14 @@
 - 运行：仓库内 `.venv` 的 Python 执行 `main.py`（Windows 布局为 `.venv\Scripts\python.exe`）。
 - 界面截图：`tools/shot.py`（真实平台插件 + `WA_DontShowOnScreen`，产物默认写 `shots/`）。**禁止**用 `QT_QPA_PLATFORM=offscreen` 截图（字体库为空，中文渲染为方块，会将布局问题误判为字体问题）。
 - 打包：装可选依赖 `.[build]`。两步：`XSY_ONEDIR=1` 时 `python -m PyInstaller packaging/xiangshuiyin-qt.spec` 出目录形态载荷并生成 `build/version.iss`；再 `ISCC.exe packaging/xiangshuiyin-qt.iss` 出安装器（构建机需装 Inno Setup 6.3 或更高版本；它只作构建工具，不随产物分发）。核实方式是读产物归档表确认资源与 `ui/i18n/*.qm` 在位，并把数据目录指向沙箱、写入英文设置后启动产物，读日志里的 `[i18n]` 行；安装器另按 §4.2 的验收项核对。
-- 多语言：`tools/build_i18n.py`（演练）/ `--write`，校验 `tools/check_i18n.py`（§5）。
+- 多语言：`scripts/build_i18n.py`（演练）/ `--write`，校验 `scripts/check_i18n.py`（§5）。
+- 命令行出图：`python src/cli/render.py <图片或目录>…`（内核默认值 + 可选预设 + 参数覆盖，可输出 `--json`；`cd src` 后也可 `python -m cli`）。
+- 发布门禁：`scripts/check_docs_style.ps1`（文档：机器相关定位信息 / 排版体例 / 术语 / 交叉引用）、`scripts/check_code_style.py`（代码：本机路径写死 / 凭据 / 过期定位信息 / 注释体例）、`scripts/check_params.py`（参数表 / 内核签名 / 默认值契约）、`scripts/check_cli.py`（命令行无头出图）、`scripts/check_bundle.py`（产物自检）；语义级检查用 `python -m ruff check --select F821`（未定义名）。新增或修改发布门禁**必须**同时接进 `.github/workflows/ci.yml` 与 `release.yml` 的发布门禁；两处跑同一套脚本，发布时不过不打包。
+- 发布门禁只收**能客观判定**的项（路径 / 行号 / 引号 / 交叉引用 / 契约）。靠语感的风格判断（口语词表一类）**不得**进 CI：穷举不可能完整，还会把个人用词偏好变成硬失败；注释体例、未使用导入（ruff `F401`）这类现存命中较多的项只**报告**，不计失败。
 
-### 7.3 探针纪律（`tools/`，被 `.gitignore` 排除，不入库）
+### 7.3 脚本纪律（`scripts/` 入库、`tools/` 不入库）
+
+- 发布门禁与资源构建脚本**必须**放 `scripts/`（要能在新克隆与 CI 上跑到）；本机草稿（`_probe_*.py`、`shot.py`）与截图产物放 `tools/` / `shots/`，由 `.gitignore` 排除。
 
 - 探针**必须**沙箱运行：把 `XSY_BASE_DIR` / `XSY_PREVIEW_DIR` 指到临时目录；需要与在跑实例并存时加 `XSY_IPC_NAME`。
 - 视觉/几何断言**必须**用 `WA_DontShowOnScreen`，量几何前**必须**先 `set_tab(i)`（§2.8）。

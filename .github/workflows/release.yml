@@ -47,8 +47,36 @@ jobs:
             exit 1
           }
 
+      # 发布门禁: 与 ci.yml 同一套脚本, 不通过就不打包
+      - name: 发布门禁 - 文档检查
+        shell: pwsh
+        run: pwsh -File scripts/check_docs_style.ps1
+
+      - name: 发布门禁 - 代码检查
+        run: python scripts/check_code_style.py
+
+      - name: 发布门禁 - 静态分析
+        run: |
+          python -m pip install --quiet ruff
+          python -m ruff check --select F821 src main.py
+
+      - name: 发布门禁 - 翻译完整性
+        run: python scripts/check_i18n.py
+
+      - name: 发布门禁 - 参数契约
+        run: python scripts/check_params.py
+
+      - name: 发布门禁 - 导入冒烟
+        run: python -c "import sys; sys.path.insert(0, 'src'); import ui.window, cli.render, main"
+
+      - name: 发布门禁 - 渲染冒烟
+        run: python scripts/check_cli.py
+
       - name: PyInstaller 打包（目录形态）
         run: python -m PyInstaller --noconfirm packaging\xiangshuiyin-qt.spec
+
+      - name: 产物自检（资源 / 翻译 / 许可 / 版本号）
+        run: python scripts/check_bundle.py --dist dist/xiangshuiyin-qt --expect-version ${{ github.ref_name }}
 
       - name: 编译安装器
         shell: pwsh
