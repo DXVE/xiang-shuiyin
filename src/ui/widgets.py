@@ -1,6 +1,7 @@
 """通用控件: 参数行、卡片、预览框、色块与胶囊开关等。"""
 from PIL import Image
-from PySide6.QtCore import (QPointF, QRectF, QSize, QT_TRANSLATE_NOOP, QTimer, QUrl, Qt, Signal)
+from PySide6.QtCore import (QCoreApplication, QPointF, QRectF, QSize, QT_TRANSLATE_NOOP, QTimer,
+                              QUrl, Qt, Signal)
 from PySide6.QtGui import (QColor, QDesktopServices, QIcon, QImage, QPainter, QPainterPath, QPen,
                            QPixmap)
 from PySide6.QtWidgets import (QAbstractSpinBox, QCheckBox, QComboBox, QDoubleSpinBox, QFrame,
@@ -29,6 +30,9 @@ def _hover_trace(msg):
 
 # 数值框 ± 步进按钮的素材边长（逻辑像素）: 与原先的 12px 粗体字形同量级。
 _STEP_ICON = 14
+# 行尾 ↺: 固定宽度与图标边长(逻辑像素)。始终占位, 显隐只换图标
+_RESET_W = 22
+_RESET_ICON = 14
 
 
 _FONT_FILTER = "字体 (*.ttf *.otf *.ttc);;所有文件 (*)"
@@ -106,7 +110,8 @@ class ParamRow(QWidget):
 
     changed = Signal(str, object)
     colorClicked = Signal()          # 点「颜色管理」: 打开预设与收藏弹窗(取色弹窗由主窗提供, 需读取用户保存的颜色)
-    nativeColorClicked = Signal()    # 点色块: 打开系统取色器(弹窗不参与, 故不经过主窗的取色弹窗)
+    pickColorClicked = Signal()    # 点色块: 弹出取色面板(自绘, 拖动即生效; 不经过「颜色管理」弹窗)
+    resetClicked = Signal()          # 点行尾 ↺: 把本行参数恢复默认值(含镜像行)
 
     def __init__(self, spec, value, parent=None):
         super().__init__(parent)
@@ -146,12 +151,12 @@ class ParamRow(QWidget):
                 lay.addWidget(self.combo, 1)
 
             elif self.kind == "color":
-                # 双入口: 色块本身是按钮, 点它直接开系统取色器(改一次颜色只要一步); 行尾「颜色管理」进预设与收藏
+                # 双入口: 色块本身是按钮, 点它直接弹取色面板(改一次颜色只要一步); 行尾「颜色管理」进预设与收藏
                 # 两段的宽度由主窗给: 色块按拉伸吃掉滑块列, 管理入口与步进器组同宽(见 _unify_spins), 故本行与数值行左右都对齐
                 self.swatch = QPushButton()
                 self.swatch.setCursor(Qt.PointingHandCursor)
                 self.swatch.setToolTip(self.tr("点击选择颜色"))
-                self.swatch.clicked.connect(self.nativeColorClicked.emit)
+                self.swatch.clicked.connect(self.pickColorClicked.emit)
                 lay.addWidget(self.swatch, 1)
                 self.color_btn = QPushButton(self.tr("颜色管理"))
                 self.color_btn.setObjectName("mini")
@@ -215,6 +220,12 @@ class ParamRow(QWidget):
                 sl.addWidget(plus)
                 lay.addWidget(self.slider, 1)
                 lay.addWidget(step)
+
+        # 行尾 ↺: 恢复本行参数为默认值; path 行在弹窗里, 不给; 格位另行共用一个(见 no_reset)
+        self.reset_btn = None
+        if self.kind != "path" and not spec.get("no_reset"):
+            self.reset_btn = _reset_button(self.resetClicked.emit)
+            lay.addWidget(self.reset_btn)
 
         self.set_value(value)
 
@@ -306,8 +317,8 @@ class ParamRow(QWidget):
             self.set_value(path)
             self.changed.emit(self.key, path)
 
-    def color_pick_title(self):
-        # 系统取色器的标题取本行标签: 与参数行同语境(ParamRow), 不必为标题另立一条文案
+    def spec_label(self):
+        # 本行标签(在 ParamRow 语境翻译): 撤销步名等取它; 主窗自己 tr 会落到别的语境, 取不到译文
         return self.tr(self._spec["label"])
 
 
@@ -337,14 +348,13 @@ class _CardHead(QWidget):
 
 
 class Card(QFrame):
-    # 卡片: 标题 + 右上角「重置本组」+ 内容区
+    # 卡片: 标题 + 内容区
     # collapsible=True 时标题行整条可点、内容区默认收起: 收放只改显示、不碰参数值、状态不落盘
 
     def __init__(self, title, parent=None, collapsible=False):
         super().__init__(parent)
         self.setObjectName("card")
-        self.keys = []
-        self.title_display = self.tr(title)   # 卡名显示文本(撤销步名与提示直接取它, 不从控件反查)
+        self.title_display = self.tr(title)   # 卡名显示文本(标题标签直接取它, 不从控件反查)
         self.collapsible = collapsible
         self.collapsed = bool(collapsible)
         self.body_host = None        # 可折叠卡的内容宿主(布局本身没有可见性, 收起要落在 widget 上)
@@ -374,12 +384,6 @@ class Card(QFrame):
         t.setObjectName("cardTitle")
         head.addWidget(t)
         head.addStretch(1)
-        self.reset_btn = QPushButton(self.tr("重置本组"))
-        self.reset_btn.setObjectName("mini")
-        _iconify(self.reset_btn, theme.RESET, 14)
-        self.reset_btn.setToolTip(self.tr("将本卡片参数恢复为出厂默认值"))
-        self.reset_btn.setCursor(Qt.PointingHandCursor)
-        head.addWidget(self.reset_btn)
         if collapsible:
             v.addWidget(self._head)
         else:
@@ -651,10 +655,10 @@ class PreviewBox(QWidget):
         oy = round((self.height() * dpr - pm.height()) / 2) / dpr
         box = QRectF(ox, oy, pm.width() / dpr, pm.height() / dpr)
         if self._fade_active:
-            # 交叉淡入: 底层在上、新帧在上层, 两者一起按进度补间(底层可能为空, 那就是从底色浮出来)
+            # 淡入: 底层按原样铺上, 新帧叠着淡入 —— 两层加起来始终铺满, 中途不会透出深色底(透出来就是"变暗")
+            # 底层为空(首次预览)时框里只有底色, 等于让画面从底色里浮出来
             t = self._fade_progress()
             if self._prev_pm is not None:
-                p.setOpacity(1.0 - t)
                 self._draw_frame(p, self._prev_pm, self._prev_box)
             p.setOpacity(t)
             self._draw_frame(p, pm, box)
@@ -761,6 +765,20 @@ class PreviewBox(QWidget):
         elif "image_margin" in self._hl:
             drew.append("图片外边距没画: geom 里没有 img")
         _hover_trace("绘制: 高亮=%s 画了[%s]" % (sorted(self._hl), "; ".join(drew) or "无"))
+
+
+def _reset_button(slot):
+    # 行尾 ↺ 按钮(参数行与「水印开关」的行共用): 常显、恒占位
+    # 不做悬停显形: 判据只能靠光标轮询(参数行不接 Enter/Leave), 落不到「水印开关」那种不在参数行内的 ↺ 上, 会错显到别的行;
+    # 也不做透明度渐隐: 卡片自带投影效果, 父级有图形效果时子控件的效果不生效(实测: 子按钮整个不绘制)
+    b = QPushButton()
+    b.setObjectName("ghost")
+    b.setFixedWidth(_RESET_W)
+    _iconify(b, theme.RESET_SOFT, _RESET_ICON)
+    b.setToolTip(QCoreApplication.translate("ParamRow", "恢复默认值"))
+    b.setCursor(Qt.PointingHandCursor)
+    b.clicked.connect(slot)
+    return b
 
 
 def _iconify(btn, asset, size=16):

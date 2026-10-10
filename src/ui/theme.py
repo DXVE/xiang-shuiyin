@@ -34,9 +34,9 @@ CTRL_H = 28           # 按钮/输入类控件的统一高度
 INSET_ROOT = 8                           # 根布局(顶栏/主体/底栏)的横向内边距
 INSET_COL = 10                           # 左列横向内边距(= 页面留白兼投影余量)
 INSET_BAR = INSET_COL                    # 顶栏/底栏在根布局之内, 与左列内容对齐
-PAD_CARD = 12         # 卡片内边距
-GAP_CARD = 10         # 卡片与卡片之间
-GAP_ROW = 4           # 卡片内相邻行之间
+PAD_CARD = 14         # 卡片内边距
+GAP_CARD = 12         # 卡片与卡片之间
+GAP_ROW = 8           # 卡片内相邻行之间
 GAP_CTRL = 8          # 同一行内控件之间
 
 ARROW_DOWN = _asset("arrow_down.svg")
@@ -54,7 +54,8 @@ MENU = _asset("menu.svg")      # 顶栏菜单
 UNDO = _asset("undo.svg")      # 撤销
 REDO = _asset("redo.svg")      # 重做
 INFO = _asset("info.svg")      # 图片信息/EXIF
-RESET = _asset("reset.svg")    # 重置本组 / 刷新预览效果
+RESET = _asset("reset.svg")    # 刷新预览效果
+RESET_SOFT = _asset("reset_soft.svg")   # 参数行行尾 ↺(每行一个, 用更浅的填充)
 # 折叠区块的开合指示: 展开复用上方资源段的 ARROW_DOWN(与下拉框箭头同一张图), 收起用右向箭头
 ARROW_RIGHT = _asset("arrow_right.svg")
 # 自绘标题栏弹窗的关闭按钮
@@ -108,6 +109,11 @@ QFrame#csdPanel {{
 }}
 
 QFrame#card {{
+    background: {CARD};
+    border: 1px solid {LINE};
+    border-radius: {RADIUS_CARD}px;
+}}
+QFrame#pickerCard {{
     background: {CARD};
     border: 1px solid {LINE};
     border-radius: {RADIUS_CARD}px;

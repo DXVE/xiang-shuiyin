@@ -8,7 +8,7 @@ from . import i18n, theme
 from .specs import PARAM_SPECS
 from .toast import Toast
 from .widgets import (Card, ElidedLabel, ParamRow, PreviewBox, PreviewStateChip, _LABEL_W,
-                      _fx_divider, _iconify)
+                      _fx_divider, _iconify, _reset_button)
 from .winconst import FONT_STYLE_COLS, FONT_STYLE_GROUPS, TABS, _SB_W
 
 
@@ -102,12 +102,6 @@ class BuildMixin:
         self._info_btn.setAccessibleName(self.tr("EXIF信息"))
         self._info_btn.clicked.connect(self._show_image_info)
         t.addWidget(self._info_btn)
-        reset = QPushButton(self.tr("恢复默认设置"))
-        reset.setObjectName("mini")
-        reset.setToolTip(self.tr("将所有参数恢复为出厂默认值"))
-        reset.setCursor(Qt.PointingHandCursor)
-        reset.clicked.connect(self._reset_settings)
-        t.addWidget(reset)
         return top
 
     def _build_menu(self):
@@ -117,6 +111,8 @@ class BuildMixin:
         m.addSeparator()
         m.addAction(self.tr("预设方案…"), self._open_preset_dialog)
         m.addAction(self.tr("字体文件…"), self._open_font_dialog)
+        a = m.addAction(self.tr("恢复默认设置"), self._reset_settings)
+        a.setToolTip(self.tr("将所有参数恢复为出厂默认值"))
         m.addSeparator()
         m.setToolTipsVisible(True)  # 菜单项也带 tooltip, 每个入口指向哪个目录一目了然
         a = m.addAction(self.tr("打开日志目录"), self._open_log_dir)
@@ -250,7 +246,6 @@ class BuildMixin:
                 v.addWidget(getattr(self, special)())
                 continue
             card = Card(name)
-            card.reset_btn.clicked.connect(lambda _c, cd=card: self._reset_card(cd))
             for s in specs:
                 if s["card"] != name:
                     continue
@@ -261,9 +256,9 @@ class BuildMixin:
                 row.changed.connect(self._on_param)
                 if s["kind"] == "color":
                     row.colorClicked.connect(lambda r=row: self._open_color_dialog(r))
-                    row.nativeColorClicked.connect(lambda r=row: self._pick_native_color(r))
+                    row.pickColorClicked.connect(lambda r=row: self._pick_color(r))
                 self._rows[s["key"]] = row
-                card.keys.append(s["key"])
+                row.resetClicked.connect(lambda r=row: self._reset_param_row(r))
                 card.body.addWidget(row)
             self._cards.append(card)
             v.addWidget(card)
@@ -358,7 +353,6 @@ class BuildMixin:
     def _build_font_style_card(self):
         # 水印开关: 行=文字种类, 列=显示/粗体/斜体
         card = Card(QT_TRANSLATE_NOOP("Card", "水印开关"))
-        card.reset_btn.clicked.connect(lambda _c, cd=card: self._reset_card(cd))
         grid = QGridLayout()
         grid.setContentsMargins(0, 2, 0, 0)
         # 横向列间距给 0: 右侧三列等分, 间距由三列自己吸收(见下面 setColumnStretch)
@@ -381,14 +375,17 @@ class BuildMixin:
             grid.addWidget(lab, r, 0)
             for c, key in enumerate(keys, start=1):
                 # 格位给空标签(不是空格): 配合 QSS 的 #cell 间距为 0, 居中后才与列头精确对齐
-                row = ParamRow(dict(key=key, label="", kind="bool"), self._params.get(key))
+                # no_reset: 格位不给 ↺, 本行共用一个(见下), 与网页版"一行一个重置"的粒度一致
+                row = ParamRow(dict(key=key, label="", kind="bool", no_reset=True), self._params.get(key))
                 row.chk.setObjectName("cell")
                 row.chk.setAccessibleName(f"{name}·{FONT_STYLE_COLS[c - 1]}")
                 row.chk.setToolTip(f"{name} · {FONT_STYLE_COLS[c - 1]}")
                 row.changed.connect(self._on_param)
                 self._rows[key] = row
-                card.keys.append(key)
                 grid.addWidget(row, r, c, Qt.AlignmentFlag.AlignCenter)
+            # 本行共用一个 ↺(格位不各给一个): 与网页版"一行一个重置"的粒度一致
+            btn = _reset_button(lambda _c, lb=name, ks=tuple(keys): self._reset_params(lb, ks))
+            grid.addWidget(btn, r, len(FONT_STYLE_COLS) + 1)
         card.body.addLayout(grid)
         self._cards.append(card)
         return card
@@ -397,8 +394,6 @@ class BuildMixin:
         # 「描边与投影」: 整块可折叠, 展开后功能组用分割线相隔
         title = QT_TRANSLATE_NOOP("Card", "描边与投影")
         card = Card(title, collapsible=True)
-        # 本卡不提供"整组重置": 四个功能组各有一个「重置」(见 _fx_group_head), 故收起自带那个按钮
-        card.reset_btn.setVisible(False)
         self._vis_rule(card.body_host, lambda c=card: not c.collapsed)
         self._cards.append(card)
 
@@ -410,8 +405,7 @@ class BuildMixin:
         for i, name in enumerate(groups):
             if i:                                   # 组与组之间才画分割线(首组之前不画)
                 card.body.addWidget(_fx_divider())
-            keys = [s["key"] for s in specs if s["group"] == name]
-            card.body.addWidget(self._fx_group_head(name, keys))
+            card.body.addWidget(self._fx_group_head(name))
             for s in specs:
                 if s["group"] != name:
                     continue
@@ -419,14 +413,14 @@ class BuildMixin:
                 row.changed.connect(self._on_param)
                 if s["kind"] == "color":
                     row.colorClicked.connect(lambda r=row: self._open_color_dialog(r))
-                    row.nativeColorClicked.connect(lambda r=row: self._pick_native_color(r))
+                    row.pickColorClicked.connect(lambda r=row: self._pick_color(r))
                 self._rows[s["key"]] = row
-                card.keys.append(s["key"])
+                row.resetClicked.connect(lambda r=row: self._reset_param_row(r))
                 card.body.addWidget(row)
         return card
 
-    def _fx_group_head(self, name, keys):
-        # 功能组的小标题行: 组名 + 右端「重置」(只重置本组, 一步撤销)
+    def _fx_group_head(self, name):
+        # 功能组的小标题行: 只有组名, 重置在组内每一行的行尾 ↺ 上
         w = QWidget()
         h = QHBoxLayout(w)
         h.setContentsMargins(0, 4, 0, 0)      # 组与上一组之间多留一点空隙
@@ -435,12 +429,6 @@ class BuildMixin:
         lab.setObjectName("groupTitle")
         h.addWidget(lab)
         h.addStretch(1)
-        btn = QPushButton(self.tr("重置"))
-        btn.setObjectName("mini")
-        btn.setCursor(Qt.PointingHandCursor)
-        btn.setToolTip(self.tr("将本组参数恢复为出厂默认值"))
-        btn.clicked.connect(lambda _c, g=name, ks=tuple(keys): self._reset_fx_group(g, ks))
-        h.addWidget(btn)
         return w
 
     def _row(self, label, widget, label_w=_LABEL_W):
@@ -468,7 +456,6 @@ class BuildMixin:
 
     def _build_mode_card(self):
         card = Card(QT_TRANSLATE_NOOP("Card", "处理模式"))
-        card.reset_btn.setVisible(False)
         # 该行必须走 _row 的栅格(定宽标签 + 控制列), 不可自占一整行:
         # 胶囊文字需要横向内边距, 贴不到卡片内容左线
         seg = QWidget()
@@ -521,7 +508,6 @@ class BuildMixin:
 
     def _build_model_card(self):
         card = Card(QT_TRANSLATE_NOOP("Card", "型号美化"))
-        card.reset_btn.setVisible(False)
         self._model_edit = QLineEdit()
         self._model_edit.setPlaceholderText(self.tr("临时美化型号（仅本次有效）"))
         self._model_edit.setToolTip(self.tr("留空则使用映射表；填写后强制使用该名称"))
@@ -539,7 +525,6 @@ class BuildMixin:
 
     def _build_manual_card(self):
         card = Card(QT_TRANSLATE_NOOP("Card", "自定义水印信息"))
-        card.reset_btn.setVisible(False)
         self._manual_chk = QCheckBox(self.tr("启用（启用后强制使用下列信息，忽略照片 EXIF）"))
         self._manual_chk.setCursor(Qt.PointingHandCursor)
         self._manual_chk.toggled.connect(self._on_manual_toggle)

@@ -16,7 +16,7 @@ from PySide6.QtCore import (QAbstractAnimation, QEasingCurve, QEvent, QParallelA
 from PySide6.QtGui import (QColor, QCursor, QDesktopServices, QFont, QIcon, QImage,
                            QKeySequence, QPainter, QPainterPath, QPen, QPixmap, QShortcut)
 from PySide6.QtWidgets import (
-    QAbstractSpinBox, QApplication, QCheckBox, QColorDialog, QComboBox, QDialog,
+    QAbstractSpinBox, QApplication, QCheckBox, QComboBox, QDialog,
     QDoubleSpinBox, QFileDialog, QFrame, QGraphicsOpacityEffect, QGridLayout, QHBoxLayout, QLabel,
     QLineEdit, QListWidget, QMainWindow, QMenu, QMessageBox, QProgressBar, QPushButton,
     QScrollArea, QSizePolicy, QSlider, QSpacerItem, QSpinBox, QSplitter, QStackedWidget,

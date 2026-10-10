@@ -1,12 +1,13 @@
 """取色弹窗: 当前颜色 + 预设色 + 我的颜色。"""
 from PySide6.QtCore import QSize, Qt, Signal
 from PySide6.QtGui import QColor, QIcon
-from PySide6.QtWidgets import (QColorDialog, QDialog, QFrame, QGridLayout, QHBoxLayout, QLabel,
-                               QLineEdit, QMenu, QMessageBox, QPushButton, QVBoxLayout, QWidget)
+from PySide6.QtWidgets import (QDialog, QFrame, QGridLayout, QHBoxLayout, QLabel, QLineEdit,
+                               QMenu, QMessageBox, QPushButton, QVBoxLayout, QWidget)
 from .. import theme
 from ..dialog import csdify, dlg_button, go_frameless
 from .base import (_CHIP_GAP, _CHIP_H, _CHIP_W, _COLS_PRESET, _COLS_USER, _CUR_W, _DLG_PAD,
                    _DLG_W, _message, _prep_dialog)
+from .colorpicker import pick_color
 from ..widgets import _ColorChip, _swatch_check, _swatch_qss
 
 
@@ -23,23 +24,14 @@ PRESET_COLORS = [
 MAX_USER_COLORS = 10
 
 
-# 开系统取色器取一个色号(取消返回 None); title 由调用方按自己的语境给
-# 自行构造对话框并经 _prep_dialog 固定位置: QColorDialog.getColor() 这类静态函数显示后 Qt 会再调一次位置
-def pick_native_color(parent, initial, title):
-    dlg = QColorDialog(QColor(initial or "#FFFFFF"), parent)
-    dlg.setWindowTitle(title)
-    _prep_dialog(dlg)
-    if dlg.exec() != QDialog.DialogCode.Accepted:
-        return None
-    c = dlg.currentColor()
-    return c.name() if c.isValid() else None
-
 
 class ColorDialog(QDialog):
     # 取色弹窗(点参数行的色块打开): 当前颜色 + 预设颜色 + 我的颜色 三张卡片
     # 点色块即时应用(弹窗不关, 可边点边看效果); 收藏色存 settings.json 的 custom_colors(核心截到 10 个)
 
     picked = Signal(str)
+    previewed = Signal(str)   # 取色器拖动中的即时预览: 主窗只刷预览与色块, 不落盘、不记撤销
+    preview_ended = Signal()  # 拖动以取消收场: 主窗据此回到拖动前的颜色(确定那条路走 picked)
 
     def __init__(self, state, current, parent=None):
         super().__init__(parent)
@@ -77,7 +69,7 @@ class ColorDialog(QDialog):
 
     # ---- 取色弹窗自身的构造 ----
     def _card(self, title, note=""):
-        # 分组卡片: 与主窗 Card 同一套外观, 但没有「重置本组」
+        # 分组卡片: 沿用主窗 Card 的外观(圆角/投影/内边距), 但表头只有标题
         # 返回 (frame, body, note_label); note 是标题右侧的补充说明(如容量), 用 hint 色
         frame = QFrame()
         frame.setObjectName("card")
@@ -104,7 +96,7 @@ class ColorDialog(QDialog):
         return frame, body, note_lab
 
     def _current_card(self):
-        # 当前颜色: 一格色块(点它开系统取色器) + 一个色号输入框; 色块只表达颜色, 色号只由输入框显示与编辑
+        # 当前颜色: 一格色块(点它弹取色面板) + 一个色号输入框; 色块只表达颜色, 色号只由输入框显示与编辑
         frame, body, _ = self._card(self.tr("当前颜色"))
         row = QHBoxLayout()
         row.setSpacing(theme.GAP_CTRL)
@@ -112,7 +104,7 @@ class ColorDialog(QDialog):
         self._cur_chip.setFixedSize(_CUR_W, theme.CTRL_H)
         self._cur_chip.setCursor(Qt.PointingHandCursor)
         self._cur_chip.setAccessibleName(self.tr("当前颜色"))   # 按钮内无文字, 需提供读屏名称
-        self._cur_chip.setToolTip(self.tr("点击打开系统取色器（可拖动取色、调透明度）"))
+        self._cur_chip.setToolTip(self.tr("点击弹出取色面板（拖动即生效）"))
         self._cur_chip.clicked.connect(self._native)
         row.addWidget(self._cur_chip)
         self._hex = QLineEdit()
@@ -229,8 +221,21 @@ class ColorDialog(QDialog):
         self._choose(col.name())
 
     def _pick_native(self, initial=None):
-        # 开系统取色器, 返回选中的色号(取消返回 None)
-        return pick_native_color(self, initial or self._current, self.tr("选择颜色"))
+        # 弹自绘取色面板, 返回选中的色号(取消返回 None)
+        # 面板内任何改动都即时上屏(previewed), 收起时保留/Esc 回到打开前; 正式应用仍走 picked(一步撤销)
+        before = self._current
+
+        def live(c):
+            self._current = c
+            self._sync_current()
+            self.previewed.emit(c)
+
+        c = pick_color(self._cur_chip, initial or self._current, live)
+        if not c:
+            self._current = before
+            self._sync_current()
+            self.preview_ended.emit()      # 取消: 让主窗把预览与参数退回拖动前
+        return c
 
     def _native(self):
         c = self._pick_native()

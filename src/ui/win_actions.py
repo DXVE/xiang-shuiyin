@@ -6,7 +6,8 @@ from core.config import DATA_DIR, DEFAULT_LOGO_DIR, LOG_DIR
 from core.exif import prettify_model
 from .dialogs.about import AboutDialog
 from .dialogs.base import _message, _open_and_report
-from .dialogs.color import ColorDialog, pick_native_color
+from .dialogs.color import ColorDialog
+from .dialogs.colorpicker import pick_color
 from .dialogs.font import FontDialog
 from .dialogs.image_info import ImageInfoDialog
 from .dialogs.map import MapDialog
@@ -103,19 +104,51 @@ class ActionMixin:
         else:
             self._notify(self.tr("无法打开 Logo 目录：{path}").format(path=path))
 
-    def _pick_native_color(self, row):
-        # 点色块: 直接开系统取色器, 改一次颜色只要一步(不必先进「颜色管理」再点一次色块)
-        # 取色器标题用本行标签, 一眼看出在改哪种颜色
-        c = pick_native_color(self, row.value(), row.color_pick_title())
+    def _preview_color(self, row, c):
+        # 取色器拖动中的即时反馈: 只改色块与预览, 不落盘、不记撤销(收尾由 _apply_color 记一步)
+        # 首次调用时记下改色前的值: 正式落地前要先还原它, 否则撤销步快照到的是已改过的状态, 这一步会丢
+        base = getattr(self, "_color_base", None)
+        if base is None:
+            base = self._color_base = {}
+        base.setdefault(row.key, self._params.get(row.key, row.value()))
+        row.set_value(c)
+        self._params[row.key] = c
+        self.request_preview()
+
+    def _apply_color(self, row, c):
+        # 正式落一次改色: 先把参数还原成拖动前, 撤销步才记得到"改色之前"; 再走参数变更的统一出口
+        base = (getattr(self, "_color_base", None) or {}).pop(row.key, None)
+        if base is not None:
+            self._params[row.key] = base
+        row.set_value(c)
+        self._on_param(row.key, c)
+
+    def _cancel_color(self, row):
+        # 取消取色: 把预览与参数退回拖动前, 并丢掉基线(免得留给下一次正式落地)
+        base = (getattr(self, "_color_base", None) or {}).pop(row.key, None)
+        if base is None:
+            return
+        row.set_value(base)
+        self._params[row.key] = base
+        self.request_preview()
+
+    def _pick_color(self, row):
+        # 点色块: 直接开取色器, 改一次颜色只要一步(不必先进「颜色管理」再点一次色块)
+        # 取色器标题用本行标签, 一眼看出在改哪种颜色; 拖动即所见, 确定保留、取消回到打开前的颜色
+        orig = row.value()
+        c = pick_color(row.swatch, orig, lambda v, r=row: self._preview_color(r, v))
         if c:
-            row.set_value(c)
-            self._on_param(row.key, c)
+            self._apply_color(row, c)
+        else:
+            self._cancel_color(row)
 
     def _open_color_dialog(self, row):
         # 点「颜色管理」开弹窗(预设色 + 我的颜色); 弹窗内点色块即时应用, 由 _on_param 一并负责保存与预览
         # 关闭后不再补一次渲染: 没有改动也重渲会让"开窗看一眼"白付一整帧
         dlg = ColorDialog(self.state, row.value(), self)
-        dlg.picked.connect(lambda c, r=row: (r.set_value(c), self._on_param(r.key, c)))
+        dlg.picked.connect(lambda c, r=row: self._apply_color(r, c))
+        dlg.previewed.connect(lambda c, r=row: self._preview_color(r, c))
+        dlg.preview_ended.connect(lambda r=row: self._cancel_color(r))
         dlg.exec()
 
     def _open_font_dialog(self):

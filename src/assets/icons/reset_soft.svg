@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16">
+  <!-- 参数行行尾 ↺: 与 reset.svg 同形, 但填充更浅 —— 每一行都有一个, 用 reset.svg 那份深色会满屏发花。
+       语义与 reset.svg 相同(重置): 只换色, 几何不得改动, 否则两种场合的图标粗细会不一致。 -->
+  <path d="M12.9 9.2A5.2 5.2 0 1 1 12.2 4.4" fill="none" stroke="#CFC6B6" stroke-width="1.9"
+        stroke-linecap="round"/>
+  <path d="M14.8 2.4L14.2 7.6L9.4 5.4Z" fill="#CFC6B6"/>
+</svg>

@@ -1,8 +1,18 @@
-"""撤销 / 重做、显隐联动与镜像行、卡片重置。"""
+"""撤销 / 重做、显隐联动与镜像行、单参数恢复默认。"""
 from PySide6.QtCore import QEvent
 from PySide6.QtWidgets import QApplication
 from core.params import default_params
 from .winconst import _UNDO_LIMIT
+
+
+# 两个参数值是否等价(色号忽略大小写, 数值留一点容差): 供"已是默认值就别重渲"的判断
+def _same_as_default(a, b, tol=1e-9):
+    if isinstance(a, str) and isinstance(b, str):
+        return a.lower() == b.lower()
+    try:
+        return abs(float(a) - float(b)) <= tol
+    except (TypeError, ValueError):
+        return a == b
 
 
 class UndoVisibilityMixin:
@@ -56,7 +66,7 @@ class UndoVisibilityMixin:
         self._sync_undo_btns()
 
     def _undo_step(self, key, label, fn):
-        # 把一个"整批动作"记成一步(重置本组 / 恢复默认 / 加载预设 / 映射表保存)
+        # 把一个"整批动作"记成一步(单参数恢复默认 / 全局恢复默认 / 加载预设 / 映射表保存)
         self._begin_undo(key, label)
         try:
             fn()
@@ -136,38 +146,22 @@ class UndoVisibilityMixin:
             if m and m[0] in changed:
                 row.set_value(self._params.get(m[0]))
 
-    def _reset_card(self, card):
+    def _reset_param_row(self, row):
+        # 参数行行尾的 ↺: 镜像行没有自己的参数, 回的是它代理的那一对底层键
+        spec = self._spec_by_key.get(row.key) or {}
+        self._reset_params(row.spec_label() or row.key, tuple(spec.get("mirror") or (row.key,)))
+
+    def _reset_params(self, label, keys):
+        # 把一组参数恢复为出厂默认值(参数行的 ↺ 给单个键, 水印开关一行的 ↺ 给该行三个键), 整批算撤销一步
+        # 已经是默认值就直接返回: 否则一次空点也要白渲一帧
         defaults = default_params()
-        keys = set(card.keys)
-        for key in card.keys:
-            keys.update((self._spec_by_key.get(key) or {}).get("mirror") or ())
-        title = card.title_display
+        targets = [k for k in keys if k in defaults]
+        if not targets or all(_same_as_default(self._params.get(k), defaults[k]) for k in targets):
+            return
 
         def _do():
             changed = set()
-            for key in keys:
-                if key in defaults:
-                    self._params[key] = defaults[key]
-                    if key in self._rows:
-                        self._rows[key].set_value(defaults[key])
-                    changed.add(key)
-            self._sync_mirror_rows(changed)
-            self._sync_visibility()
-            self._touch()
-
-        self._undo_step(f"__reset_card__{title}", f"重置「{title}」", _do)
-        self._notify(self.tr("已重置「{title}」为默认值").format(title=title))
-
-    def _reset_fx_group(self, name, keys):
-        # 重置一个功能组(开关 + 细节行), 整批算撤销的一步
-        defaults = default_params()
-        title = self.tr(name)
-
-        def _do():
-            changed = set()
-            for key in keys:
-                if key not in defaults:
-                    continue
+            for key in targets:
                 self._params[key] = defaults[key]
                 if key in self._rows:
                     self._rows[key].set_value(defaults[key])
@@ -176,5 +170,4 @@ class UndoVisibilityMixin:
             self._sync_visibility()
             self._touch()
 
-        self._undo_step(f"__reset_fx__{name}", f"重置「{title}」", _do)
-        self._notify(self.tr("已重置「{title}」为默认值").format(title=title))
+        self._undo_step(f"__reset__{label}", label, _do)
