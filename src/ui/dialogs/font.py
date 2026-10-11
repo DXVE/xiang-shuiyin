@@ -33,8 +33,8 @@ class FontDialog(QDialog):
 
         v.addSpacing(6)
         v.addLayout(dlg_button_row(
-            dlg_button(self.tr("恢复默认字体"), self._reset),
-            dlg_button(self.tr("关闭"), self.accept, primary=True)))
+            dlg_button(self.tr("恢复默认字体"), self._reset, primary=True),
+            dlg_button(self.tr("关闭"), self.accept)))
         csdify(self, self.tr("字体文件"), _prep_dialog)
 
     def _reset(self):

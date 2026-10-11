@@ -1,5 +1,6 @@
 """预设槽位与设置持久化: 读盘写盘、导入导出、参数收集与恢复默认。"""
-from PySide6.QtWidgets import QMessageBox
+from PySide6.QtCore import Qt
+from PySide6.QtWidgets import QListWidgetItem, QMessageBox
 from core.config import DEFAULT_LOGO_DIR
 from core.paths import load_model_map, preset_path, save_model_map, save_settings
 from core.params import default_params
@@ -26,26 +27,26 @@ class PresetMixin:
         return p
 
     def _reload_presets(self, view):
-        # 把 10 个槽位列进 view 的下拉(显示各自存着的方案名, 空槽显示「— 空 —」)
+        # 把 10 个槽位画进 view 的竖排列表(显示各自存着的方案名, 空槽显示「— 空 —」)
         # view 是 PresetDialog(控件在它那儿); 预设数据缓存在窗口的 self._preset_data
-        # 键是槽位号(字符串), 与 preset_path(slot) 的槽位一致
+        # 槽位号(字符串)挂在列表项的 UserRole 上, 与 preset_path(slot) 的槽位一致
         try:
             self._preset_data = self.state.load_presets() or {}
         except Exception as e:                      # noqa: BLE001
             logging.warning(f"[预设] 读取失败: {e}")
             self._preset_data = {}
         cur = view.current_slot()
-        view.combo.clear()
+        view.list.clear()
         for i in range(1, _PRESET_SLOTS + 1):
             key = str(i)
             rec = self._preset_data.get(key) or {}
             name = rec.get("_preset_name") if isinstance(rec, dict) else None
-            view.combo.addItem(self.tr("槽位 {slot}：{name}").format(
-                slot=i, name=name or self.tr("— 空 —")), key)
+            item = QListWidgetItem(self.tr("槽位 {slot}：{name}").format(
+                slot=i, name=name or self.tr("— 空 —")))
+            item.setData(Qt.ItemDataRole.UserRole, key)
+            view.list.addItem(item)
         if cur:
-            j = view.combo.findData(cur)
-            if j >= 0:
-                view.combo.setCurrentIndex(j)
+            view.select_slot(cur)
 
     def _preset_load(self, view):
         key = view.current_slot()
@@ -61,7 +62,6 @@ class PresetMixin:
             return
         self._undo_step("__preset_load__", f"加载预设「{name}」",
                         lambda: self._apply_params(migrate_preset(p)))
-        view.set_name(name)
         self._notify(self.tr("已加载预设：{name}").format(name=name))
 
     def _preset_payload(self):
@@ -71,30 +71,32 @@ class PresetMixin:
         return p
 
     def _preset_save(self, view):
-        # 把当前调参存进当前选中的槽位(方案名只是存在文件里的一个名字)
+        # 把当前调参存进当前选中的槽位: 先弹子弹窗输入方案名, 槽位已有内容时再确认覆盖
         key = view.current_slot()
         if not key:
             return
-        name = view.name_text()
+        cur = self._preset_data.get(key) or {}
+        occupied = isinstance(cur, dict)
+        cur_name = cur.get("_preset_name") if occupied else None
+        name = view.ask_name(str(cur_name or ""))
+        if name is None:                       # 取消
+            return
         if not name:
             self._notify(self.tr("请先输入方案名后再保存"))
             return
-        cur = self._preset_data.get(key) or {}
-        cur_name = cur.get("_preset_name") if isinstance(cur, dict) else None
-        if cur_name and cur_name != name:
-            if _message(self, QMessageBox.Icon.Question, self.tr("保存预设"),
-                        self.tr("槽位 {slot} 已有方案「{name}」，保存会覆盖它。继续？")
-                        .format(slot=key, name=cur_name),
-                        QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-                        QMessageBox.StandardButton.No) != QMessageBox.StandardButton.Yes:
-                return
+        if occupied and _message(self, QMessageBox.Icon.Question, self.tr("保存预设"),
+                                 self.tr("槽位 {slot} 已有方案「{name}」，保存会覆盖它。继续？")
+                                 .format(slot=key, name=cur_name or self.tr("（未命名）")),
+                                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                                 QMessageBox.StandardButton.No) != QMessageBox.StandardButton.Yes:
+            return
         d = self.state.preset_save(key, self._preset_payload(), name)
         if not d.get("ok"):
             _message(self, QMessageBox.Icon.Warning, self.tr("保存预设"),
                      str(d.get("error") or ""))
             return
         view.reload()
-        view.combo.setCurrentIndex(view.combo.findData(key))
+        view.select_slot(key)
         logging.info(f"[预设] 已保存: 槽位 {key}「{name}」-> {preset_path(key)}")
         self._notify(self.tr("已保存到槽位 {slot}：{name}").format(slot=key, name=name))
 
@@ -150,7 +152,7 @@ class PresetMixin:
         name = str(data.get("_preset_name") or os.path.splitext(os.path.basename(path))[0])
         payload = {k: v for k, v in data.items()
                    if k not in _PRESET_MACHINE_KEYS and k != "_format"}
-        # 导入目标是当前选中的槽位: 想换目标先在下拉里选好槽位
+        # 导入目标是当前选中的槽位: 想换目标先在列表里选好槽位
         key = view.current_slot()
         if not key:
             return
@@ -168,7 +170,7 @@ class PresetMixin:
                      str(d.get("error") or ""))
             return
         view.reload()
-        view.combo.setCurrentIndex(view.combo.findData(key))
+        view.select_slot(key)
         logging.info(f"[预设] 已导入 {path} -> 槽位 {key}「{name}」（{'覆盖' if cur_name else '空槽'}）")
         self._notify(self.tr("已导入方案「{name}」到槽位 {slot}").format(name=name, slot=key))
 
@@ -188,7 +190,6 @@ class PresetMixin:
             _message(self, QMessageBox.Icon.Warning, self.tr("删除预设"), str(d.get("error") or ""))
             return
         view.reload()
-        view.set_name("")
         self._notify(self.tr("已删除槽位 {slot}：{name}").format(slot=key, name=name))
 
     def _apply_params(self, src):

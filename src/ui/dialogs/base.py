@@ -1,9 +1,10 @@
-"""弹窗公共部分: 无边框壳、显示前准备、按钮工厂、文件/目录选择框与弹窗度量常量。"""
+"""弹窗公共部分: 无边框壳、显示前准备、按钮工厂、表单弹窗、文件/目录选择框与弹窗度量常量。"""
 from PySide6.QtCore import QUrl, Qt
 from PySide6.QtGui import QDesktopServices
-from PySide6.QtWidgets import QDialog, QFileDialog, QMessageBox
+from PySide6.QtWidgets import (QDialog, QFileDialog, QHBoxLayout, QLabel, QLineEdit, QMessageBox,
+                               QVBoxLayout)
 from .. import theme
-from ..dialog import MessageDialog
+from ..dialog import MessageDialog, csdify, dlg_button, dlg_button_row, go_frameless
 import logging
 import os
 
@@ -107,6 +108,55 @@ def _open_dir_dialog(parent, caption, directory=""):
         return ""
     files = dlg.selectedFiles()
     return files[0] if files else ""
+
+
+class _FormDialog(QDialog):
+    # 通用表单弹窗: 若干「标签 + 单行输入」, 确定返回 {key: 去空白后的文本}, 取消返回 None
+
+    def __init__(self, parent, title, fields, ok_text=None):
+        super().__init__(parent)
+        go_frameless(self)
+        self.setWindowTitle(title)
+        self.setMinimumWidth(400)
+        self._values = None
+        v = QVBoxLayout(self)
+        self._edits = []
+        for f in fields:
+            row = QHBoxLayout()
+            row.setSpacing(theme.GAP_CTRL)
+            lab = QLabel(f.get("label", ""))
+            lab.setObjectName("fieldLabel")
+            lab.setWordWrap(True)
+            row.addWidget(lab)
+            e = QLineEdit(str(f.get("value", "")))
+            if f.get("placeholder"):
+                e.setPlaceholderText(f["placeholder"])
+            row.addWidget(e, 1)
+            v.addLayout(row)
+            self._edits.append((f["key"], e))
+        v.addSpacing(6)
+        v.addLayout(dlg_button_row(
+            dlg_button(ok_text or self.tr("确定"), self._ok, primary=True),
+            dlg_button(self.tr("取消"), self.reject)))
+        csdify(self, title, _prep_dialog)
+        if self._edits:
+            self._edits[0][1].setFocus()
+
+    def _ok(self):
+        # 收集各输入框文本(去首尾空白); 非空校验由调用方按字段语义决定
+        self._values = {k: e.text().strip() for k, e in self._edits}
+        self.accept()
+
+    def values(self):
+        return self._values
+
+
+def ask_fields(parent, title, fields, ok_text=None):
+    # 弹出表单并等待: 取消返回 None, 否则返回 {key: 文本}
+    dlg = _FormDialog(parent, title, fields, ok_text)
+    if dlg.exec() != QDialog.DialogCode.Accepted:
+        return None
+    return dlg.values()
 
 
 _CHIP_W = theme.CTRL_H + 20          # 色块尺寸: 宽于控件高度, 便于点击与辨识

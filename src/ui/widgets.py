@@ -8,6 +8,7 @@ from PySide6.QtWidgets import (QAbstractSpinBox, QCheckBox, QComboBox, QDoubleSp
                                QHBoxLayout, QLabel, QLineEdit, QPushButton, QSizePolicy, QSlider,
                                QSpinBox, QVBoxLayout, QWidget)
 from . import theme
+from .dialog import dlg_button
 from .dialogs.base import _open_file_dialog
 from .render import _pil_to_qimage
 from .winconst import _PV_FADE_MS
@@ -168,10 +169,10 @@ class ParamRow(QWidget):
                 self.edit = QLineEdit()
                 self.edit.setReadOnly(True)
                 self.edit.setToolTip(str(value or ""))
+                self.edit.setFixedHeight(theme.CTRL_H)   # 与「选择字体」按钮同高, 整行对齐
                 lay.addWidget(self.edit, 1)
-                b = QPushButton(self.tr("选择字体"))
+                b = dlg_button(self.tr("选择字体"), self._pick_font)
                 self._path_btn = b          # 宽度在 _unify_spins() 里与数值框对齐
-                b.clicked.connect(self._pick_font)
                 lay.addWidget(b)
 
             else:                                   # pct / int —— 整数显示; pct 可声明 decimals 走小数档

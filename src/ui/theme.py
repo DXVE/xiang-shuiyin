@@ -216,6 +216,21 @@ QComboBox QAbstractItemView {{
     selection-color: #fff;
 }}
 
+QListWidget#presetList, QListWidget#mapList {{
+    background: {CARD};
+    border: 1px solid {LINE};
+    border-radius: {RADIUS_CTRL}px;
+    outline: none;
+    padding: 2px;
+}}
+QListWidget#presetList::item, QListWidget#mapList::item {{
+    padding: 2px 9px;
+    border-radius: {RADIUS_SMALL}px;
+    color: {TEXT};
+}}
+QListWidget#presetList::item:hover, QListWidget#mapList::item:hover {{ background: #FAF7F1; }}
+QListWidget#presetList::item:selected, QListWidget#mapList::item:selected {{ background: #F1F3EB; color: #2f4a38; }}
+
 QSlider::groove:horizontal {{
     height: 6px;
     background: {LINE};

@@ -142,13 +142,18 @@ def dlg_button(text, slot=None, primary=False, parent=None):
     return b
 
 
+def _order_buttons(buttons):
+    # 弹窗按钮统一顺序: 主色(肯定/主操作)恒排最左, 其余保持原相对顺序
+    return sorted(buttons, key=lambda b: b.objectName() != "primary")
+
+
 def dlg_button_row(*buttons):
-    # 把按钮排成弹窗底部那一行: 右对齐、统一间距
+    # 把按钮排成弹窗底部那一行: 右对齐、统一间距; 主色(确定/主操作)恒在最左
     row = QHBoxLayout()
     row.setContentsMargins(0, 0, 0, 0)
     row.setSpacing(theme.GAP_CTRL)
     row.addStretch(1)
-    for b in buttons:
+    for b in _order_buttons(buttons):
         row.addWidget(b)
     return row
 
@@ -175,12 +180,16 @@ class MessageDialog(QDialog):
         row = QHBoxLayout()
         row.setSpacing(theme.GAP_CTRL)
         row.addStretch(1)
+        btns = []
         for b in (QMessageBox.StandardButton.Ok, QMessageBox.StandardButton.Yes,
                   QMessageBox.StandardButton.No):
             if not (buttons & b):
                 continue
+            # 主色 = 默认按钮(default), 即确认框里的安全选项(默认恒为「否」); 未知默认时才退回肯定按钮
             btn = dlg_button(_btn_text(b), primary=(b == self.result_button))
             btn.clicked.connect(lambda _c, bb=b: self._pick(bb))
+            btns.append(btn)
+        for btn in _order_buttons(btns):
             row.addWidget(btn)
         root.addLayout(row)
         if recenter is not None:

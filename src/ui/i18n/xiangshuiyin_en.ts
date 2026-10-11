@@ -349,12 +349,12 @@
             <translation>Watermark switches</translation>
         </message>
         <message>
-            <location filename="../widgets.py" line="420" />
+            <location filename="../widgets.py" line="421" />
             <source>展开本组</source>
             <translation>Expand this group</translation>
         </message>
         <message>
-            <location filename="../widgets.py" line="420" />
+            <location filename="../widgets.py" line="421" />
             <source>收起本组</source>
             <translation>Collapse this group</translation>
         </message>
@@ -886,99 +886,106 @@
     <context>
         <name>MapDialog</name>
         <message>
-            <location filename="../dialogs/map.py" line="17" />
-            <location filename="../dialogs/map.py" line="61" />
+            <location filename="../dialogs/map.py" line="16" />
+            <location filename="../dialogs/map.py" line="48" />
             <source>型号映射管理</source>
             <translation>Model mapping</translation>
         </message>
         <message>
-            <location filename="../dialogs/map.py" line="27" />
-            <source>识别到的原始型号 --&gt; 水印上显示的型号。在列表里选中一条即可修改或删除（删除前会先确认）。</source>
-            <translation>Detected raw model --&gt; the model shown in the watermark. Select an entry to update or delete it (deleting asks first).</translation>
-        </message>
-        <message>
-            <location filename="../dialogs/map.py" line="39" />
-            <source>原始</source>
-            <translation>Raw</translation>
-        </message>
-        <message>
-            <location filename="../dialogs/map.py" line="41" />
+            <location filename="../dialogs/map.py" line="85" />
             <source>如 ILCE-7M4</source>
             <translation>e.g. ILCE-7M4</translation>
         </message>
         <message>
-            <location filename="../dialogs/map.py" line="43" />
-            <source>显示</source>
-            <translation>Display</translation>
-        </message>
-        <message>
-            <location filename="../dialogs/map.py" line="45" />
+            <location filename="../dialogs/map.py" line="87" />
             <source>如 Sony A7M4</source>
             <translation>e.g. Sony A7M4</translation>
         </message>
         <message>
-            <location filename="../dialogs/map.py" line="52" />
-            <source>添加 / 修改</source>
-            <translation>Add / update</translation>
+            <location filename="../dialogs/map.py" line="77" />
+            <source>修改</source>
+            <translation>Edit</translation>
         </message>
         <message>
-            <location filename="../dialogs/map.py" line="143" />
+            <location filename="../dialogs/map.py" line="78" />
+            <source>删除</source>
+            <translation>Delete</translation>
+        </message>
+        <message>
+            <location filename="../dialogs/map.py" line="166" />
             <source>确定删除「{raw}」--&gt;「{nice}」这条映射？</source>
             <translation>Delete the mapping "{raw}" --&gt; "{nice}"?</translation>
         </message>
         <message>
-            <location filename="../dialogs/map.py" line="51" />
-            <source>删除选中</source>
-            <translation>Delete selected</translation>
-        </message>
-        <message>
-            <location filename="../dialogs/map.py" line="53" />
+            <location filename="../dialogs/map.py" line="41" />
             <source>关闭</source>
             <translation>Close</translation>
         </message>
         <message>
+            <location filename="../dialogs/map.py" line="27" />
+            <source>识别到的原始型号 --&gt; 水印上显示的型号。点「添加」新增；右键列表项可修改或删除（删除前会确认），改动立即保存。</source>
+            <translation>Detected raw model --&gt; model shown on the watermark. Click Add to create one; right-click a list item to edit or delete it (deletion asks for confirmation); changes are saved immediately.</translation>
+        </message>
+        <message>
+            <location filename="../dialogs/map.py" line="40" />
+            <source>添加</source>
+            <translation>Add</translation>
+        </message>
+        <message>
+            <location filename="../dialogs/map.py" line="83" />
+            <source>型号映射</source>
+            <translation>Model mapping</translation>
+        </message>
+        <message>
+            <location filename="../dialogs/map.py" line="84" />
+            <source>原始型号</source>
+            <translation>Raw model</translation>
+        </message>
+        <message>
+            <location filename="../dialogs/map.py" line="86" />
+            <source>显示型号</source>
+            <translation>Display model</translation>
+        </message>
+        <message>
+            <location filename="../dialogs/map.py" line="97" />
             <location filename="../dialogs/map.py" line="120" />
             <source>请先填写「原始型号」</source>
             <translation>Fill in the raw model first</translation>
         </message>
         <message>
-            <location filename="../dialogs/map.py" line="123" />
+            <location filename="../dialogs/map.py" line="100" />
+            <location filename="../dialogs/map.py" line="131" />
             <source>修改映射「{raw}」</source>
             <translation>Update mapping "{raw}"</translation>
         </message>
         <message>
-            <location filename="../dialogs/map.py" line="124" />
+            <location filename="../dialogs/map.py" line="101" />
             <source>新增映射「{raw}」</source>
             <translation>Add mapping "{raw}"</translation>
         </message>
         <message>
-            <location filename="../dialogs/map.py" line="139" />
-            <source>「原始型号」里现在这条不在映射表里，请先在列表里选中要删除的条目。</source>
-            <translation>The entry currently in the field is not in the mapping table; select the one you want to delete from the list first.</translation>
-        </message>
-        <message>
-            <location filename="../dialogs/map.py" line="142" />
+            <location filename="../dialogs/map.py" line="165" />
             <source>删除型号映射</source>
             <translation>Delete model mapping</translation>
         </message>
         <message>
-            <location filename="../dialogs/map.py" line="144" />
+            <location filename="../dialogs/map.py" line="167" />
             <source>（显示为空）</source>
             <translation>(display empty)</translation>
         </message>
         <message>
-            <location filename="../dialogs/map.py" line="157" />
+            <location filename="../dialogs/map.py" line="178" />
             <source>删除映射「{raw}」</source>
             <translation>Delete mapping "{raw}"</translation>
         </message>
         <message>
-            <location filename="../dialogs/map.py" line="164" />
+            <location filename="../dialogs/map.py" line="185" />
             <source>保存失败</source>
             <translation>Save failed</translation>
         </message>
         <message>
+            <location filename="../dialogs/map.py" line="97" />
             <location filename="../dialogs/map.py" line="120" />
-            <location filename="../dialogs/map.py" line="138" />
             <source>提示</source>
             <translation>Notice</translation>
         </message>
@@ -1320,27 +1327,27 @@
             <translation>0–30 px, default 5</translation>
         </message>
         <message>
-            <location filename="../widgets.py" line="158" />
+            <location filename="../widgets.py" line="159" />
             <source>点击选择颜色</source>
             <translation>Click to pick a color</translation>
         </message>
         <message>
-            <location filename="../widgets.py" line="161" />
+            <location filename="../widgets.py" line="162" />
             <source>颜色管理</source>
             <translation>Color library</translation>
         </message>
         <message>
-            <location filename="../widgets.py" line="172" />
+            <location filename="../widgets.py" line="174" />
             <source>选择字体</source>
             <translation>Choose font</translation>
         </message>
         <message>
-            <location filename="../widgets.py" line="314" />
+            <location filename="../widgets.py" line="315" />
             <source>选择字体文件</source>
             <translation>Choose a font file</translation>
         </message>
         <message>
-            <location filename="../widgets.py" line="778" />
+            <location filename="../widgets.py" line="779" />
             <source>恢复默认值</source>
             <translation>Reset to default</translation>
         </message>
@@ -1348,58 +1355,75 @@
     <context>
         <name>PresetDialog</name>
         <message>
-            <location filename="../dialogs/preset.py" line="18" />
-            <location filename="../dialogs/preset.py" line="64" />
+            <location filename="../dialogs/preset.py" line="23" />
+            <location filename="../dialogs/preset.py" line="71" />
             <source>预设方案</source>
             <translation>Presets</translation>
         </message>
         <message>
-            <location filename="../dialogs/preset.py" line="36" />
-            <source>一个槽位一个文件（presets1..10.json）；导入将保存到当前选中的槽位。</source>
-            <translation>One file per slot (presets1..10.json); importing saves to the currently selected slot.</translation>
-        </message>
-        <message>
-            <location filename="../dialogs/preset.py" line="45" />
-            <source>方案名（保存时必填）</source>
-            <translation>Preset name (required when saving)</translation>
-        </message>
-        <message>
-            <location filename="../dialogs/preset.py" line="48" />
+            <location filename="../dialogs/preset.py" line="88" />
             <source>加载</source>
             <translation>Load</translation>
         </message>
         <message>
-            <location filename="../dialogs/preset.py" line="49" />
+            <location filename="../dialogs/preset.py" line="89" />
+            <location filename="../dialogs/preset.py" line="112" />
             <source>保存</source>
             <translation>Save</translation>
         </message>
         <message>
-            <location filename="../dialogs/preset.py" line="50" />
+            <location filename="../dialogs/preset.py" line="91" />
+            <source>导出</source>
+            <translation>Export</translation>
+        </message>
+        <message>
+            <location filename="../dialogs/preset.py" line="92" />
             <source>删除</source>
             <translation>Delete</translation>
         </message>
         <message>
-            <location filename="../dialogs/preset.py" line="57" />
+            <location filename="../dialogs/preset.py" line="43" />
             <source>打开目录</source>
             <translation>Open folder</translation>
         </message>
         <message>
-            <location filename="../dialogs/preset.py" line="58" />
+            <location filename="../dialogs/preset.py" line="50" />
+            <location filename="../dialogs/preset.py" line="51" />
             <source>预设目录</source>
             <translation>Presets folder</translation>
         </message>
         <message>
-            <location filename="../dialogs/preset.py" line="61" />
-            <source>导入…</source>
-            <translation>Import…</translation>
+            <location filename="../dialogs/preset.py" line="53" />
+            <source>预设方案（{n} 个槽位，一槽一文件）</source>
+            <translation>Presets ({n} slots, one file per slot)</translation>
         </message>
         <message>
-            <location filename="../dialogs/preset.py" line="62" />
-            <source>导出…</source>
-            <translation>Export…</translation>
+            <location filename="../dialogs/preset.py" line="57" />
+            <source>右键槽位可执行 加载 / 保存 / 导出 / 导入 / 删除</source>
+            <translation>Right-click a slot for Load / Save / Export / Import / Delete</translation>
         </message>
         <message>
-            <location filename="../dialogs/preset.py" line="63" />
+            <location filename="../dialogs/preset.py" line="93" />
+            <source>导入</source>
+            <translation>Import</translation>
+        </message>
+        <message>
+            <location filename="../dialogs/preset.py" line="109" />
+            <source>保存预设</source>
+            <translation>Save preset</translation>
+        </message>
+        <message>
+            <location filename="../dialogs/preset.py" line="110" />
+            <source>方案名</source>
+            <translation>Preset name</translation>
+        </message>
+        <message>
+            <location filename="../dialogs/preset.py" line="111" />
+            <source>为方案命名</source>
+            <translation>Name this preset</translation>
+        </message>
+        <message>
+            <location filename="../dialogs/preset.py" line="70" />
             <source>关闭</source>
             <translation>Close</translation>
         </message>
@@ -1407,27 +1431,27 @@
     <context>
         <name>PresetMixin</name>
         <message>
-            <location filename="../win_preset.py" line="43" />
+            <location filename="../win_preset.py" line="44" />
             <source>槽位 {slot}：{name}</source>
             <translation>Slot {slot}: {name}</translation>
         </message>
         <message>
-            <location filename="../win_preset.py" line="44" />
+            <location filename="../win_preset.py" line="45" />
             <source>— 空 —</source>
             <translation>— empty —</translation>
         </message>
         <message>
-            <location filename="../win_preset.py" line="54" />
+            <location filename="../win_preset.py" line="55" />
             <source>该槽位为空，无法加载</source>
             <translation>This slot is empty, nothing to load</translation>
         </message>
         <message>
-            <location filename="../win_preset.py" line="57" />
+            <location filename="../win_preset.py" line="58" />
             <source>加载预设</source>
             <translation>Load preset</translation>
         </message>
         <message>
-            <location filename="../win_preset.py" line="58" />
+            <location filename="../win_preset.py" line="59" />
             <source>将把当前所有参数覆盖为预设「{name}」的值。继续？</source>
             <translation>All parameters will be replaced with preset "{name}". Continue?</translation>
         </message>
@@ -1437,136 +1461,141 @@
             <translation>Preset loaded: {name}</translation>
         </message>
         <message>
-            <location filename="../win_preset.py" line="80" />
+            <location filename="../win_preset.py" line="85" />
             <source>请先输入方案名后再保存</source>
             <translation>Enter a preset name before saving</translation>
         </message>
         <message>
-            <location filename="../win_preset.py" line="85" />
-            <location filename="../win_preset.py" line="93" />
+            <location filename="../win_preset.py" line="87" />
+            <location filename="../win_preset.py" line="95" />
             <source>保存预设</source>
             <translation>Save preset</translation>
         </message>
         <message>
-            <location filename="../win_preset.py" line="86" />
+            <location filename="../win_preset.py" line="88" />
             <source>槽位 {slot} 已有方案「{name}」，保存会覆盖它。继续？</source>
             <translation>Slot {slot} already has preset "{name}"; saving will overwrite it. Continue?</translation>
         </message>
         <message>
-            <location filename="../win_preset.py" line="99" />
+            <location filename="../win_preset.py" line="89" />
+            <source>（未命名）</source>
+            <translation>(unnamed)</translation>
+        </message>
+        <message>
+            <location filename="../win_preset.py" line="101" />
             <source>已保存到槽位 {slot}：{name}</source>
             <translation>Saved to slot {slot}: {name}</translation>
         </message>
         <message>
-            <location filename="../win_preset.py" line="106" />
+            <location filename="../win_preset.py" line="108" />
             <source>该槽位为空，没有可导出的方案</source>
             <translation>This slot is empty, nothing to export</translation>
         </message>
         <message>
-            <location filename="../win_preset.py" line="111" />
+            <location filename="../win_preset.py" line="113" />
             <source>导出预设</source>
             <translation>Export preset</translation>
         </message>
         <message>
-            <location filename="../win_preset.py" line="112" />
+            <location filename="../win_preset.py" line="114" />
             <source>预设 (*.json)</source>
             <translation>Presets (*.json)</translation>
         </message>
         <message>
-            <location filename="../win_preset.py" line="121" />
+            <location filename="../win_preset.py" line="123" />
             <source>导出失败：{err}</source>
             <translation>Export failed: {err}</translation>
         </message>
         <message>
-            <location filename="../win_preset.py" line="125" />
+            <location filename="../win_preset.py" line="127" />
             <source>已导出方案「{name}」</source>
             <translation>Preset exported: "{name}"</translation>
         </message>
         <message>
-            <location filename="../win_preset.py" line="129" />
-            <location filename="../win_preset.py" line="137" />
-            <location filename="../win_preset.py" line="141" />
-            <location filename="../win_preset.py" line="146" />
-            <location filename="../win_preset.py" line="159" />
-            <location filename="../win_preset.py" line="167" />
+            <location filename="../win_preset.py" line="131" />
+            <location filename="../win_preset.py" line="139" />
+            <location filename="../win_preset.py" line="143" />
+            <location filename="../win_preset.py" line="148" />
+            <location filename="../win_preset.py" line="161" />
+            <location filename="../win_preset.py" line="169" />
             <source>导入预设</source>
             <translation>Import preset</translation>
         </message>
         <message>
-            <location filename="../win_preset.py" line="130" />
+            <location filename="../win_preset.py" line="132" />
             <source>预设 (*.json);;所有文件 (*)</source>
             <translation>Presets (*.json);;All files (*)</translation>
         </message>
         <message>
-            <location filename="../win_preset.py" line="138" />
+            <location filename="../win_preset.py" line="140" />
             <source>无法读取该文件：
 {err}</source>
             <translation>Could not read this file:
 {err}</translation>
         </message>
         <message>
-            <location filename="../win_preset.py" line="141" />
+            <location filename="../win_preset.py" line="143" />
             <source>该文件中没有方案数据。</source>
             <translation>This file contains no preset data.</translation>
         </message>
         <message>
-            <location filename="../win_preset.py" line="147" />
+            <location filename="../win_preset.py" line="149" />
             <source>该文件不是单个方案格式（可能是旧版 presets.json）。请先用「导出预设」导出单个方案文件，再导入。</source>
             <translation>This file is not a single preset (it may be an old presets.json). Export a single preset file with "Export preset" first, then import it.</translation>
         </message>
         <message>
-            <location filename="../win_preset.py" line="160" />
+            <location filename="../win_preset.py" line="162" />
             <source>槽位 {slot} 已有方案「{name}」，导入会覆盖它。继续？</source>
             <translation>Slot {slot} already has preset "{name}"; importing will overwrite it. Continue?</translation>
         </message>
         <message>
-            <location filename="../win_preset.py" line="173" />
+            <location filename="../win_preset.py" line="175" />
             <source>已导入方案「{name}」到槽位 {slot}</source>
             <translation>Preset "{name}" imported into slot {slot}</translation>
         </message>
         <message>
-            <location filename="../win_preset.py" line="178" />
+            <location filename="../win_preset.py" line="180" />
             <source>该槽位为空，无需删除</source>
             <translation>This slot is empty, nothing to delete</translation>
         </message>
         <message>
-            <location filename="../win_preset.py" line="181" />
-            <location filename="../win_preset.py" line="188" />
+            <location filename="../win_preset.py" line="183" />
+            <location filename="../win_preset.py" line="190" />
             <source>删除预设</source>
             <translation>Delete preset</translation>
         </message>
         <message>
-            <location filename="../win_preset.py" line="182" />
+            <location filename="../win_preset.py" line="184" />
             <source>确定删除「{name}」？</source>
             <translation>Delete "{name}"?</translation>
         </message>
         <message>
-            <location filename="../win_preset.py" line="192" />
+            <location filename="../win_preset.py" line="193" />
             <source>已删除槽位 {slot}：{name}</source>
             <translation>Deleted slot {slot}: {name}</translation>
         </message>
         <message>
-            <location filename="../win_preset.py" line="222" />
+            <location filename="../win_preset.py" line="223" />
             <source>映射表没能写回文件：{err}</source>
             <translation>Could not write the mapping table back to the file: {err}</translation>
         </message>
         <message>
-            <location filename="../win_preset.py" line="240" />
+            <location filename="../win_preset.py" line="241" />
             <source>自动保存失败：{err}</source>
             <translation>Auto-save failed: {err}</translation>
         </message>
         <message>
-            <location filename="../win_preset.py" line="250" />
+            <location filename="../win_preset.py" line="251" />
             <source>恢复默认设置</source>
             <translation>Reset to defaults</translation>
         </message>
         <message>
-            <location filename="../win_preset.py" line="251" />
+            <location filename="../win_preset.py" line="252" />
             <source>将把当前所有参数恢复为出厂默认，现有调整会丢失。继续？</source>
             <translation>All current parameters will be restored to factory defaults and your adjustments will be lost. Continue?</translation>
         </message>
         <message>
-            <location filename="../win_preset.py" line="263" />
+            <location filename="../win_preset.py" line="264" />
             <source>已恢复默认设置</source>
             <translation>Restored to defaults</translation>
         </message>
@@ -1574,7 +1603,7 @@
     <context>
         <name>PreviewBox</name>
         <message>
-            <location filename="../widgets.py" line="494" />
+            <location filename="../widgets.py" line="495" />
             <source>请拖入图片，或点击「打开图片」</source>
             <translation>Drop an image, or click "Open image"</translation>
         </message>
@@ -1630,52 +1659,52 @@
     <context>
         <name>PreviewStateChip</name>
         <message>
-            <location filename="../widgets.py" line="77" />
+            <location filename="../widgets.py" line="78" />
             <source>无预览</source>
             <translation>No preview</translation>
         </message>
         <message>
-            <location filename="../widgets.py" line="78" />
+            <location filename="../widgets.py" line="79" />
             <source>渲染中…</source>
             <translation>Rendering…</translation>
         </message>
         <message>
-            <location filename="../widgets.py" line="79" />
+            <location filename="../widgets.py" line="80" />
             <source>已按当前参数渲染</source>
             <translation>Rendered with current settings</translation>
         </message>
         <message>
-            <location filename="../widgets.py" line="80" />
+            <location filename="../widgets.py" line="81" />
             <source>参数已改，待渲染</source>
             <translation>Settings changed, not rendered yet</translation>
         </message>
         <message>
-            <location filename="../widgets.py" line="81" />
+            <location filename="../widgets.py" line="82" />
             <source>渲染失败，未更新</source>
             <translation>Render failed, not updated</translation>
         </message>
         <message>
-            <location filename="../widgets.py" line="84" />
+            <location filename="../widgets.py" line="85" />
             <source>未选择图片</source>
             <translation>No image selected</translation>
         </message>
         <message>
-            <location filename="../widgets.py" line="85" />
+            <location filename="../widgets.py" line="86" />
             <source>正在渲染，完成后自动更新</source>
             <translation>Rendering; the preview updates automatically</translation>
         </message>
         <message>
-            <location filename="../widgets.py" line="86" />
+            <location filename="../widgets.py" line="87" />
             <source>预览已与当前参数一致（缩略档渲染，细节请用放大镜查看）</source>
             <translation>The preview matches the current settings (rendered at reduced size; use the magnifier for detail)</translation>
         </message>
         <message>
-            <location filename="../widgets.py" line="87" />
+            <location filename="../widgets.py" line="88" />
             <source>预览尚未更新到当前参数，渲染完成后自动更新</source>
             <translation>The preview has not been updated to the current settings yet; it refreshes when rendering finishes</translation>
         </message>
         <message>
-            <location filename="../widgets.py" line="88" />
+            <location filename="../widgets.py" line="89" />
             <source>上次预览渲染失败，当前显示的是上一张成功的预览</source>
             <translation>The last preview render failed; the preview shown is the previous successful one</translation>
         </message>
@@ -1711,6 +1740,19 @@
             <location filename="../win_undo.py" line="112" />
             <source>重做（Ctrl+Shift+Z）</source>
             <translation>Redo (Ctrl+Shift+Z)</translation>
+        </message>
+    </context>
+    <context>
+        <name>_FormDialog</name>
+        <message>
+            <location filename="../dialogs/base.py" line="139" />
+            <source>取消</source>
+            <translation>Cancel</translation>
+        </message>
+        <message>
+            <location filename="../dialogs/base.py" line="140" />
+            <source>确定</source>
+            <translation>OK</translation>
         </message>
     </context>
     <context>

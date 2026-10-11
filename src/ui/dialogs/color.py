@@ -52,11 +52,11 @@ class ColorDialog(QDialog):
 
         acts = QHBoxLayout()
         acts.setSpacing(theme.GAP_CTRL)
-        b = dlg_button(self.tr("保存当前颜色"), self._remember)
+        b = dlg_button(self.tr("保存当前颜色"), self._remember, primary=True)
         b.setToolTip(self.tr("将当前颜色保存到「我的颜色」，下次可直接使用"))
         acts.addWidget(b)
         acts.addStretch(1)
-        acts.addWidget(dlg_button(self.tr("关闭"), self.accept, primary=True))
+        acts.addWidget(dlg_button(self.tr("关闭"), self.accept))
         v.addLayout(acts)
 
 # 初始焦点收到对话框自身, 不落在子控件上: 落到色块或色号框会先按无焦点绘制、随后补上焦点态, 表现为打开时闪一下
