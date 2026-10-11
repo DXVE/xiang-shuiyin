@@ -32,9 +32,12 @@ VersionInfoProductTextVersion=v{#AppVer}
 ; 安装器可执行文件的描述, 显示于文件属性
 VersionInfoDescription=「镶 · 水印」 水印处理工具 安装程序
 
-; 默认解压位置, 用户可在向导中修改
+; 默认解压位置; 输入栏只读(见末尾 [Code]), 用户只能通过「浏览」改位置
 ; 位于程序数据根目录 %LOCALAPPDATA%\XiangShuiyin-QT6 下的 app 子目录, 与同根目录内的 watermark_data(设置与预设)和 logs 互不影响: 删除 app 目录不影响用户数据, 删除数据根目录则会一并删除程序
 DefaultDirName={localappdata}\XiangShuiyin-QT6\app
+
+; 开始菜单文件夹默认名(用户可在向导中修改)
+DefaultGroupName=「镶 · 水印」 水印处理工具
 
 ; 以非管理员模式安装: 不请求提权, 不触发用户账户控制提示
 PrivilegesRequired=lowest
@@ -70,8 +73,8 @@ DisableWelcomePage=yes
 
 DisableReadyPage=yes
 
-; 本安装器不创建开始菜单快捷方式, 该页没有意义
-DisableProgramGroupPage=yes
+; 保留「选择开始菜单文件夹」向导页, 默认组名见 DefaultGroupName
+DisableProgramGroupPage=no
 
 ; 向导配色: classic 为灰底, modern 为白底, 二者改此一行即可切换
 WizardStyle=classic
@@ -116,10 +119,17 @@ Name: "desktopicon"; Description: "创建桌面快捷方式"; Flags: checkedonce
 Source: "..\dist\xiangshuiyin-qt\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
+; 开始菜单项: 始终创建; {group} = {autoprograms}\<开始菜单组名>
+Name: "{group}\「镶 · 水印」 水印处理工具"; Filename: "{app}\xiangshuiyin-qt.exe"
+
+; 桌面快捷方式: 由向导的附加任务决定(默认勾选)
 Name: "{autodesktop}\「镶 · 水印」 水印处理工具"; Filename: "{app}\xiangshuiyin-qt.exe"; Tasks: desktopicon
 
 [InstallDelete]
-; 清理早期版本残留的快捷方式: 本安装器不再创建开始菜单项, 桌面项也已改用新名字
+; 覆盖安装时先清空 {app} 整个目录, 避免上一版删掉的模块/文件残留(本段是安装第一步, 随后由 [Files] 重新铺开)
+; {app} 被 [Code] 固定在数据根目录下的 app 子目录, 故清空不波及其父目录(watermark_data 与 logs)
+Type: filesandordirs; Name: "{app}"
+; 清理早期版本残留的旧快捷方式(旧版无开始菜单组、桌面项用旧名)
 Type: files; Name: "{autoprograms}\「镶 · 水印」 水印处理工具.lnk"
 Type: files; Name: "{autoprograms}\镶 · 水印.lnk"
 Type: files; Name: "{autodesktop}\镶 · 水印.lnk"
@@ -127,3 +137,26 @@ Type: files; Name: "{autodesktop}\镶 · 水印.lnk"
 [Run]
 ; 完成页的可选动作: nowait 不等待程序退出, postinstall 显示于完成页, skipifsilent 静默安装时不启动
 Filename: "{app}\xiangshuiyin-qt.exe"; Description: "立即运行"; Flags: nowait postinstall skipifsilent
+
+[Code]
+var
+  DirEditing: Boolean;
+
+// 「选择目标位置」页的路径输入栏设为只读, 禁手输或粘贴绕过 app 子目录, 只能通过「浏览」选位置
+// 浏览后立即把 app 子目录补回, 使输入栏与最终安装路径都恒为数据根下的独立子目录
+procedure DirEditChanged(Sender: TObject);
+begin
+  if DirEditing then
+    Exit;
+  if CompareText(ExtractFileName(WizardForm.DirEdit.Text), 'app') = 0 then
+    Exit;
+  DirEditing := True;
+  WizardForm.DirEdit.Text := AddBackslash(WizardForm.DirEdit.Text) + 'app';
+  DirEditing := False;
+end;
+
+procedure InitializeWizard;
+begin
+  WizardForm.DirEdit.ReadOnly := True;
+  WizardForm.DirEdit.OnChange := @DirEditChanged;
+end;
