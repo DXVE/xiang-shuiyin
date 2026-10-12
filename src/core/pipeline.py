@@ -151,7 +151,7 @@ def process_single(input_path, output_path, logo_dir,
     min_font_size_in = min_font_size
     # 显式关闭原图句柄, 避免批量处理时句柄与内存堆积(convert()/resize() 生成新对象, 不受 close() 影响)
     # src_key: 本次输入图的内容标识, 分层缓存键均以它开头
-    # 预览档下 input_path 为 psrc 缩略图(文件名含原图 mtime 与 size), 可直接作为原图标识
+    # 预览档下 input_path 为 psrc 缩略图(文件名含原图路径哈希 + mtime + size), 可直接作为原图标识
     src_key = _src_key(input_path)
     original_exif = b""
     _original = Image.open(input_path)

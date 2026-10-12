@@ -135,6 +135,7 @@ def _list_presets():
 def _collect_params(args):
     # 参数组装顺序: 内核默认值 -> 预设 -> 命令行覆盖(命令行优先级最高)
     p = {k: v for k, v in default_params().items() if k in _BACKEND_KEYS}
+    p["canvas_ratio"] = 0                     # 内核默认“跟随原图”: 未套用预设/未传 --ratio 时也要有值
     base = dict(p)
     source = "默认值"
     if args.preset is not None:

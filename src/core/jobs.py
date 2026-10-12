@@ -10,6 +10,7 @@ from .paths import (_default_font_path, _load_json, _repair_font_paths, _save_js
                     load_model_map, load_settings, preset_path, save_model_map, save_settings)
 from .pipeline import PreviewCancelled, _oriented_height, _unique_output_path, process_single
 from datetime import datetime
+import hashlib
 import logging
 import os
 import queue
@@ -439,8 +440,10 @@ class AppState:
     def _preview_src_for(self, input_path, src_image=None, max_side=PREVIEW_MAX_SIDE):
         try:
             st = os.stat(input_path)
-            key = (os.path.normcase(os.path.abspath(input_path)), st.st_mtime_ns, st.st_size, max_side)
-            tag = f"{int(st.st_mtime)}_{st.st_size}"
+            absp = os.path.normcase(os.path.abspath(input_path))
+            key = (absp, st.st_mtime_ns, st.st_size, max_side)
+            # 文件名带路径哈希: 只带 mtime(秒)+size 会撞名, 切回上一张会显示成另一张
+            tag = f"{hashlib.sha1(absp.encode('utf-8')).hexdigest()[:8]}_{int(st.st_mtime)}_{st.st_size}"
         except Exception:
             key, tag = None, ""
         if key is not None:

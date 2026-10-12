@@ -12,6 +12,13 @@ import os
 from .winconst import ILLEGAL_FN_CHARS, _NOT_PERSISTED, _PRESET_FORMAT, _PRESET_MACHINE_KEYS, _PRESET_SLOTS
 
 
+# 预设参数: 迁移到当前口径后剔除 model_map(老预设可能仍带该键)
+def _preset_params(rec):
+    out = migrate_preset(rec)
+    out.pop("model_map", None)
+    return out
+
+
 class PresetMixin:
 
     def _load_params(self):
@@ -61,13 +68,14 @@ class PresetMixin:
                     QMessageBox.StandardButton.No) != QMessageBox.StandardButton.Yes:
             return
         self._undo_step("__preset_load__", f"加载预设「{name}」",
-                        lambda: self._apply_params(migrate_preset(p)))
+                        lambda: self._apply_params(_preset_params(p)))
         self._notify(self.tr("已加载预设：{name}").format(name=name))
 
     def _preset_payload(self):
         # 存进预设的参数(与 settings 的口径刻意不同)
         p = dict(self._params)
         p["canvas_ratio_mode"] = self._params.get("canvas_ratio_mode", "original")
+        p.pop("model_map", None)      # 型号映射是独立数据文件, 不进预设(见 _preset_params)
         return p
 
     def _preset_save(self, view):
@@ -114,7 +122,8 @@ class PresetMixin:
                                  self.tr("预设 (*.json)"))
         if not path:
             return
-        data = {k: v for k, v in rec.items() if k not in _PRESET_MACHINE_KEYS}
+        data = {k: v for k, v in rec.items()
+                if k not in _PRESET_MACHINE_KEYS and k != "model_map"}
         data["_format"] = _PRESET_FORMAT
         try:
             with open(path, "w", encoding="utf-8") as f:
@@ -151,7 +160,7 @@ class PresetMixin:
             return
         name = str(data.get("_preset_name") or os.path.splitext(os.path.basename(path))[0])
         payload = {k: v for k, v in data.items()
-                   if k not in _PRESET_MACHINE_KEYS and k != "_format"}
+                   if k not in _PRESET_MACHINE_KEYS and k not in ("_format", "model_map")}
         # 导入目标是当前选中的槽位: 想换目标先在列表里选好槽位
         key = view.current_slot()
         if not key:
@@ -164,7 +173,7 @@ class PresetMixin:
                                  QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
                                  QMessageBox.StandardButton.No) != QMessageBox.StandardButton.Yes:
             return
-        d = self.state.preset_save(key, migrate_preset(payload), name)
+        d = self.state.preset_save(key, _preset_params(payload), name)
         if not d.get("ok"):
             _message(self, QMessageBox.Icon.Warning, self.tr("导入预设"),
                      str(d.get("error") or ""))
