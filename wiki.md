@@ -73,6 +73,7 @@
 | `src/core/pipeline.py` | 渲染流水线：单张成品的渲染与落盘 | `process_single` |
 | `src/core/jobs.py` | 渲染线程与应用状态：设置/预设/映射表管理、生成与预览调度 | `RenderWorker`、`AppState` |
 | `src/core/__init__.py` | 内核包声明与版本号；导入本包即完成环境初始化 | `__version__` |
+| `src/cli/` | 命令行出图入口：按内核签名组装参数、`--set` 覆盖任意内核参数、目录展开与批量出图、JSON 结果与退出码；不 import 任何界面代码 | `render.py`、`main`、`_collect_params`、`_expand_inputs`、`__main__.py` |
 | `src/ui/window.py` | 主窗口 `MainWindow`：组合下列 mixin，自身只留装配点 `__init__` 与类说明 | `MainWindow` |
 | `src/ui/win_build.py` · `win_undo.py` · `win_preset.py` · `win_preview.py` · `win_files.py` · `win_actions.py` · `win_generate.py` · `win_events.py` · `winconst.py` | `MainWindow` 按职责拆成的 8 个 mixin 模块与界面共享常量；逐模块内容见 §2.5 | `BuildMixin`、`UndoVisibilityMixin`、`PresetMixin`、`PreviewMixin`、`FilesMixin`、`ActionMixin`、`GenerateMixin`、`EventMixin` |
 | `src/ui/widgets.py` | 通用控件：参数行、卡片、预览框与状态标识、色块与图标链接、胶囊开关 | `ParamRow`、`Card`、`PreviewBox`、`PreviewStateChip`、`ElidedLabel`、`NoWheelSlider`、`NoWheelComboBox`、`_swatch_qss` |
@@ -89,6 +90,7 @@
 | `src/assets/` | 两个包共用的资源（在包外，见 §3.3） | `fonts/`、`icons/` |
 | `packaging/` | 打包配置与安装器脚本 | `xiangshuiyin-qt.spec`、`xiangshuiyin-qt.iss`、`i18n/` |
 | `docs/` | 对外展示文档（各平台的功能差异、成因与影响） | `跨平台功能点差异.md` |
+| `skills/` | 给 AI agent 的可执行操作说明：以 skill 形式随仓库分发，不随打包产物带出，由使用者自行添加到自己的 skill 目录 | `xsy-cli/SKILL.md` |
 | `scripts/` | 入库的项目脚本：发布门禁与资源构建（CI 与发布门禁跑同一套） | `check_docs_style.ps1`、`check_i18n.py`、`check_params.py`、`check_cli.py`、`check_bundle.py`、`build_i18n.py`、`build_bundled_font.py` |
 | `tools/`、`shots/` | 本机草稿与截图产物（被 `.gitignore` 排除，不入库） | `shot.py`、`_probe_*.py`、`_bench_switch.py` |
 
@@ -240,6 +242,7 @@
 
 - 打包成无控制台模式后 `sys.stdout` 为 `None`，入口对 `print` 做了静默兜底（`_say`），因此启动信息要看日志文件而不是控制台。
 - 单实例是**真单实例**：已有实例在运行时，第二次启动只会激活已有窗口随后退出。自检脚本想要并行运行，用 `XSY_IPC_NAME` 换一个管道名（§9.2）。
+- 命令行入口是同一内核的第二个消费者：`python src/cli/render.py <图片或目录>…`，或 `cd src` 后 `python -m cli`；不需要 Qt 与显示器（命令与开关见 `AGENTS.md` §7.2，面向 agent 的操作说明见 `skills/xsy-cli/SKILL.md`）。
 
 ### 3.2 打包配置项与其因果
 
@@ -905,9 +908,11 @@ QTranslator 装配（早于主窗口创建）
 
 一个参数的“权威定义”分布在三处：内核默认值、内核形参、界面参数表。界面到内核的转换是“按内核签名自动过滤 + 少量手工映射”：界面专有概念（例如“画布比例档位”）需要在转换、持久化口径、预设口径、旧记录反查四处各写一次，这是它和普通参数的区别所在。关联点：缓存键（§5.1）、预览载荷（§6.3）、显隐与镜像（§6.1）、是否持久化（§7.2）、文案（§8）。
 
+命令行入口**不为新增参数改动**：它以 `--list-params` 暴露内核签名与参数表的交集，普通参数自动出现在其中。需要手工同步的只有四份镜像清单（画布档位、布局取值、背景模式、自定义 EXIF 键，见 `AGENTS.md` §1.2）。
+
 ### 10.2 布局
 
-布局是内核里的枚举分支，牵连**五处**内核代码（最小高度与画布尺寸、垂直定位、绘制分组、图片适配后的几何重算、几何收集）加界面侧三处（下拉选项、受布局影响的行显隐、按布局分支的特殊处理）。其中“图片适配缩放后重算依赖图片高的几何”最容易被遗漏，表现为极端比例画布下水印位置错位。验证覆盖面与要求见 `AGENTS.md` §6.2。
+布局是内核里的枚举分支，牵连**五处**内核代码（最小高度与画布尺寸、垂直定位、绘制分组、图片适配后的几何重算、几何收集）加界面侧三处（下拉选项、受布局影响的行显隐、按布局分支的特殊处理）。其中“图片适配缩放后重算依赖图片高的几何”最容易被遗漏，表现为极端比例画布下水印位置错位。命令行侧还有一份布局取值清单（`AGENTS.md` §1.2）。验证覆盖面与要求见 `AGENTS.md` §6.2。
 
 ### 10.3 卡片与行
 
