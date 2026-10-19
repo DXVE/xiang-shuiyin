@@ -36,6 +36,32 @@ _RESET_W = 22
 _RESET_ICON = 14
 
 
+# 数值框编辑区整宽: 编辑区宽度由样式表的边框与内边距算出, 左右不对称会把数字挤偏,
+# 铺满控件后由编辑框自身居中, 与平台样式表实现无关。
+class _CenteredSpin:
+    def _fit_editor(self):
+        ed = self.lineEdit()
+        if ed is not None:
+            g = ed.geometry()
+            ed.setGeometry(0, g.y(), self.width(), g.height())
+
+    def resizeEvent(self, e):
+        super().resizeEvent(e)
+        self._fit_editor()
+
+    def changeEvent(self, e):
+        super().changeEvent(e)
+        self._fit_editor()
+
+
+class _SpinBox(_CenteredSpin, QSpinBox):
+    pass
+
+
+class _DoubleSpinBox(_CenteredSpin, QDoubleSpinBox):
+    pass
+
+
 _FONT_FILTER = "字体 (*.ttf *.otf *.ttc);;所有文件 (*)"
 
 
@@ -188,12 +214,12 @@ class ParamRow(QWidget):
                 if self._decimals:
                     # 只有小数档用 QDoubleSpinBox: 其余参数都是整数, 混两套只会让宽度统一更难算。
                     # ± 按钮调 stepDown/stepUp, 走的就是 singleStep, 因此按钮步进 = step。
-                    self.spin = QDoubleSpinBox()
+                    self.spin = _DoubleSpinBox()
                     self.spin.setDecimals(self._decimals)
                     self.spin.setRange(self._disp_lo / 10, self._disp_hi / 10)
                     self.spin.setSingleStep(self._step)
                 else:
-                    self.spin = QSpinBox()
+                    self.spin = _SpinBox()
                     self.spin.setRange(self._disp_lo, self._disp_hi)
                     self.spin.setSingleStep(self._step)
                 self.spin.setButtonSymbols(QAbstractSpinBox.ButtonSymbols.NoButtons)
