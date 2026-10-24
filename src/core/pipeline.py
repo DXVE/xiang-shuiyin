@@ -594,10 +594,14 @@ def process_single(input_path, output_path, logo_dir,
 
         if layout_mode == "split_top_bottom":
             # 等高中带渲染: 上组贴图(品牌底 → 图顶 = gap_image_top), 下组贴图(图底 → 型号顶 = gap_image_bottom)
-            # 矮侧/比例画布的余量落在外侧, 图片由画布几何保证垂直居中
+            # 矮侧余量在带内按外侧/内侧各半分(该组垂直居中), 比例画布的额外高度留在带外
             above_content_h = _sec_height(above_lines, line_spacing)
             below_content_h = _sec_height(below_lines, line_spacing)
             cy = paste_y - gap_image_top_px - above_content_h
+            if above_lines:
+                slack = side_h - (gap_top_px + above_content_h + gap_image_top_px)   # 上带高于上组内容的余量
+                if slack > 0:
+                    cy -= slack // 2
             above_ys = []
             for i, (typ, content, fnt, h) in enumerate(above_lines):
                 clip = cy + h + line_spacing if i < len(above_lines) - 1 else paste_y
@@ -605,6 +609,10 @@ def process_single(input_path, output_path, logo_dir,
                 above_ys.append((cy, cy + h))
                 cy += h + line_spacing
             below_y = paste_y + img_h + gap_image_bottom_px   # 图底到下方水印顶 = gap_image_bottom
+            if below_lines:
+                slack = side_h - (gap_image_bottom_px + below_content_h + bottom_gap_px)   # 下带高于下组内容的余量
+                if slack > 0:
+                    below_y += slack // 2
             cy = below_y
             below_ys = []
             for i, (typ, content, fnt, h) in enumerate(below_lines):

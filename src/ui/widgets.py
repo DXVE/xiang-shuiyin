@@ -235,7 +235,7 @@ class ParamRow(QWidget):
                 for b, slot in ((minus, self.spin.stepDown), (plus, self.spin.stepUp)):
                     b.setObjectName("step")
                     b.setCursor(Qt.PointingHandCursor)
-                    b.clicked.connect(slot)
+                    b.clicked.connect(lambda _checked=False, s=slot: self._step_spin(s))
                 step = QWidget()
                 self._step_box = step
                 self._step_w = max(minus.sizeHint().width(), plus.sizeHint().width())
@@ -255,6 +255,14 @@ class ParamRow(QWidget):
             lay.addWidget(self.reset_btn)
 
         self.set_value(value)
+
+    def _step_spin(self, action):
+        # ± 按钮步进: QAbstractSpinBox 步进时会全选编辑框文本, 步进后清选区并收光标到末尾
+        action()
+        ed = self.spin.lineEdit()
+        if ed is not None:
+            ed.deselect()
+            ed.setCursorPosition(len(ed.text()))
 
     def set_value(self, v):
         self._updating = True
