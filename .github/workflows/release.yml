@@ -13,11 +13,12 @@ jobs:
     # Windows 专用: PyInstaller 与 Inno Setup 都只在 Windows 上出本项目的分发产物
     runs-on: windows-latest
     env:
-      # 版本号 = 触发发布的 v* tag; 放在 job 级 env, 而不是在 run 里内插 ${{ github.ref_name }}, 以免 tag 里的 $() 与引号被 shell 当代码执行
+      # 发布 tag: 用于与源码 __version__ 核对, 以及产物/资产命名; 版本号本身只来自源码
+      # 放在 job 级 env, 而不是在 run 里内插 ${{ github.ref_name }}, 以免 tag 里的 $() 与引号被 shell 当代码执行
       BUILD_TAG: ${{ github.ref_name }}
       XSY_ONEDIR: '1'
-      # 安装器产物路径, 等于脚本里 OutputBaseFilename 的值(位于 OutputDir=..\dist)
-      INSTALLER: dist\xiangshuiyin-qt-portable.exe
+      # 控制台按 UTF-8 输出, 否则脚本里的中文在 CI 日志上会因编码报错(与 ci.yml 同一设置)
+      PYTHONUTF8: '1'
     steps:
       - uses: actions/checkout@v7
 
@@ -26,6 +27,11 @@ jobs:
         with:
           # 需满足 pyproject 的 requires-python>=3.10
           python-version: '3.14'
+
+      - name: 版本核对（tag 与源码版本一致）
+        # 版本号唯一真源是 src/core/__init__.py; tag 只是发布用的标签, 与它不一致时在编译前直接失败
+        shell: pwsh
+        run: python scripts/check_version.py --tag $env:BUILD_TAG
 
       - name: 安装构建依赖
         # 用 -e 与仓库文档中的本地流程保持一致
@@ -87,18 +93,19 @@ jobs:
             Write-Error "安装器编译失败（ISCC 退出码 $LASTEXITCODE）"
             exit 1
           }
-          if (-not (Test-Path $env:INSTALLER)) {
-            Write-Error "未生成安装器: $($env:INSTALLER)"
+          # 产物名由安装器脚本的 OutputBaseFilename 与 build/version.iss 的 AppVer 拼成;
+          # 版本核对已保证 AppVer 与 tag 一致, 因此这里直接用 tag 组出路径
+          $installer = "dist\xiangshuiyin-$env:BUILD_TAG-portable.exe"
+          if (-not (Test-Path $installer)) {
+            Write-Error "未生成安装器: $installer"
+            Get-ChildItem dist -Name
             exit 1
           }
 
-      - name: 重命名产物并列出大小
-        # 资产名带上 tag, 便于用户区分版本
+      - name: 列出产物大小
         shell: pwsh
         run: |
-          $dst = "dist\xiangshuiyin-qt-portable-$env:BUILD_TAG.exe"
-          Move-Item -Path $env:INSTALLER -Destination $dst -Force
-          Get-Item $dst |
+          Get-Item "dist\xiangshuiyin-$env:BUILD_TAG-portable.exe" |
             Select-Object Name, @{N = 'Size_MB'; E = { [Math]::Round($_.Length / 1MB, 2) }}, LastWriteTime |
             Format-Table -AutoSize
 
@@ -131,4 +138,4 @@ jobs:
           # 资产名随 tag 变化; 未匹配到文件时默认静默跳过, 会发布出没有产物的 release, 必须显式失败
           fail_on_unmatched_files: true
           files: |
-            dist/xiangshuiyin-qt-portable-${{ github.ref_name }}.exe
+            dist/xiangshuiyin-${{ github.ref_name }}-portable.exe

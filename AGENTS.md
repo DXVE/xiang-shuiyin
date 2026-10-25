@@ -296,7 +296,7 @@
 - 安装器**必须**创建桌面与开始菜单快捷方式（`DefaultGroupName` + `DisableProgramGroupPage=no`）。
 - 安装器覆盖安装**必须**先清空 `{app}`（`[InstallDelete]` 的 `filesandordirs`），以清掉旧版删除的模块残留；`{app}` 恒为数据根目录下的 `app` 子目录，清空不波及同级 `watermark_data` 与 `logs`。
 - 「选择目标位置」页的路径输入栏**必须**只读，且离开该页前把路径补回 `app` 子目录（`[Code]`），禁止手输或粘贴绕过子目录。
-- 发布由 `.github/workflows/release.yml` 在打 tag 时执行：它只做打包与上传，**不得**依赖 tag 注入版本号（版本号只来自内核，tag 仅用于资产命名）。
+- 发布由 `.github/workflows/release.yml` 在打 tag 时执行：它只做打包与上传，**不得**依赖 tag 注入版本号（版本号只来自内核）；`scripts/check_version.py` 在打包前核对 tag 与 `__version__`，不一致即失败、不打包，tag 只用于该核对与资产命名。
 - **验收**：`dist/` 产物能启动、资源在位、无 Addons 依赖；安装器装完可运行、桌面与开始菜单快捷方式齐备、注册表无新增、删除程序目录与快捷方式即卸载干净；版本字面量只出现在 `src/core/__init__.py`（打包项与因果见 wiki §3.2、§3.6）。
 
 ### 4.3 字体与许可
@@ -417,7 +417,7 @@
 - 打包：装可选依赖 `.[build]`。两步：`XSY_ONEDIR=1` 时 `python -m PyInstaller packaging/xiangshuiyin-qt.spec` 出目录形态载荷并生成 `build/version.iss`；再 `ISCC.exe packaging/xiangshuiyin-qt.iss` 出安装器（构建机需装 Inno Setup 6.3 或更高版本；它只作构建工具，不随产物分发）。核实方式是读产物归档表确认资源与 `ui/i18n/*.qm` 在位，并把数据目录指向沙箱、写入英文设置后启动产物，读日志里的 `[i18n]` 行；安装器另按 §4.2 的验收项核对。
 - 多语言：`scripts/build_i18n.py`（演练）/ `--write`，校验 `scripts/check_i18n.py`（§5）。
 - 命令行出图：`python src/cli/render.py <图片或目录>…`（内核默认值 + 可选预设 + 参数覆盖，可输出 `--json`；`cd src` 后也可 `python -m cli`）。
-- 发布门禁：`scripts/check_docs_style.ps1`（文档：机器相关定位信息 / 排版体例 / 术语 / 交叉引用）、`scripts/check_code_style.py`（代码：本机路径写死 / 凭据 / 过期定位信息 / 注释体例）、`scripts/check_params.py`（参数表 / 内核签名 / 默认值契约）、`scripts/check_cli.py`（命令行无头出图）、`scripts/check_bundle.py`（产物自检）；语义级检查用 `python -m ruff check --select F821`（未定义名）。新增或修改发布门禁**必须**同时接进 `.github/workflows/ci.yml` 与 `release.yml` 的发布门禁；两处跑同一套脚本，发布时不过不打包。
+- 发布门禁：`scripts/check_docs_style.ps1`（文档：机器相关定位信息 / 排版体例 / 术语 / 交叉引用）、`scripts/check_code_style.py`（代码：本机路径写死 / 凭据 / 过期定位信息 / 注释体例）、`scripts/check_params.py`（参数表 / 内核签名 / 默认值契约）、`scripts/check_version.py`（发布 tag 与源码版本号一致）、`scripts/check_cli.py`（命令行无头出图）、`scripts/check_bundle.py`（产物自检）；语义级检查用 `python -m ruff check --select F821`（未定义名）。新增或修改发布门禁**必须**同时接进 `.github/workflows/ci.yml` 与 `release.yml` 的发布门禁；两处跑同一套脚本，发布时不过不打包。
 - 发布门禁只收**能客观判定**的项（路径 / 行号 / 引号 / 交叉引用 / 契约）。靠语感的风格判断（口语词表一类）**不得**进 CI：穷举不可能完整，还会把个人用词偏好变成硬失败；注释体例、未使用导入（ruff `F401`）这类现存命中较多的项只**报告**，不计失败。
 
 ### 7.3 脚本纪律（`scripts/` 入库、`tools/` 不入库）

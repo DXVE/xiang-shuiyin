@@ -23,6 +23,10 @@ jobs:
         with:
           python-version: '3.14'
 
+      - name: 版本号检查（源码版本号格式）
+        # 与发布门禁同一份脚本; CI 没有 tag, 这里只校验源码版本号本身
+        run: python scripts/check_version.py
+
       - name: 安装依赖
         run: |
           python -m pip install --upgrade pip

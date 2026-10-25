@@ -90,8 +90,9 @@ LicenseFile=..\dist\xiangshuiyin-qt\LICENSE
 ; 安装器输出目录, 相对本脚本所在目录
 OutputDir=..\dist
 
-; 安装器文件名; 不使用 setup 命名: 帮助文档指出 Windows 会对所有名为 setup.exe 的程序施加兼容性 shim
-OutputBaseFilename=xiangshuiyin-qt-portable
+; 安装器文件名: 版本号取自打包生成的 build/version.iss(AppVer), 与源码 __version__ 同源;
+; 不使用 setup 命名: 帮助文档指出 Windows 会对所有名为 setup.exe 的程序施加兼容性 shim
+OutputBaseFilename=xiangshuiyin-v{#AppVer}-portable
 
 ; 压缩算法与等级: lzma2 最高档, 安装包体积最小
 Compression=lzma2/max

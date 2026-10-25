@@ -65,7 +65,7 @@
 
 ## 打包形态与「可替换该库」
 
-对外分发的形态是**安装器**（`dist\xiangshuiyin-qt-portable.exe`）：它装出的是目录形态，Qt 的 DLL 就在程序目录里、用户可以直接替换，因此走 LGPLv3 第 4 条 d 项 **1 款**（「可替换该库」）。`licenses/Qt-Notice.txt` 同时给出各组件的源码位置，作为 0 款的兜底。
+对外分发的形态是**安装器**（`dist\xiangshuiyin-v<版本号>-portable.exe`）：它装出的是目录形态，Qt 的 DLL 就在程序目录里、用户可以直接替换，因此走 LGPLv3 第 4 条 d 项 **1 款**（「可替换该库」）。`licenses/Qt-Notice.txt` 同时给出各组件的源码位置，作为 0 款的兜底。
 
 只做目录形态构建时（安装器的输入）：
 
