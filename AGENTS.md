@@ -310,7 +310,7 @@
 
 ### 4.4 其它交付项
 
-- `window.REPO_URL` 目前是**占位符**：没有明确指示**不得**改成某个真实仓库地址。
+- `REPO_URL`（`src/ui/dialogs/about.py`）**必须**是本仓库的真实地址（当前为 `https://github.com/DXVE/xiang-shuiyin`），并与 README 里的 Releases 链接指向同一仓库；改名或迁移后同步修改，**不得**留占位符。
 - 许可文本收在仓库根 `licenses/`（GPLv3 与 LGPLv3 全文、Qt 声明与源码位置、Pillow / exifread / Python / PyInstaller 的文本）**不得**删除：LGPLv3 第 4 条 b 项要求分发时随附 **GPL 与 LGPL 两份全文**，而 PySide6 的 wheel 只带一个商业许可引用文件。spec 会在构建后把它们复制到 `dist/`，该步骤**不得**移除（单文件产物的内部解包目录用户看不到）。
 - 打包形态决定「可替换该库」走哪一款：对外分发用安装器（装出目录形态），Qt 的 DLL 落在程序目录里、用户可替换，对应 LGPLv3 第 4 条 d 项 **1 款**；`licenses/Qt-Notice.txt` 同时给出源码位置，作为 0 款的兜底。若仍要分发单文件产物，只能走 0 款，且**不得**在缺少源码位置说明的情况下分发。
 - 运行时依赖用 `PySide6-Essentials`：**不得**改回 `PySide6` 元包（会带上用不到的 Addons，安装体积 435 MB 量级）。

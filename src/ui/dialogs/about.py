@@ -14,7 +14,7 @@ import platform
 
 
 # 项目仓库地址(同时用作 GitHub 图标的 tooltip)
-REPO_URL = "https://github.com/your-name/ShuiYin-QT6"
+REPO_URL = "https://github.com/DXVE/xiang-shuiyin"
 _ABOUT_ICON = 20            # 「关于」弹窗里 GitHub 标识的显示边长(逻辑像素)
 
 
