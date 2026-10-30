@@ -16,7 +16,7 @@ from ui.specs import PARAM_SPECS, backend_params   # noqa: E402
 from ui.winconst import FONT_STYLE_GROUPS       # noqa: E402
 
 # 不进内核的界面专有键
-UI_ONLY = {"canvas_ratio_mode"}
+UI_ONLY = {"canvas_ratio_mode", "compare_layouts"}
 # 镜像行: 本身不存值, 写的是两个底层参数
 MIRROR_ONLY = {"gap_inner", "gap_outer"}
 # 由 backend_params() 从界面键派生出来的内核参数

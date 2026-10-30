@@ -422,6 +422,7 @@ PyInstaller 属可选依赖（`build` 组），不进运行时依赖；打包目
 - 保存走 `_save_output`：JPEG 用最高画质且不做色度抽样（水印文字对色度抽样敏感），并带上原图 EXIF（已去掉 Orientation）；JPEG 不可写时回退 PNG。
 - 输出名不覆盖：单张用 `_unique_output_path`（同名则递增后缀）；批量用批内已用名集合，命名可复现、同名图片落在同一批也不互相覆盖。
 - 批量输出落在导出目录下的独立子目录（名字含毫秒级时间戳），因此“原图目录里已有同名文件”或“同秒跑两次批量”都不会撞。
+- **对比模式**只改“出几张”，不改渲染：`RenderWorker` 逐张把 `layout_mode` 换成三种取值各跑一次 `process_single`，其余参数原样透传，因此三张之间只有布局不同；后缀取 `RenderWorker.COMPARE_SUFFIX`（`_watermarked_unified` / `_watermarked_split_top_bottom` / `_watermarked_split_left_right`）。批量模式下进度仍按“文件数”计，一张的三个布局全成功才算这个文件成功。预览不受该开关影响，始终按当前选中的布局渲染，所以勾选后界面上看到的那一帧只是三种结果之一。
 
 ### 4.10 `geom`：几何收集与能力矩阵
 

@@ -22,6 +22,7 @@ class GenerateMixin:
             "raw_model": self._raw_model,
             "custom_model": self._custom_model,
             "save_map_flag": True,
+            "compare_layouts": bool(self._params.get("compare_layouts")),
         }
         if self._mode == "single":
             if not self._input_path:

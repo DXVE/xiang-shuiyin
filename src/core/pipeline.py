@@ -57,12 +57,13 @@ def _save_output(canvas, output_path, original_exif):
 
 # 生成不覆盖已存在成品的唯一输出路径(单张模式用)
 def _unique_output_path(out_root, stem, suffix="_watermarked.jpg"):
+    root, ext = os.path.splitext(suffix)
     out_path = os.path.join(out_root, f"{stem}{suffix}")
     if not os.path.exists(out_path):
         return out_path
     dup = 2
     while True:
-        candidate = os.path.join(out_root, f"{stem}_watermarked_{dup}.jpg")
+        candidate = os.path.join(out_root, f"{stem}{root}_{dup}{ext}")
         if not os.path.exists(candidate):
             return candidate
         dup += 1

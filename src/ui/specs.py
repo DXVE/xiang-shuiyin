@@ -63,6 +63,9 @@ PARAM_SPECS = [
          args=[("unified", QT_TRANSLATE_NOOP("ParamRow", "统一下方")), ("split_top_bottom", QT_TRANSLATE_NOOP("ParamRow", "上下分离")),
                ("split_left_right", QT_TRANSLATE_NOOP("ParamRow", "下方左右分离"))]),
 
+    dict(tab="font", card=QT_TRANSLATE_NOOP("Card", "水印位置布局"), key="compare_layouts", label=QT_TRANSLATE_NOOP("ParamRow", "对比模式"), kind="bool",
+         hint=QT_TRANSLATE_NOOP("ParamRow", "开启后按三种布局各出一张，其余参数不变（布局选择不参与）")),
+
     dict(tab="effects", card=QT_TRANSLATE_NOOP("Card", "背景模式"), key="bg_mode", label=QT_TRANSLATE_NOOP("ParamRow", "背景模式"), kind="choice",
          args=[("blur", QT_TRANSLATE_NOOP("ParamRow", "模糊图片")), ("color", QT_TRANSLATE_NOOP("ParamRow", "纯色"))]),
     dict(tab="effects", card=QT_TRANSLATE_NOOP("Card", "背景模式"), key="bg_color", label=QT_TRANSLATE_NOOP("ParamRow", "背景色"), kind="color",

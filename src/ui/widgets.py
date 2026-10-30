@@ -156,6 +156,8 @@ class ParamRow(QWidget):
             self.chk = QCheckBox(self.tr(spec["label"]))
             self.chk.setCursor(Qt.PointingHandCursor)
             self.chk.toggled.connect(self._from_check)
+            if spec.get("hint"):
+                self.chk.setToolTip(self.tr(spec["hint"]))
             lay.addWidget(self.chk)
             if spec["label"].strip():
 # 标签为空(字体/水印开关网格的格位)时不加弹性空白: 那些格位靠 grid 的 AlignCenter 居中, 加 stretch 会把开关推偏

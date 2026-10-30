@@ -20,10 +20,16 @@ import time
 
 
 class RenderWorker(threading.Thread):
+    # 对比模式: 一次按三种布局各写一张, 文件名后缀与 layout_mode 取值一一对应
+    COMPARE_SUFFIX = {"unified": "_watermarked_unified.jpg",
+                      "split_top_bottom": "_watermarked_split_top_bottom.jpg",
+                      "split_left_right": "_watermarked_split_left_right.jpg"}
+
     def __init__(self, mode, params, events, stop_event,
                  input_path=None, output_path=None, original_name=None,
                  file_paths=None, raw_model=None, custom_model=None,
-                 save_map_flag=False, manual_exif=None, batch_out_dir=None):
+                 save_map_flag=False, manual_exif=None, batch_out_dir=None,
+                 compare_layouts=False, compare_dir=None):
         super().__init__(daemon=True)
         self.name = "生成线程"        # 进日志的 %(threadName)s: 与预览/界面线程区分开(日志格式里带线程名)
         self.mode = mode
@@ -40,6 +46,8 @@ class RenderWorker(threading.Thread):
         self.save_map_flag = save_map_flag
         self.manual_exif = manual_exif
         self.logo_dir = params.get("logo_dir", "")
+        self.compare_layouts = bool(compare_layouts)
+        self.compare_dir = compare_dir or None   # 对比模式下单张成品的落盘目录
 
     def run(self):
         try:
@@ -59,6 +67,10 @@ class RenderWorker(threading.Thread):
             model_map = load_model_map(self.logo_dir)
             model_map[self.raw_model] = self.custom_model
             save_model_map(self.logo_dir, model_map)
+
+        if self.compare_layouts:
+            self._process_single_compare()
+            return
 
         logging.info(f"单张处理: {self.input_path}")
         self.events.put({"type": "log", "msg": "处理中...", "level": "INFO"})
@@ -82,6 +94,39 @@ class RenderWorker(threading.Thread):
         else:
             self.events.put({"type": "finished", "message": "处理失败", "success": False})
 
+    # 对比模式(单张): 其余参数原样透传, 只把 layout_mode 逐张替换
+    def _process_single_compare(self):
+        logging.info(f"单张对比处理: {self.input_path} (三种布局)")
+        self.events.put({"type": "log", "msg": "对比模式: 三种布局各出一张", "level": "INFO"})
+        stem = os.path.splitext(os.path.basename(self.input_path))[0]
+        out_dir = self.compare_dir or PREVIEW_DIR   # 未指定落盘目录时退回预览临时目录
+        t0 = time.monotonic()
+        names = []
+        for layout, suffix in self.COMPARE_SUFFIX.items():
+            out_p = _unique_output_path(out_dir, stem, suffix)
+            logging.info(f"对比模式 {layout}: {os.path.basename(out_p)}")
+            try:
+                success, final_path = process_single(
+                    self.input_path, out_p, manual_exif=self.manual_exif,
+                    **dict(self.params, layout_mode=layout))
+            except Exception as e:
+                logging.error(f"对比模式处理失败({layout}): {e}")
+                self.events.put({"type": "log", "msg": f"处理失败: {e}", "level": "ERROR"})
+                self.events.put({"type": "finished", "message": str(e), "success": False})
+                return
+            if not success:
+                self.events.put({"type": "finished", "message": "处理失败", "success": False})
+                return
+            names.append(os.path.basename(final_path))
+        one_ms = (time.monotonic() - t0) * 1000
+        logging.info(f"对比模式完成: {', '.join(names)} (耗时 {one_ms:.0f}ms)")
+        self.events.put({"type": "log", "msg": f"对比模式完成: {', '.join(names)}", "level": "INFO"})
+        self.events.put({"type": "finished", "message": f"已完成: {len(names)} 张（对比模式）",
+                         "success": True, "download_path": os.path.join(out_dir, names[-1]),
+                         "ms": one_ms, "count": len(names),
+                         "download_name": names[-1],
+                         "out_dir": out_dir})
+
     def _process_batch(self):
         files = self.file_paths  # [{path, name}, ...]
         if not files:
@@ -99,6 +144,10 @@ class RenderWorker(threading.Thread):
         used_names = set()   # 输出名去重: 不同子目录同名图片不互相覆盖
         t_batch = time.monotonic()
         logging.info(f"批量处理: 共 {total} 个文件 -> {out_dir}")
+        if self.compare_layouts:
+            logging.info("批量对比模式: 每张按三种布局各出一张")
+        # 对比模式逐张跑三种布局; 键为 None 表示按当前布局只出一张
+        variants = self.COMPARE_SUFFIX if self.compare_layouts else {None: "_watermarked.jpg"}
         if self.manual_exif:
             # 批量使用与照片无关的参数(该设置一次作用于整批), 日志记明本次忽略了照片 EXIF
             logging.info("批量: 使用自定义水印信息(忽略每张照片的 EXIF)")
@@ -112,25 +161,35 @@ class RenderWorker(threading.Thread):
             fpath = item.get("path", "")
             fname = item.get("name", os.path.basename(fpath))
             stem = os.path.splitext(fname)[0]
-            out_name = f"{stem}_watermarked.jpg"
-            dup = 2
-            while out_name in used_names:
-                out_name = f"{stem}_watermarked_{dup}.jpg"
-                dup += 1
-            used_names.add(out_name)
-            out_path = os.path.join(out_dir, out_name)
-            logging.info(f"[{idx}/{total}] 处理: {fname} -> {out_name}")
+            logging.info(f"[{idx}/{total}] 处理: {fname}")
             self.events.put({"type": "progress", "done": idx, "total": total, "name": fname})
             t_one = time.monotonic()
-            try:
-                process_single(fpath, out_path, manual_exif=self.manual_exif, **self.params)
-                success += 1
-                # 每张的耗时: 便于定位是单张偏大还是整体退化
-                logging.info(f"[{idx}/{total}] 完成: {fname} (耗时 {(time.monotonic() - t_one) * 1000:.0f}ms)")
-            except Exception as e:
-                err_msg = f"{fname} -> {e}"
-                logging.warning(f"处理失败 {fpath}: {e}")
-                errors.append(err_msg)
+            failed = False
+            for layout, suffix in variants.items():
+                base = f"{stem}{suffix}"
+                root, ext = os.path.splitext(base)
+                out_name = base
+                dup = 2
+                while out_name in used_names:
+                    out_name = f"{root}_{dup}{ext}"
+                    dup += 1
+                used_names.add(out_name)
+                out_path = os.path.join(out_dir, out_name)
+                logging.info(f"[{idx}/{total}] 写出: {out_name}")
+                params = self.params if layout is None else dict(self.params, layout_mode=layout)
+                try:
+                    process_single(fpath, out_path, manual_exif=self.manual_exif, **params)
+                except Exception as e:
+                    err_msg = f"{fname} -> {e}"
+                    logging.warning(f"处理失败 {fpath}({layout or '当前布局'}): {e}")
+                    errors.append(err_msg)
+                    failed = True
+                    break
+            if failed:
+                continue
+            success += 1
+            # 每张的耗时: 便于定位是单张偏大还是整体退化
+            logging.info(f"[{idx}/{total}] 完成: {fname} (耗时 {(time.monotonic() - t_one) * 1000:.0f}ms)")
         batch_ms = (time.monotonic() - t_batch) * 1000
         avg = f", 平均 {batch_ms / success:.0f}ms" if success else ""
         result_msg = f"批量处理完成：{success}/{total} -> {out_dir}"
@@ -372,6 +431,8 @@ class AppState:
             # 记录本次会话用过的导出目录: output_dir 不再持久化, 「打开所在目录」的白名单依赖它
             with self._sel_lock:
                 self.user_dirs.add(os.path.normcase(os.path.abspath(out_root)))
+            # 对比模式: 单张的成品名由生成线程按布局逐张取, 此处不再占名
+            compare = bool(req.get("compare_layouts"))
             if mode == "single":
                 in_p = (req.get("input_path") or "").strip()
                 original_name = (req.get("original_name") or os.path.basename(in_p)).strip()
@@ -381,14 +442,19 @@ class AppState:
                     os.makedirs(out_root, exist_ok=True)
                 except Exception as e:
                     return {"ok": False, "error": f"导出目录不可写：{out_root}（{e}）"}
-                stem = os.path.splitext(original_name)[0]
-                out_p = _unique_output_path(out_root, stem)
-                out_name = os.path.basename(out_p)
+                if compare:
+                    out_p = None
+                    out_name = original_name
+                else:
+                    stem = os.path.splitext(original_name)[0]
+                    out_p = _unique_output_path(out_root, stem)
+                    out_name = os.path.basename(out_p)
                 self.worker = RenderWorker(
                     "single", params, self.events, self.stop_event,
                     input_path=in_p, output_path=out_p, original_name=out_name,
                     raw_model=req.get("raw_model"), custom_model=req.get("custom_model"),
-                    save_map_flag=bool(req.get("save_map_flag")), manual_exif=manual_exif)
+                    save_map_flag=bool(req.get("save_map_flag")), manual_exif=manual_exif,
+                    compare_layouts=compare, compare_dir=out_root)
             else:
                 file_paths = req.get("file_paths") or []
                 if not file_paths:
@@ -412,7 +478,8 @@ class AppState:
                     return {"ok": False, "error": f"无法创建导出子目录: {e}"}
                 self.worker = RenderWorker("batch", params, self.events, self.stop_event,
                                               file_paths=file_paths, batch_out_dir=batch_out,
-                                              manual_exif=manual_exif)
+                                              manual_exif=manual_exif,
+                                              compare_layouts=compare)
             self.worker.start()
             return {"ok": True}
         finally:

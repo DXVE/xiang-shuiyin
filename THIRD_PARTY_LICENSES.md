@@ -79,7 +79,3 @@ set XSY_ONEDIR=1
 ## 已处理的依赖项
 
 - 运行时依赖已从 `PySide6` 元包改为 **`PySide6-Essentials`**（`pyproject.toml`）：本程序只用 `QtCore` / `QtGui` / `QtWidgets` / `QtNetwork`，元包会额外带上 `PySide6-Addons`（安装体积 435 MB 量级，实测），既无用途也没有必要一起分发。
-
-## 历史
-
-- 2026-09-23：把原先内置的 Roboto 四变体（SIL OFL 1.1）**整体替换**为上面这套更纱黑体子集 —— Roboto 只有拉丁字形，水印文案里一出现中文就渲染成方框（FreeType 的 `.notdef`）。同时把 Roboto 的许可文件换成 Sarasa 的 `LICENSE`（现为 `src/assets/fonts/OFL.txt`），并新建本文件（此前 README 与「关于」弹窗指向的 `THIRD_PARTY_LICENSES` 并不存在）。

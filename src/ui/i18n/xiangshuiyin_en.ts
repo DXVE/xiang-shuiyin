@@ -287,74 +287,75 @@
         </message>
         <message>
             <location filename="../specs.py" line="62" />
+            <location filename="../specs.py" line="66" />
             <source>水印位置布局</source>
             <translation>Watermark layout</translation>
         </message>
         <message>
-            <location filename="../specs.py" line="66" />
-            <location filename="../specs.py" line="69" />
-            <location filename="../specs.py" line="73" />
-            <location filename="../specs.py" line="77" />
-            <location filename="../specs.py" line="81" />
-            <location filename="../specs.py" line="85" />
+            <location filename="../specs.py" line="93" />
+            <location filename="../specs.py" line="96" />
+            <location filename="../specs.py" line="100" />
+            <location filename="../specs.py" line="104" />
+            <location filename="../specs.py" line="108" />
+            <location filename="../specs.py" line="112" />
             <source>边距</source>
             <translation>Spacing</translation>
         </message>
         <message>
-            <location filename="../specs.py" line="89" />
-            <location filename="../specs.py" line="91" />
-            <location filename="../specs.py" line="93" />
-            <location filename="../specs.py" line="95" />
-            <location filename="../specs.py" line="98" />
-            <location filename="../specs.py" line="100" />
+            <location filename="../specs.py" line="69" />
+            <location filename="../specs.py" line="71" />
+            <location filename="../specs.py" line="73" />
+            <location filename="../specs.py" line="75" />
+            <location filename="../specs.py" line="78" />
+            <location filename="../specs.py" line="80" />
             <source>背景模式</source>
             <translation>Background mode</translation>
         </message>
         <message>
-            <location filename="../specs.py" line="114" />
-            <location filename="../specs.py" line="116" />
-            <location filename="../specs.py" line="118" />
-            <location filename="../specs.py" line="120" />
-            <location filename="../specs.py" line="124" />
-            <location filename="../specs.py" line="126" />
-            <location filename="../specs.py" line="128" />
+            <location filename="../specs.py" line="117" />
+            <location filename="../specs.py" line="119" />
+            <location filename="../specs.py" line="121" />
+            <location filename="../specs.py" line="123" />
+            <location filename="../specs.py" line="127" />
+            <location filename="../specs.py" line="129" />
             <location filename="../specs.py" line="131" />
             <location filename="../specs.py" line="134" />
             <location filename="../specs.py" line="137" />
-            <location filename="../specs.py" line="141" />
-            <location filename="../specs.py" line="143" />
-            <location filename="../specs.py" line="145" />
-            <location filename="../specs.py" line="149" />
-            <location filename="../specs.py" line="151" />
-            <location filename="../specs.py" line="153" />
+            <location filename="../specs.py" line="140" />
+            <location filename="../specs.py" line="144" />
+            <location filename="../specs.py" line="146" />
+            <location filename="../specs.py" line="148" />
+            <location filename="../specs.py" line="152" />
+            <location filename="../specs.py" line="154" />
             <location filename="../specs.py" line="156" />
             <location filename="../specs.py" line="159" />
             <location filename="../specs.py" line="162" />
+            <location filename="../specs.py" line="165" />
             <location filename="../win_build.py" line="395" />
             <source>描边与投影</source>
             <translation>Stroke and shadow</translation>
         </message>
         <message>
-            <location filename="../specs.py" line="102" />
-            <location filename="../specs.py" line="103" />
-            <location filename="../specs.py" line="105" />
-            <location filename="../specs.py" line="107" />
+            <location filename="../specs.py" line="82" />
+            <location filename="../specs.py" line="83" />
+            <location filename="../specs.py" line="85" />
+            <location filename="../specs.py" line="87" />
             <source>水印文字</source>
             <translation>Watermark text</translation>
         </message>
         <message>
-            <location filename="../specs.py" line="111" />
+            <location filename="../specs.py" line="91" />
             <location filename="../win_build.py" line="355" />
             <source>水印开关</source>
             <translation>Watermark switches</translation>
         </message>
         <message>
-            <location filename="../widgets.py" line="421" />
+            <location filename="../widgets.py" line="457" />
             <source>展开本组</source>
             <translation>Expand this group</translation>
         </message>
         <message>
-            <location filename="../widgets.py" line="421" />
+            <location filename="../widgets.py" line="457" />
             <source>收起本组</source>
             <translation>Collapse this group</translation>
         </message>
@@ -626,32 +627,32 @@
             <translation>Choose an output folder first</translation>
         </message>
         <message>
-            <location filename="../win_generate.py" line="28" />
+            <location filename="../win_generate.py" line="29" />
             <source>请先选择图片</source>
             <translation>Select an image first</translation>
         </message>
         <message>
-            <location filename="../win_generate.py" line="34" />
+            <location filename="../win_generate.py" line="35" />
             <source>请先选择要批量处理的图片</source>
             <translation>Select the images to batch-process first</translation>
         </message>
         <message>
-            <location filename="../win_generate.py" line="39" />
+            <location filename="../win_generate.py" line="40" />
             <source>无法开始处理</source>
             <translation>Could not start processing</translation>
         </message>
         <message>
-            <location filename="../win_generate.py" line="72" />
+            <location filename="../win_generate.py" line="73" />
             <source>已完成：{msg}</source>
             <translation>Done: {msg}</translation>
         </message>
         <message>
-            <location filename="../win_generate.py" line="76" />
+            <location filename="../win_generate.py" line="77" />
             <source>处理结果</source>
             <translation>Result</translation>
         </message>
         <message>
-            <location filename="../win_generate.py" line="77" />
+            <location filename="../win_generate.py" line="78" />
             <source>处理失败</source>
             <translation>Processing failed</translation>
         </message>
@@ -748,36 +749,36 @@
             <translation>Model</translation>
         </message>
         <message>
-            <location filename="../specs.py" line="116" />
-            <location filename="../specs.py" line="118" />
-            <location filename="../specs.py" line="120" />
+            <location filename="../specs.py" line="119" />
+            <location filename="../specs.py" line="121" />
+            <location filename="../specs.py" line="123" />
             <source>图片描边</source>
             <translation>Image stroke</translation>
         </message>
         <message>
-            <location filename="../specs.py" line="124" />
-            <location filename="../specs.py" line="126" />
-            <location filename="../specs.py" line="128" />
+            <location filename="../specs.py" line="127" />
+            <location filename="../specs.py" line="129" />
             <location filename="../specs.py" line="131" />
             <location filename="../specs.py" line="134" />
             <location filename="../specs.py" line="137" />
+            <location filename="../specs.py" line="140" />
             <source>图片投影</source>
             <translation>Image shadow</translation>
         </message>
         <message>
-            <location filename="../specs.py" line="141" />
-            <location filename="../specs.py" line="143" />
-            <location filename="../specs.py" line="145" />
+            <location filename="../specs.py" line="144" />
+            <location filename="../specs.py" line="146" />
+            <location filename="../specs.py" line="148" />
             <source>文字描边</source>
             <translation>Text stroke</translation>
         </message>
         <message>
-            <location filename="../specs.py" line="149" />
-            <location filename="../specs.py" line="151" />
-            <location filename="../specs.py" line="153" />
+            <location filename="../specs.py" line="152" />
+            <location filename="../specs.py" line="154" />
             <location filename="../specs.py" line="156" />
             <location filename="../specs.py" line="159" />
             <location filename="../specs.py" line="162" />
+            <location filename="../specs.py" line="165" />
             <source>文字投影</source>
             <translation>Text shadow</translation>
         </message>
@@ -1094,260 +1095,270 @@
         </message>
         <message>
             <location filename="../specs.py" line="66" />
+            <source>对比模式</source>
+            <translation>Compare mode</translation>
+        </message>
+        <message>
+            <location filename="../specs.py" line="67" />
+            <source>开启后按三种布局各出一张，其余参数不变（布局选择不参与）</source>
+            <translation>Writes one image per layout (three in total) with all other parameters unchanged; the layout choice does not apply.</translation>
+        </message>
+        <message>
+            <location filename="../specs.py" line="93" />
             <source>图片与边框间距</source>
             <translation>Image margin</translation>
         </message>
         <message>
-            <location filename="../specs.py" line="69" />
+            <location filename="../specs.py" line="96" />
             <source>内侧间距（水印与图片间距）</source>
             <translation>Inner spacing (watermark ↔ image)</translation>
         </message>
         <message>
-            <location filename="../specs.py" line="73" />
+            <location filename="../specs.py" line="100" />
             <source>外侧间距（水印与画布边距）</source>
             <translation>Outer spacing (watermark ↔ canvas edge)</translation>
         </message>
         <message>
-            <location filename="../specs.py" line="77" />
+            <location filename="../specs.py" line="104" />
             <source>水印与图片间距</source>
             <translation>Spacing to image</translation>
         </message>
         <message>
-            <location filename="../specs.py" line="81" />
+            <location filename="../specs.py" line="108" />
             <source>水印与底部间距</source>
             <translation>Spacing to bottom</translation>
         </message>
         <message>
-            <location filename="../specs.py" line="85" />
+            <location filename="../specs.py" line="112" />
             <source>水印行间距</source>
             <translation>Line spacing</translation>
         </message>
         <message>
-            <location filename="../specs.py" line="89" />
+            <location filename="../specs.py" line="69" />
             <source>背景模式</source>
             <translation>Background mode</translation>
         </message>
         <message>
-            <location filename="../specs.py" line="90" />
+            <location filename="../specs.py" line="70" />
             <source>模糊图片</source>
             <translation>Blur the image</translation>
         </message>
         <message>
-            <location filename="../specs.py" line="90" />
+            <location filename="../specs.py" line="70" />
             <source>纯色</source>
             <translation>Solid color</translation>
         </message>
         <message>
-            <location filename="../specs.py" line="91" />
+            <location filename="../specs.py" line="71" />
             <source>背景色</source>
             <translation>Background color</translation>
         </message>
         <message>
-            <location filename="../specs.py" line="93" />
+            <location filename="../specs.py" line="73" />
             <source>模糊半径</source>
             <translation>Blur radius</translation>
         </message>
         <message>
-            <location filename="../specs.py" line="94" />
+            <location filename="../specs.py" line="74" />
             <source>1~1000，默认 150</source>
             <translation>1–1000, default 150</translation>
         </message>
         <message>
-            <location filename="../specs.py" line="95" />
+            <location filename="../specs.py" line="75" />
             <source>背景暗化</source>
             <translation>Background darkening</translation>
         </message>
         <message>
-            <location filename="../specs.py" line="96" />
+            <location filename="../specs.py" line="76" />
             <source>0~100%，默认 0；100=全黑（仅模糊模式）</source>
             <translation>0–100%, default 0; 100 = fully black (blur mode only)</translation>
         </message>
         <message>
-            <location filename="../specs.py" line="98" />
+            <location filename="../specs.py" line="78" />
             <source>图片圆角</source>
             <translation>Image corner radius</translation>
         </message>
         <message>
-            <location filename="../specs.py" line="99" />
+            <location filename="../specs.py" line="79" />
             <source>0~1000 圆角，默认 0</source>
             <translation>0–1000 px radius, default 0</translation>
         </message>
         <message>
-            <location filename="../specs.py" line="100" />
+            <location filename="../specs.py" line="80" />
             <source>圆形（整图正圆）</source>
             <translation>Circle (full round)</translation>
         </message>
         <message>
-            <location filename="../specs.py" line="117" />
-            <location filename="../specs.py" line="125" />
-            <location filename="../specs.py" line="142" />
-            <location filename="../specs.py" line="150" />
+            <location filename="../specs.py" line="120" />
+            <location filename="../specs.py" line="128" />
+            <location filename="../specs.py" line="145" />
+            <location filename="../specs.py" line="153" />
             <source>开启</source>
             <translation>On</translation>
         </message>
         <message>
-            <location filename="../specs.py" line="119" />
-            <location filename="../specs.py" line="127" />
-            <location filename="../specs.py" line="144" />
-            <location filename="../specs.py" line="152" />
+            <location filename="../specs.py" line="122" />
+            <location filename="../specs.py" line="130" />
+            <location filename="../specs.py" line="147" />
+            <location filename="../specs.py" line="155" />
             <source>颜色</source>
             <translation>Color</translation>
         </message>
         <message>
-            <location filename="../specs.py" line="121" />
-            <location filename="../specs.py" line="146" />
+            <location filename="../specs.py" line="124" />
+            <location filename="../specs.py" line="149" />
             <source>宽度</source>
             <translation>Width</translation>
         </message>
         <message>
-            <location filename="../specs.py" line="122" />
+            <location filename="../specs.py" line="125" />
             <source>1~50px，默认 5</source>
             <translation>1–50 px, default 5</translation>
         </message>
         <message>
-            <location filename="../specs.py" line="129" />
-            <location filename="../specs.py" line="154" />
+            <location filename="../specs.py" line="132" />
+            <location filename="../specs.py" line="157" />
             <source>方向</source>
             <translation>Angle</translation>
         </message>
         <message>
-            <location filename="../specs.py" line="130" />
-            <location filename="../specs.py" line="155" />
+            <location filename="../specs.py" line="133" />
+            <location filename="../specs.py" line="158" />
             <source>0~360°，默认 135</source>
             <translation>0–360°, default 135</translation>
         </message>
         <message>
-            <location filename="../specs.py" line="132" />
-            <location filename="../specs.py" line="157" />
+            <location filename="../specs.py" line="135" />
+            <location filename="../specs.py" line="160" />
             <source>偏移</source>
             <translation>Offset</translation>
         </message>
         <message>
-            <location filename="../specs.py" line="133" />
+            <location filename="../specs.py" line="136" />
             <source>0~100px，默认 25</source>
             <translation>0–100 px, default 25</translation>
         </message>
         <message>
-            <location filename="../specs.py" line="135" />
-            <location filename="../specs.py" line="160" />
+            <location filename="../specs.py" line="138" />
+            <location filename="../specs.py" line="163" />
             <source>浓度</source>
             <translation>Opacity</translation>
         </message>
         <message>
-            <location filename="../specs.py" line="136" />
+            <location filename="../specs.py" line="139" />
             <source>5~100%，默认 35</source>
             <translation>5–100%, default 35</translation>
         </message>
         <message>
-            <location filename="../specs.py" line="138" />
-            <location filename="../specs.py" line="163" />
+            <location filename="../specs.py" line="141" />
+            <location filename="../specs.py" line="166" />
             <source>晕开范围</source>
             <translation>Spread</translation>
         </message>
         <message>
-            <location filename="../specs.py" line="139" />
+            <location filename="../specs.py" line="142" />
             <source>0~80px，默认 30</source>
             <translation>0–80 px, default 30</translation>
         </message>
         <message>
-            <location filename="../specs.py" line="102" />
+            <location filename="../specs.py" line="82" />
             <source>文字颜色</source>
             <translation>Text color</translation>
         </message>
         <message>
-            <location filename="../specs.py" line="68" />
+            <location filename="../specs.py" line="95" />
             <source>0.5~5%，默认 1.5%；可输 1 位小数，按钮按 0.5% 步进</source>
             <translation>0.5~5%, default 1.5%; one decimal place allowed, buttons step by 0.5%</translation>
         </message>
         <message>
-            <location filename="../specs.py" line="71" />
-            <location filename="../specs.py" line="75" />
+            <location filename="../specs.py" line="98" />
+            <location filename="../specs.py" line="102" />
             <source>0.1~20%，上下镜像同步（默认 4%，仅上下分离）；可输 1 位小数</source>
             <translation>0.1~20%, mirrored top/bottom (default 4%, split layout only); one decimal place allowed</translation>
         </message>
         <message>
-            <location filename="../specs.py" line="79" />
-            <location filename="../specs.py" line="83" />
+            <location filename="../specs.py" line="106" />
+            <location filename="../specs.py" line="110" />
             <source>0.1~20%，默认 4%；可输 1 位小数，按钮按 0.5% 步进</source>
             <translation>0.1~20%, default 4%; one decimal place allowed, buttons step by 0.5%</translation>
         </message>
         <message>
-            <location filename="../specs.py" line="87" />
+            <location filename="../specs.py" line="114" />
             <source>0~10%，默认 2%；可输 1 位小数，按钮按 0.5% 步进</source>
             <translation>0~10%, default 2%; one decimal place allowed, buttons step by 0.5%</translation>
         </message>
         <message>
-            <location filename="../specs.py" line="103" />
+            <location filename="../specs.py" line="83" />
             <source>Logo 缩放</source>
             <translation>Logo scale</translation>
         </message>
         <message>
-            <location filename="../specs.py" line="104" />
+            <location filename="../specs.py" line="84" />
             <source>10~200%，默认 70%</source>
             <translation>10–200%, default 70%</translation>
         </message>
         <message>
-            <location filename="../specs.py" line="105" />
+            <location filename="../specs.py" line="85" />
             <source>型号缩放</source>
             <translation>Model scale</translation>
         </message>
         <message>
-            <location filename="../specs.py" line="106" />
+            <location filename="../specs.py" line="86" />
             <source>10~200%，默认 50%</source>
             <translation>10–200%, default 50%</translation>
         </message>
         <message>
-            <location filename="../specs.py" line="107" />
+            <location filename="../specs.py" line="87" />
             <source>参数缩放</source>
             <translation>Params scale</translation>
         </message>
         <message>
-            <location filename="../specs.py" line="108" />
+            <location filename="../specs.py" line="88" />
             <source>10~200%，默认 30%</source>
             <translation>10–200%, default 30%</translation>
         </message>
         <message>
-            <location filename="../specs.py" line="147" />
+            <location filename="../specs.py" line="150" />
             <source>1~50px，默认 1</source>
             <translation>1–50 px, default 1</translation>
         </message>
         <message>
-            <location filename="../specs.py" line="158" />
+            <location filename="../specs.py" line="161" />
             <source>0~40px，默认 3</source>
             <translation>0–40 px, default 3</translation>
         </message>
         <message>
-            <location filename="../specs.py" line="161" />
+            <location filename="../specs.py" line="164" />
             <source>5~100%，默认 20</source>
             <translation>5–100%, default 20</translation>
         </message>
         <message>
-            <location filename="../specs.py" line="164" />
+            <location filename="../specs.py" line="167" />
             <source>0~30px，默认 5</source>
             <translation>0–30 px, default 5</translation>
         </message>
         <message>
-            <location filename="../widgets.py" line="159" />
+            <location filename="../widgets.py" line="187" />
             <source>点击选择颜色</source>
             <translation>Click to pick a color</translation>
         </message>
         <message>
-            <location filename="../widgets.py" line="162" />
+            <location filename="../widgets.py" line="190" />
             <source>颜色管理</source>
             <translation>Color library</translation>
         </message>
         <message>
-            <location filename="../widgets.py" line="174" />
+            <location filename="../widgets.py" line="202" />
             <source>选择字体</source>
             <translation>Choose font</translation>
         </message>
         <message>
-            <location filename="../widgets.py" line="315" />
+            <location filename="../widgets.py" line="351" />
             <source>选择字体文件</source>
             <translation>Choose a font file</translation>
         </message>
         <message>
-            <location filename="../widgets.py" line="779" />
+            <location filename="../widgets.py" line="815" />
             <source>恢复默认值</source>
             <translation>Reset to default</translation>
         </message>
@@ -1431,171 +1442,171 @@
     <context>
         <name>PresetMixin</name>
         <message>
-            <location filename="../win_preset.py" line="44" />
+            <location filename="../win_preset.py" line="51" />
             <source>槽位 {slot}：{name}</source>
             <translation>Slot {slot}: {name}</translation>
         </message>
         <message>
-            <location filename="../win_preset.py" line="45" />
+            <location filename="../win_preset.py" line="52" />
             <source>— 空 —</source>
             <translation>— empty —</translation>
         </message>
         <message>
-            <location filename="../win_preset.py" line="55" />
+            <location filename="../win_preset.py" line="62" />
             <source>该槽位为空，无法加载</source>
             <translation>This slot is empty, nothing to load</translation>
         </message>
         <message>
-            <location filename="../win_preset.py" line="58" />
+            <location filename="../win_preset.py" line="65" />
             <source>加载预设</source>
             <translation>Load preset</translation>
         </message>
         <message>
-            <location filename="../win_preset.py" line="59" />
+            <location filename="../win_preset.py" line="66" />
             <source>将把当前所有参数覆盖为预设「{name}」的值。继续？</source>
             <translation>All parameters will be replaced with preset "{name}". Continue?</translation>
         </message>
         <message>
-            <location filename="../win_preset.py" line="65" />
+            <location filename="../win_preset.py" line="72" />
             <source>已加载预设：{name}</source>
             <translation>Preset loaded: {name}</translation>
         </message>
         <message>
-            <location filename="../win_preset.py" line="85" />
+            <location filename="../win_preset.py" line="94" />
             <source>请先输入方案名后再保存</source>
             <translation>Enter a preset name before saving</translation>
         </message>
         <message>
-            <location filename="../win_preset.py" line="87" />
-            <location filename="../win_preset.py" line="95" />
+            <location filename="../win_preset.py" line="96" />
+            <location filename="../win_preset.py" line="104" />
             <source>保存预设</source>
             <translation>Save preset</translation>
         </message>
         <message>
-            <location filename="../win_preset.py" line="88" />
+            <location filename="../win_preset.py" line="97" />
             <source>槽位 {slot} 已有方案「{name}」，保存会覆盖它。继续？</source>
             <translation>Slot {slot} already has preset "{name}"; saving will overwrite it. Continue?</translation>
         </message>
         <message>
-            <location filename="../win_preset.py" line="89" />
+            <location filename="../win_preset.py" line="98" />
             <source>（未命名）</source>
             <translation>(unnamed)</translation>
         </message>
         <message>
-            <location filename="../win_preset.py" line="101" />
+            <location filename="../win_preset.py" line="110" />
             <source>已保存到槽位 {slot}：{name}</source>
             <translation>Saved to slot {slot}: {name}</translation>
         </message>
         <message>
-            <location filename="../win_preset.py" line="108" />
+            <location filename="../win_preset.py" line="117" />
             <source>该槽位为空，没有可导出的方案</source>
             <translation>This slot is empty, nothing to export</translation>
         </message>
         <message>
-            <location filename="../win_preset.py" line="113" />
+            <location filename="../win_preset.py" line="122" />
             <source>导出预设</source>
             <translation>Export preset</translation>
         </message>
         <message>
-            <location filename="../win_preset.py" line="114" />
+            <location filename="../win_preset.py" line="123" />
             <source>预设 (*.json)</source>
             <translation>Presets (*.json)</translation>
         </message>
         <message>
-            <location filename="../win_preset.py" line="123" />
+            <location filename="../win_preset.py" line="133" />
             <source>导出失败：{err}</source>
             <translation>Export failed: {err}</translation>
         </message>
         <message>
-            <location filename="../win_preset.py" line="127" />
+            <location filename="../win_preset.py" line="137" />
             <source>已导出方案「{name}」</source>
             <translation>Preset exported: "{name}"</translation>
         </message>
         <message>
-            <location filename="../win_preset.py" line="131" />
-            <location filename="../win_preset.py" line="139" />
-            <location filename="../win_preset.py" line="143" />
-            <location filename="../win_preset.py" line="148" />
-            <location filename="../win_preset.py" line="161" />
-            <location filename="../win_preset.py" line="169" />
+            <location filename="../win_preset.py" line="141" />
+            <location filename="../win_preset.py" line="149" />
+            <location filename="../win_preset.py" line="153" />
+            <location filename="../win_preset.py" line="158" />
+            <location filename="../win_preset.py" line="171" />
+            <location filename="../win_preset.py" line="179" />
             <source>导入预设</source>
             <translation>Import preset</translation>
         </message>
         <message>
-            <location filename="../win_preset.py" line="132" />
+            <location filename="../win_preset.py" line="142" />
             <source>预设 (*.json);;所有文件 (*)</source>
             <translation>Presets (*.json);;All files (*)</translation>
         </message>
         <message>
-            <location filename="../win_preset.py" line="140" />
+            <location filename="../win_preset.py" line="150" />
             <source>无法读取该文件：
 {err}</source>
             <translation>Could not read this file:
 {err}</translation>
         </message>
         <message>
-            <location filename="../win_preset.py" line="143" />
+            <location filename="../win_preset.py" line="153" />
             <source>该文件中没有方案数据。</source>
             <translation>This file contains no preset data.</translation>
         </message>
         <message>
-            <location filename="../win_preset.py" line="149" />
+            <location filename="../win_preset.py" line="159" />
             <source>该文件不是单个方案格式（可能是旧版 presets.json）。请先用「导出预设」导出单个方案文件，再导入。</source>
             <translation>This file is not a single preset (it may be an old presets.json). Export a single preset file with "Export preset" first, then import it.</translation>
         </message>
         <message>
-            <location filename="../win_preset.py" line="162" />
+            <location filename="../win_preset.py" line="172" />
             <source>槽位 {slot} 已有方案「{name}」，导入会覆盖它。继续？</source>
             <translation>Slot {slot} already has preset "{name}"; importing will overwrite it. Continue?</translation>
         </message>
         <message>
-            <location filename="../win_preset.py" line="175" />
+            <location filename="../win_preset.py" line="185" />
             <source>已导入方案「{name}」到槽位 {slot}</source>
             <translation>Preset "{name}" imported into slot {slot}</translation>
         </message>
         <message>
-            <location filename="../win_preset.py" line="180" />
+            <location filename="../win_preset.py" line="190" />
             <source>该槽位为空，无需删除</source>
             <translation>This slot is empty, nothing to delete</translation>
         </message>
         <message>
-            <location filename="../win_preset.py" line="183" />
-            <location filename="../win_preset.py" line="190" />
+            <location filename="../win_preset.py" line="193" />
+            <location filename="../win_preset.py" line="200" />
             <source>删除预设</source>
             <translation>Delete preset</translation>
         </message>
         <message>
-            <location filename="../win_preset.py" line="184" />
+            <location filename="../win_preset.py" line="194" />
             <source>确定删除「{name}」？</source>
             <translation>Delete "{name}"?</translation>
         </message>
         <message>
-            <location filename="../win_preset.py" line="193" />
+            <location filename="../win_preset.py" line="203" />
             <source>已删除槽位 {slot}：{name}</source>
             <translation>Deleted slot {slot}: {name}</translation>
         </message>
         <message>
-            <location filename="../win_preset.py" line="223" />
+            <location filename="../win_preset.py" line="233" />
             <source>映射表没能写回文件：{err}</source>
             <translation>Could not write the mapping table back to the file: {err}</translation>
         </message>
         <message>
-            <location filename="../win_preset.py" line="241" />
+            <location filename="../win_preset.py" line="252" />
             <source>自动保存失败：{err}</source>
             <translation>Auto-save failed: {err}</translation>
         </message>
         <message>
-            <location filename="../win_preset.py" line="251" />
+            <location filename="../win_preset.py" line="262" />
             <source>恢复默认设置</source>
             <translation>Reset to defaults</translation>
         </message>
         <message>
-            <location filename="../win_preset.py" line="252" />
+            <location filename="../win_preset.py" line="263" />
             <source>将把当前所有参数恢复为出厂默认，现有调整会丢失。继续？</source>
             <translation>All current parameters will be restored to factory defaults and your adjustments will be lost. Continue?</translation>
         </message>
         <message>
-            <location filename="../win_preset.py" line="264" />
+            <location filename="../win_preset.py" line="275" />
             <source>已恢复默认设置</source>
             <translation>Restored to defaults</translation>
         </message>
@@ -1603,7 +1614,7 @@
     <context>
         <name>PreviewBox</name>
         <message>
-            <location filename="../widgets.py" line="495" />
+            <location filename="../widgets.py" line="531" />
             <source>请拖入图片，或点击「打开图片」</source>
             <translation>Drop an image, or click "Open image"</translation>
         </message>
@@ -1659,52 +1670,52 @@
     <context>
         <name>PreviewStateChip</name>
         <message>
-            <location filename="../widgets.py" line="78" />
+            <location filename="../widgets.py" line="104" />
             <source>无预览</source>
             <translation>No preview</translation>
         </message>
         <message>
-            <location filename="../widgets.py" line="79" />
+            <location filename="../widgets.py" line="105" />
             <source>渲染中…</source>
             <translation>Rendering…</translation>
         </message>
         <message>
-            <location filename="../widgets.py" line="80" />
+            <location filename="../widgets.py" line="106" />
             <source>已按当前参数渲染</source>
             <translation>Rendered with current settings</translation>
         </message>
         <message>
-            <location filename="../widgets.py" line="81" />
+            <location filename="../widgets.py" line="107" />
             <source>参数已改，待渲染</source>
             <translation>Settings changed, not rendered yet</translation>
         </message>
         <message>
-            <location filename="../widgets.py" line="82" />
+            <location filename="../widgets.py" line="108" />
             <source>渲染失败，未更新</source>
             <translation>Render failed, not updated</translation>
         </message>
         <message>
-            <location filename="../widgets.py" line="85" />
+            <location filename="../widgets.py" line="111" />
             <source>未选择图片</source>
             <translation>No image selected</translation>
         </message>
         <message>
-            <location filename="../widgets.py" line="86" />
+            <location filename="../widgets.py" line="112" />
             <source>正在渲染，完成后自动更新</source>
             <translation>Rendering; the preview updates automatically</translation>
         </message>
         <message>
-            <location filename="../widgets.py" line="87" />
+            <location filename="../widgets.py" line="113" />
             <source>预览已与当前参数一致（缩略档渲染，细节请用放大镜查看）</source>
             <translation>The preview matches the current settings (rendered at reduced size; use the magnifier for detail)</translation>
         </message>
         <message>
-            <location filename="../widgets.py" line="88" />
+            <location filename="../widgets.py" line="114" />
             <source>预览尚未更新到当前参数，渲染完成后自动更新</source>
             <translation>The preview has not been updated to the current settings yet; it refreshes when rendering finishes</translation>
         </message>
         <message>
-            <location filename="../widgets.py" line="89" />
+            <location filename="../widgets.py" line="115" />
             <source>上次预览渲染失败，当前显示的是上一张成功的预览</source>
             <translation>The last preview render failed; the preview shown is the previous successful one</translation>
         </message>
@@ -1745,12 +1756,12 @@
     <context>
         <name>_FormDialog</name>
         <message>
-            <location filename="../dialogs/base.py" line="139" />
+            <location filename="../dialogs/base.py" line="140" />
             <source>取消</source>
             <translation>Cancel</translation>
         </message>
         <message>
-            <location filename="../dialogs/base.py" line="140" />
+            <location filename="../dialogs/base.py" line="139" />
             <source>确定</source>
             <translation>OK</translation>
         </message>
@@ -1976,7 +1987,7 @@
             <translation>Close</translation>
         </message>
         <message>
-            <location filename="../dialog.py" line="187" />
+            <location filename="../dialog.py" line="196" />
             <source>提示</source>
             <translation>Notice</translation>
         </message>

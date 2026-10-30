@@ -76,6 +76,7 @@ class PresetMixin:
         p = dict(self._params)
         p["canvas_ratio_mode"] = self._params.get("canvas_ratio_mode", "original")
         p.pop("model_map", None)      # 型号映射是独立数据文件, 不进预设(见 _preset_params)
+        p.pop("compare_layouts", None)   # 出图方式而非观感参数, 与 mode 同类, 不进预设
         return p
 
     def _preset_save(self, view):
@@ -232,10 +233,11 @@ class PresetMixin:
             self._notify(self.tr("映射表没能写回文件：{err}").format(err=e))
 
     def _collect_settings(self):
-        # 与 settings 同一口径: 全部参数(除路径类) + canvas_ratio_mode + mode
+        # 与 settings 同一口径: 全部参数(除路径类) + canvas_ratio_mode + compare_layouts + mode
         s = {k: v for k, v in self._params.items()
              if k in _BACKEND_KEYS and k not in _NOT_PERSISTED}
         s["canvas_ratio_mode"] = self._params.get("canvas_ratio_mode", "original")
+        s["compare_layouts"] = bool(self._params.get("compare_layouts"))
         s["mode"] = self._mode
         return s
 

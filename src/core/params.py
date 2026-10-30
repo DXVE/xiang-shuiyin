@@ -89,4 +89,5 @@ def default_params():
         "text_shadow_angle": 135,
         "bg_darken_strength": 0,
         "layout_mode": "unified",
+        "compare_layouts": False,
     }
