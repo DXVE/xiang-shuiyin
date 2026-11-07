@@ -21,7 +21,11 @@ for _s in (sys.stdout, sys.stderr):
     except Exception:                                       # noqa: BLE001
         pass
 
+from PIL import Image                                                  # noqa: E402
 from core.config import DATA_DIR, DEFAULT_LOGO_DIR, MAX_PRESET_SLOTS   # noqa: E402
+from core.exif import (aperture_to_str, exposure_to_str,               # noqa: E402
+                       get_exif_data_from_path, iso_to_str)
+from core.jobs import RenderWorker                                     # noqa: E402
 from core.params import _format_manual_exif, default_params             # noqa: E402
 from core.paths import load_model_map, preset_path, _load_json         # noqa: E402
 from core.pipeline import _unique_output_path, process_single          # noqa: E402
@@ -37,6 +41,14 @@ _RATIOS = {"original": 0, "1:1": 1, "3:2": 3 / 2, "2:3": 2 / 3, "4:3": 4 / 3, "3
 _LAYOUTS = ("unified", "split_top_bottom", "split_left_right")
 _BG_MODES = ("color", "blur")
 _EXIF_KEYS = ("make", "model", "exposure", "fnumber", "iso")
+
+# 对比模式的布局与成品后缀: 直接取界面同一定义, 不另抄一份清单
+_COMPARE_SUFFIX = RenderWorker.COMPARE_SUFFIX
+
+# --set 命中的界面专有键: 它们不是内核形参, 报错时指向等价的专用开关
+_UI_ONLY_HINTS = {"compare_layouts": "对比模式请用 --compare",
+                  "canvas_ratio_mode": "画布比例请用 --ratio"}
+
 
 def _image_ext(path):
     # 按文件头魔数判定受支持的图片并返回真实扩展名, 与内核 _sniff_image_type 同一套判据
@@ -90,7 +102,9 @@ def _apply_overrides(p, pairs):
         key, val = raw.split("=", 1)
         key = key.strip()
         if key not in known:
-            raise ValueError(f"未知参数 {key!r}; 已知参数见 --list-params")
+            hint = _UI_ONLY_HINTS.get(key)
+            raise ValueError(f"未知参数 {key!r}; {hint}" if hint
+                             else f"未知参数 {key!r}; 已知参数见 --list-params")
         p[key] = _coerce(key, val, p.get(key))
     return p
 
@@ -132,6 +146,26 @@ def _list_presets():
     return rows
 
 
+def _apply_preset(p, rec):
+    # 套用一份方案记录: 只认内核形参; 只有档位字符串时按档位换算(与界面 migrate_preset 同一口径)
+    for k, v in rec.items():
+        if k in _BACKEND_KEYS:
+            p[k] = v
+    if rec.get("canvas_ratio_mode") is not None and rec.get("canvas_ratio") is None:
+        p["canvas_ratio"] = _RATIOS.get(str(rec["canvas_ratio_mode"]), 0)
+    return p
+
+
+def _load_preset_file(path):
+    # 读界面「导出预设」产生的单个方案 JSON; 不存在、空文件、非 JSON 对象都按读取失败处理
+    if not os.path.isfile(path):
+        raise ValueError(f"方案文件不存在: {path}")
+    rec = _load_json(path, check_file=True)
+    if not isinstance(rec, dict) or not rec:
+        raise ValueError(f"方案文件为空或不是 JSON 对象: {path}")
+    return rec
+
+
 def _collect_params(args):
     # 参数组装顺序: 内核默认值 -> 预设 -> 命令行覆盖(命令行优先级最高)
     p = {k: v for k, v in default_params().items() if k in _BACKEND_KEYS}
@@ -142,13 +176,12 @@ def _collect_params(args):
         rec, slot = _load_preset(args.preset)
         if rec is None:
             raise ValueError(f"找不到预设 {args.preset!r}; 可用预设见 --list-presets")
-        for k, v in rec.items():
-            if k in _BACKEND_KEYS:
-                p[k] = v
-        # 预设文件里同时存了界面键与数值, 数值优先; 只存界面键时按档位换算
-        if rec.get("canvas_ratio_mode") is not None and rec.get("canvas_ratio") is None:
-            p["canvas_ratio"] = _RATIOS.get(str(rec["canvas_ratio_mode"]), 0)
+        _apply_preset(p, rec)
         source = f"预设 {slot}「{rec.get('_preset_name') or slot}」"
+    elif args.preset_file is not None:
+        rec = _load_preset_file(args.preset_file)
+        _apply_preset(p, rec)
+        source = f"方案文件 {os.path.basename(args.preset_file)}"
 
     logo_dir = args.logo_dir or p.get("logo_dir") or DEFAULT_LOGO_DIR
     p["logo_dir"] = logo_dir
@@ -205,23 +238,82 @@ def _expand_inputs(paths, recursive):
     return files, skipped
 
 
-def _run_one(src, out_dir, params, manual_exif, want_stage):
+def _expand_jobs(files, compare):
+    # 展开成 (输入, 布局) 任务: 普通模式布局为 None, 对比模式每个输入按三种布局各一条
+    if not compare:
+        return [(src, None) for src in files]
+    return [(src, layout) for src in files for layout in _COMPARE_SUFFIX]
+
+
+def _info_row(path):
+    # 一张图的文件信息与照片自身 EXIF: 读不出的项留空, 与界面「图片信息」弹窗同一口径
+    row = {"input": path, "format": (_image_ext(path) or "").lstrip(".").upper(),
+           "width": 0, "height": 0, "size_kb": 0.0, "mtime": "", "exif": {}}
+    try:
+        st = os.stat(path)
+        row["size_kb"] = round(st.st_size / 1024.0, 1)
+        row["mtime"] = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(st.st_mtime))
+    except OSError:
+        pass
+    try:
+        with Image.open(path) as im:                 # 只读文件头, 不解码
+            row["width"], row["height"] = im.size
+    except Exception:                                # noqa: BLE001
+        pass
+    try:
+        ex = get_exif_data_from_path(path) or {}
+    except Exception:                                # noqa: BLE001
+        ex = {}
+    row["exif"] = {"make": (ex.get("make") or "").strip(),
+                   "model": (ex.get("model") or "").strip(),
+                   "exposure": exposure_to_str(ex.get("exposure_time"), ex.get("exposure_num"),
+                                               ex.get("exposure_den")),
+                   "fnumber": aperture_to_str(ex.get("fnumber")),
+                   "iso": iso_to_str(ex.get("iso"))}
+    return row
+
+
+def _print_info(rows, skipped, as_json):
+    # 人读: 每张两行(文件信息 / EXIF 五项); 机器读: 与其余模式一致的缩进 JSON
+    if as_json:
+        print(json.dumps({"total": len(rows), "skipped": skipped, "images": rows},
+                         ensure_ascii=False, indent=2))
+        return
+    for r in rows:
+        ex = r["exif"]
+        print(f"{r['input']}\n  {r['format'] or '—'}  {r['width']}x{r['height']}  "
+              f"{r['size_kb']}KB  {r['mtime']}")
+        print("  " + " / ".join(ex[k] or "—" for k in _EXIF_KEYS))
+
+
+def _run_one(src, out_dir, params, manual_exif, want_stage, layout=None):
+    # layout 为 None 按参数里的 layout_mode 出一张, 否则只替换布局(对比模式)
     stem = os.path.splitext(os.path.basename(src))[0]
-    out_path = _unique_output_path(out_dir, stem)
+    use = params if layout is None else dict(params, layout_mode=layout)
+    suffix = "_watermarked.jpg" if layout is None else _COMPARE_SUFFIX[layout]
+    out_path = _unique_output_path(out_dir, stem, suffix)
     stages = []
     t0 = time.perf_counter()
     try:
-        process_single(src, out_path, params["logo_dir"],
-                       **{k: v for k, v in params.items() if k != "logo_dir"},
+        process_single(src, out_path, use["logo_dir"],
+                       **{k: v for k, v in use.items() if k != "logo_dir"},
                        manual_exif=manual_exif, stage_out=stages,
                        stage_log=want_stage)
     except Exception as e:                                  # noqa: BLE001
-        return {"input": src, "ok": False, "error": f"{type(e).__name__}: {e}",
-                "ms": (time.perf_counter() - t0) * 1000, "stages": []}
+        row = {"input": src, "ok": False, "error": f"{type(e).__name__}: {e}",
+               "ms": (time.perf_counter() - t0) * 1000, "stages": []}
+        return _with_layout(row, layout)
     row = {"input": src, "output": out_path, "ok": True,
            "ms": (time.perf_counter() - t0) * 1000}
     if want_stage and stages:
         row["stages"] = stages[0]["stages"]
+    return _with_layout(row, layout)
+
+
+def _with_layout(row, layout):
+    # 对比模式下每行标注所属布局, 普通模式不出现该键(保持原 JSON 形状)
+    if layout is not None:
+        row["layout"] = layout
     return row
 
 
@@ -234,10 +326,15 @@ def _build_parser():
         formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("inputs", nargs="*", help="输入图片或目录(至少一个; 目录需配合 --recursive 走子目录)")
     ap.add_argument("--out", help="输出目录(默认 <首张图所在目录>/watermarked)")
-    ap.add_argument("--preset", help="先套用某预设: 槽位号 1~10 或方案名")
+    preset_group = ap.add_mutually_exclusive_group()
+    preset_group.add_argument("--preset", help="先套用某预设: 槽位号 1~10 或方案名")
+    preset_group.add_argument("--preset-file", dest="preset_file",
+                              help="先套用界面「导出预设」得到的单个 .json(与 --preset 二选一)")
     ap.add_argument("--logo-dir", help="Logo 目录(默认取参数默认值, 型号映射也从这里读)")
     ap.add_argument("--bg", choices=_BG_MODES, help="背景模式: color / blur")
     ap.add_argument("--layout", choices=_LAYOUTS, help="水印布局: unified / split_top_bottom / split_left_right")
+    ap.add_argument("--compare", action="store_true",
+                    help="对比模式: 每个输入按三种布局各出一张(忽略 --layout)")
     ap.add_argument("--ratio", help="画布比例: " + " / ".join(_RATIOS))
     ap.add_argument("--bg-color", help="纯色背景色, 如 #FFFFFF")
     ap.add_argument("--text-color", help="水印文字色, 如 #383a42")
@@ -256,6 +353,7 @@ def _build_parser():
     ap.add_argument("--json", action="store_true", help="以 JSON 输出结果(供程序解析)")
     ap.add_argument("--stage", action="store_true", help="输出每张的渲染分段耗时")
     ap.add_argument("--dry-run", action="store_true", help="只列将处理的文件与生效参数, 不渲染")
+    ap.add_argument("--info", action="store_true", help="只输出输入图片的文件信息与 EXIF, 不渲染")
     ap.add_argument("--list-params", action="store_true", help="列出可用参数名与默认值后退出")
     ap.add_argument("--list-presets", action="store_true", help="列出预设槽位后退出")
     ap.add_argument("--quiet", action="store_true", help="只输出结果, 不打日志")
@@ -278,6 +376,21 @@ def main(argv=None):
         print(json.dumps(rows, ensure_ascii=False, indent=2) if args.json
               else "\n".join(f"槽位 {r['slot']}: {r['name']}" for r in rows) or "(无预设)")
         return 0
+    if args.info:
+        # 只读模式: 不套参数、不渲染、不建输出目录
+        if not args.inputs:
+            print("缺少输入图片; 用法见 --help", file=sys.stderr)
+            return 2
+        try:
+            files, skipped = _expand_inputs(args.inputs, args.recursive)
+        except FileNotFoundError as e:
+            print(str(e), file=sys.stderr)
+            return 2
+        if not files:
+            print("没有可处理的受支持图片", file=sys.stderr)
+            return 2
+        _print_info([_info_row(p) for p in files], skipped, args.json)
+        return 0
 
     try:
         params, base, source, manual_exif = _collect_params(args)
@@ -297,19 +410,26 @@ def main(argv=None):
         print("没有可处理的受支持图片", file=sys.stderr)
         return 2
 
+    jobs = _expand_jobs(files, args.compare)
     out_dir = args.out or os.path.join(os.path.dirname(os.path.abspath(files[0])), "watermarked")
     changed = {k: v for k, v in params.items() if k not in ("logo_dir", "model_map") and base.get(k) != v}
     if args.dry_run:
-        info = {"out_dir": out_dir, "count": len(files), "files": files, "skipped": skipped,
-                "param_source": source, "logo_dir": params["logo_dir"], "changed": changed}
-        print(json.dumps(info, ensure_ascii=False, indent=2) if args.json
-              else f"将处理 {len(files)} 张 -> {out_dir}\n参数来源: {source}\n非默认参数: {changed}")
+        info = {"out_dir": out_dir, "count": len(jobs), "compare": bool(args.compare),
+                "files": files, "skipped": skipped, "param_source": source,
+                "logo_dir": params["logo_dir"], "changed": changed}
+        if args.json:
+            print(json.dumps(info, ensure_ascii=False, indent=2))
+        else:
+            plan = f"将处理 {len(files)} 张 -> {out_dir}"
+            if args.compare:
+                plan += f"（对比模式: {len(jobs)} 张成品）"
+            print(f"{plan}\n参数来源: {source}\n非默认参数: {changed}")
         return 0
 
     os.makedirs(out_dir, exist_ok=True)
     results = []
-    for src in files:
-        row = _run_one(src, out_dir, params, manual_exif, args.stage)
+    for src, layout in jobs:
+        row = _run_one(src, out_dir, params, manual_exif, args.stage, layout)
         results.append(row)
         if not args.json:
             if row["ok"]:
@@ -321,7 +441,8 @@ def main(argv=None):
     success = sum(1 for r in results if r["ok"])
     if args.json:
         print(json.dumps({"ok": success == len(results), "total": len(results), "success": success,
-                          "out_dir": out_dir, "param_source": source, "changed": changed,
+                          "compare": bool(args.compare), "out_dir": out_dir,
+                          "param_source": source, "changed": changed,
                           "skipped": skipped, "results": results},
                          ensure_ascii=False, indent=2))
     else:

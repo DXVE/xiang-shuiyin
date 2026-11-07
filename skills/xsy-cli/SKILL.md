@@ -31,8 +31,10 @@ description: 用「镶 · 水印」的命令行入口给照片加水印：单张
 1. 查可用参数：`<解释器> src/cli/render.py --list-params --json`
    输出内核接受的键、默认值与类型。**键名以这条命令的结果为准**，不要凭记忆写。
 2. 只试不渲染：`<解释器> src/cli/render.py <入参> --dry-run --json`
-   输出将处理的文件、跳过项、生效参数来源与非默认参数，不写任何成品（这套 JSON 的字段是 `out_dir`、`count`、`files`、`skipped`、`param_source`、`logo_dir`、`changed`）。
+   输出将处理的文件、跳过项、生效参数来源与非默认参数，不写任何成品（这套 JSON 的字段是 `out_dir`、`count`、`compare`、`files`、`skipped`、`param_source`、`logo_dir`、`changed`）。
 3. 正式出图：`<解释器> src/cli/render.py <入参> --json`
+
+出图前要自己填 `--exif` 时，先用 `--info` 看输入图自带的读数：`<解释器> src/cli/render.py <入参> --info --json`。
 
 套用预设前可先看槽位：`<解释器> src/cli/render.py --list-presets`
 
@@ -42,11 +44,11 @@ description: 用「镶 · 水印」的命令行入口给照片加水印：单张
 |---|---|
 | 输入输出 | `inputs`（图片或目录，至少一个）、`--out <目录>`、`--recursive` |
 | 外观 | `--bg color\|blur`、`--bg-color <#RRGGBB>`、`--text-color <#RRGGBB>`、`--blur-radius <整数>`、`--darken <0~1>`、`--corner-radius <整数>` |
-| 布局与间距 | `--layout unified\|split_top_bottom\|split_left_right`、`--ratio <档位>`、`--margin <比例>`、`--line-gap <比例>`、`--gap-inner <比例>`、`--gap-outer <比例>` |
-| 预设与素材 | `--preset <槽位号或方案名>`、`--logo-dir <目录>` |
+| 布局与间距 | `--layout unified\|split_top_bottom\|split_left_right`、`--compare`、`--ratio <档位>`、`--margin <比例>`、`--line-gap <比例>`、`--gap-inner <比例>`、`--gap-outer <比例>` |
+| 预设与素材 | `--preset <槽位号或方案名>` 或 `--preset-file <方案 JSON>`、`--logo-dir <目录>` |
 | 任意参数 | `--set KEY=VALUE`，可重复 |
 | 水印信息 | `--exif KEY=VALUE`，可重复 |
-| 诊断 | `--json`、`--stage`、`--dry-run`、`--list-params`、`--list-presets`、`--quiet` |
+| 诊断 | `--json`、`--stage`、`--dry-run`、`--info`、`--list-params`、`--list-presets`、`--quiet` |
 
 `--ratio` 的档位：`original`、`1:1`、`3:2`、`2:3`、`4:3`、`3:4`、`16:9`、`9:16`、`21:9`、`9:21`。
 
@@ -54,14 +56,14 @@ description: 用「镶 · 水印」的命令行入口给照片加水印：单张
 
 ## 参数优先级
 
-内核默认值 → `--preset` → 专用选项（`--bg` / `--layout` / `--ratio` / `--exif` 等）→ `--set`。`--set` 最后生效，可覆盖前面任何来源。
+内核默认值 → `--preset` 或 `--preset-file` → 专用选项（`--bg` / `--layout` / `--ratio` / `--exif` 等）→ `--set`。`--set` 最后生效，可覆盖前面任何来源。`--compare` 不是参数来源：它在参数定好后按三种布局各渲染一次。
 
 ## 输出与退出码
 
 - 默认输出目录：首张输入图所在目录下的 `watermarked/`；`--out` 覆盖，目录不存在会创建。
-- 成品命名：`<原文件名>_watermarked.jpg`；同名已存在时依次 `_watermarked_2.jpg`、`_watermarked_3.jpg`。
+- 成品命名：`<原文件名>_watermarked.jpg`；同名已存在时依次 `_watermarked_2.jpg`、`_watermarked_3.jpg`。对比模式按布局加后缀：`<原文件名>_watermarked_unified.jpg`、`_watermarked_split_top_bottom.jpg`、`_watermarked_split_left_right.jpg`。
 - 成品格式固定 JPEG（质量 100），沿用原图 EXIF 并去掉方向标记；JPEG 写不出时回退为同名 `.png`，此时路径以 JSON 里的 `output` 为准。
-- `--json` 顶层字段：`ok`、`total`、`success`、`out_dir`、`param_source`、`changed`、`skipped`、`results`。每张结果含 `input`、`output`、`ok`、`ms`，失败时是 `error`，加了 `--stage` 才有 `stages`。
+- `--json` 顶层字段：`ok`、`total`、`success`、`compare`、`out_dir`、`param_source`、`changed`、`skipped`、`results`。每张结果含 `input`、`output`、`ok`、`ms`，对比模式下另有 `layout`，失败时是 `error`，加了 `--stage` 才有 `stages`。对比模式下一张输入对应三行结果，`total` 与 `success` 按成品数计。
 - 退出码：`0` 全部成功；`1` 有失败的图（其余仍会继续处理）；`2` 参数错误、没有输入、输入不存在或没有受支持的图片。
 - 批量是串行执行，单张失败不中断其余。
 
@@ -72,6 +74,9 @@ description: 用「镶 · 水印」的命令行入口给照片加水印：单张
 3. **目录入参默认只看当前层**，要含子目录加 `--recursive`；图片按文件头判定而不看扩展名，不支持的文件计入 `skipped`，不算失败。
 4. **`--exif` 的键固定五个**：`make`、`model`、`exposure`、`fnumber`、`iso`，必须写成 `键=值`。值会自动补格式：`exposure=1/250` → `1/250s`、`fnumber=2.8` → `f/2.8`、`iso=400` → `ISO400`。品牌与型号逐字段以自定义值优先、缺省回退原图 EXIF；曝光 / 光圈 / ISO 只要给了任一项，参数行整行采用自定义值，未给的项不显示；留空等于不覆盖。
 5. **`--gap-inner` 同时写图片上下的内侧间距，`--gap-outer` 同时写画布上下的外侧间距**。上下分离布局里两段可见距离都可能大于设定值（矮侧余量内外各半，居中与镜像语义），这是既定行为而不是缺陷。
+6. **`--compare` 会忽略 `--layout`**，按 `unified`、`split_top_bottom`、`split_left_right` 各写一张；`--dry-run` 的 `count` 是成品数（输入数 × 3）。
+7. **`--preset-file` 只认界面「导出预设」得到的单个方案 JSON**，与 `--preset` 二选一。导出文件有意不含字体、Logo 目录等机器路径，需要时用 `--logo-dir` 与 `--set font_path=<路径>` 补；`_preset_name`、`_format` 这类非内核键会被忽略。
+8. **`--info` 是只读模式**：不套参数、不建输出目录，只读文件与照片自带 EXIF；它报告的是原图读数，不是水印最终会印成什么。
 
 ## 副作用与隔离
 

@@ -118,6 +118,46 @@ report("--dry-run 只列计划", bool(info.get("count")) and not os.path.exists(
 report("--list-params 可发现", "gap_image_bottom" in run(["--list-params"]).stdout)
 report("--help 可读", "用法" in run(["--help"]).stdout or "usage" in run(["--help"]).stdout.lower())
 
+# 7. 对比模式: 一张输入出三张, 后缀与布局一一对应
+out6 = os.path.join(sandbox, "o6")
+r = run([src_img, "--compare", "--bg", "color", "--out", out6, "--json"])
+data = json.loads(r.stdout) if r.stdout.strip().startswith("{") else {}
+outs = [x.get("output") for x in data.get("results", []) if x.get("ok")]
+names = sorted(os.path.basename(p) for p in outs)
+want = sorted(f"in_watermarked_{k}.jpg" for k in ("unified", "split_top_bottom", "split_left_right"))
+report("对比模式出三张", len(outs) == 3 and names == want and all(os.path.isfile(p) for p in outs),
+       f"{names}")
+
+# 8. 方案文件: 与 --preset 同口径套用(档位字符串按比例换算)
+preset_file = os.path.join(sandbox, "one.json")
+with open(preset_file, "w", encoding="utf-8") as f:
+    json.dump({"canvas_ratio_mode": "1:1", "bg_color": "#000000"}, f)
+out7 = os.path.join(sandbox, "o7")
+r = run([src_img, "--preset-file", preset_file, "--out", out7, "--json"])
+data = json.loads(r.stdout) if r.stdout.strip().startswith("{") else {}
+outs = [x.get("output") for x in data.get("results", []) if x.get("ok")]
+if outs:
+    w, h = size_of(outs[0])
+    report("方案文件生效", w == h and w > 320, f"{w}x{h}")
+else:
+    report("方案文件生效", False, "未拿到产物")
+
+# 9. 只读查询: --info 报告原图读数, 且不建输出目录、不出成品
+out8 = os.path.join(sandbox, "o8")
+r = run([src_img, "--info", "--json", "--out", out8])
+info = json.loads(r.stdout) if r.stdout.strip().startswith("{") else {}
+img = (info.get("images") or [{}])[0]
+report("--info 只读且报出读数",
+       r.returncode == 0 and img.get("width") == 320
+       and set(img.get("exif") or {}) == {"make", "model", "exposure", "fnumber", "iso"}
+       and not os.path.exists(out8),
+       f"exit={r.returncode}, keys={sorted(img.get('exif') or {})}")
+
+# 10. 界面专有键不认参数面, 报错要指向等价的专用开关
+r = run([src_img, "--set", "compare_layouts=true", "--out", os.path.join(sandbox, "e3")])
+report("界面专有键报错指向 --compare", r.returncode == 2 and "--compare" in r.stderr,
+       f"returncode={r.returncode}, stderr={r.stderr.strip()[:80]}")
+
 print(f"\n沙箱: {sandbox}" if fails else f"\n沙箱已清理: {sandbox}")
 if not fails:
     shutil.rmtree(sandbox, ignore_errors=True)

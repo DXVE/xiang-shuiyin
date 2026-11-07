@@ -37,7 +37,7 @@
 
 - **不得**用 `**default_params()` 直接调内核，必须经 `window.backend_params()`：`default_params()` 含界面专用的 `canvas_ratio_mode`，而 `process_single` 只接受数值型 `canvas_ratio`（`0` = 跟随原图），直接展开必定 `TypeError`（原理见 wiki §4.1）。
 - 档位表 `_RATIOS` 与反查表 `_RATIO_MODES` 都在 `src/ui/specs.py`：新增档位时两处需同步添加，`migrate_preset()` 依赖反查表还原旧记录。
-- 命令行入口（`src/cli/render.py`）自带**四份镜像清单**：档位表 `_RATIOS`（比界面多一个 `original` → `0`）、布局取值 `_LAYOUTS`、背景模式 `_BG_MODES`、自定义 EXIF 键 `_EXIF_KEYS`。普通参数不用登记（按内核签名自动过滤），但取值集合变化必须同步这四份，否则 `--ratio` / `--layout` / `--bg` 会拒绝新值；`--exif` 的键清单只用于帮助文案，写错键名不报错而被内核静默忽略。
+- 命令行入口（`src/cli/render.py`）自带**四份镜像清单**：档位表 `_RATIOS`（比界面多一个 `original` → `0`）、布局取值 `_LAYOUTS`、背景模式 `_BG_MODES`、自定义 EXIF 键 `_EXIF_KEYS`。普通参数不用登记（按内核签名自动过滤），但取值集合变化必须同步这四份，否则 `--ratio` / `--layout` / `--bg` 会拒绝新值；`--exif` 的键清单只用于帮助文案，写错键名不报错而被内核静默忽略。对比模式**不另设清单**：`--compare` 直接引用 `RenderWorker.COMPARE_SUFFIX`，与界面共用同一份布局与后缀定义。
 - `model_map` 是内核必填：`backend_params()` 已 `setdefault`，生成路径另有 `_inject_model_map(..., ensure_map=True)` 兜底。`_inject_model_map` 的两种模式**不得合并**：生成用 `ensure_map=True`（原地改），预览用 `copy_on_inject=True`（拷贝，避免污染请求对象）。
 - `manual_exif` 的键固定为 `make` / `model` / `exposure` / `fnumber` / `iso`（字符串），由 `_format_manual_exif()` 归一；`None` = 不启用；**有意不持久化**。
 - `low_res_enhance` 是**常驻入参**、成品恒为开：界面没有控件，`backend_params()` 也不产出该键，成品只走 `process_single()` 的形参默认值 `True`；只有预览显式传 `False`（见 §1.4）。改动这里要同时确认预览与成品两条取值路径都仍成立。
@@ -418,7 +418,7 @@
 - 界面截图：`tools/shot.py`（真实平台插件 + `WA_DontShowOnScreen`，产物默认写 `shots/`）。**禁止**用 `QT_QPA_PLATFORM=offscreen` 截图（字体库为空，中文渲染为方块，会将布局问题误判为字体问题）。
 - 打包：装可选依赖 `.[build]`。两步：`XSY_ONEDIR=1` 时 `python -m PyInstaller packaging/xiangshuiyin-qt.spec` 出目录形态载荷并生成 `build/version.iss`；再 `ISCC.exe packaging/xiangshuiyin-qt.iss` 出安装器（构建机需装 Inno Setup 6.3 或更高版本；它只作构建工具，不随产物分发）。核实方式是读产物归档表确认资源与 `ui/i18n/*.qm` 在位，并把数据目录指向沙箱、写入英文设置后启动产物，读日志里的 `[i18n]` 行；安装器另按 §4.2 的验收项核对。
 - 多语言：`scripts/build_i18n.py`（演练）/ `--write`，校验 `scripts/check_i18n.py`（§5）。
-- 命令行出图：`python src/cli/render.py <图片或目录>…`（内核默认值 + 可选预设 + 参数覆盖，可输出 `--json`；`cd src` 后也可 `python -m cli`）。
+- 命令行出图：`python src/cli/render.py <图片或目录>…`（内核默认值 + 可选预设或方案文件 + 参数覆盖，可输出 `--json`；`--compare` 一次按三种布局出图，`--info` 只读文件信息与 EXIF；`cd src` 后也可 `python -m cli`）。
 - 发布门禁：`scripts/check_docs_style.ps1`（文档：机器相关定位信息 / 排版体例 / 术语 / 交叉引用）、`scripts/check_code_style.py`（代码：本机路径写死 / 凭据 / 过期定位信息 / 注释体例）、`scripts/check_params.py`（参数表 / 内核签名 / 默认值契约）、`scripts/check_version.py`（发布 tag 与源码版本号一致）、`scripts/check_cli.py`（命令行无头出图）、`scripts/check_bundle.py`（产物自检）；语义级检查用 `python -m ruff check --select F821`（未定义名）。新增或修改发布门禁**必须**同时接进 `.github/workflows/ci.yml` 与 `release.yml` 的发布门禁；两处跑同一套脚本，发布时不过不打包。
 - 发布门禁只收**能客观判定**的项（路径 / 行号 / 引号 / 交叉引用 / 契约）。靠语感的风格判断（口语词表一类）**不得**进 CI：穷举不可能完整，还会把个人用词偏好变成硬失败；注释体例、未使用导入（ruff `F401`）这类现存命中较多的项只**报告**，不计失败。
 

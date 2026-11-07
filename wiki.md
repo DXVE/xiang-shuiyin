@@ -242,7 +242,7 @@
 
 - 打包成无控制台模式后 `sys.stdout` 为 `None`，入口对 `print` 做了静默兜底（`_say`），因此启动信息要看日志文件而不是控制台。
 - 单实例是**真单实例**：已有实例在运行时，第二次启动只会激活已有窗口随后退出。自检脚本想要并行运行，用 `XSY_IPC_NAME` 换一个管道名（§9.2）。
-- 命令行入口是同一内核的第二个消费者：`python src/cli/render.py <图片或目录>…`，或 `cd src` 后 `python -m cli`；不需要 Qt 与显示器（命令与开关见 `AGENTS.md` §7.2，面向 agent 的操作说明见 `skills/xsy-cli/SKILL.md`）。
+- 命令行入口是同一内核的第二个消费者：`python src/cli/render.py <图片或目录>…`，或 `cd src` 后 `python -m cli`；不需要 Qt 与显示器，支持对比模式（一次按三种布局出图）、直接套用界面导出的方案文件，以及只读查看输入图 EXIF（命令与开关见 `AGENTS.md` §7.2，面向 agent 的操作说明见 `skills/xsy-cli/SKILL.md`）。
 
 ### 3.2 打包配置项与其因果
 
