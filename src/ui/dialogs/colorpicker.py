@@ -9,11 +9,11 @@ from PySide6.QtWidgets import (QFrame, QGraphicsDropShadowEffect, QHBoxLayout, Q
 
 from .. import theme
 
-_SV_W, _SV_H = 208, 140     # 明度/饱和度方片(逻辑像素)
-_HUE_W = 20                 # 色相条宽度
+_SV_W, _SV_H = 288, 200     # 明度/饱和度方片(逻辑像素): 高度决定纵向精度, 不宜低于 200
+_HUE_W = 36                 # 色相条宽度(交互宽度): 24 时点中与拖动都嫌窄, 36 与方片比例仍协调
 _PAD = 12                   # 卡片内边距
 _GAP = 10                   # 控件间距
-_R = 6                      # 取色圈半径
+_R = 7                      # 取色圈半径(随方片放大, 否则在大面板上显得过小)
 _SHADOW = 8                 # 卡片投影在外层窗口里占的余量
 _RADIUS = theme.RADIUS_SMALL
 
@@ -194,7 +194,9 @@ class _HueStrip(QWidget):
     def keyPressEvent(self, e):          # noqa: N802 - Qt 命名
         step = 10 if e.modifiers() & Qt.KeyboardModifier.ShiftModifier else 1
         if e.key() in (Qt.Key.Key_Up, Qt.Key.Key_Down):
-            self._set(max(0, min(359, self._hue + (step if e.key() == Qt.Key.Key_Up else -step))))
+            # 指示线的 y 随色相递增(0° 在顶), 故上键要上移就得减色相: 方向按视觉走, 不按「上键加值」的直觉
+            delta = step if e.key() == Qt.Key.Key_Down else -step
+            self._set(max(0, min(359, self._hue + delta)))
             return
         super().keyPressEvent(e)
 
@@ -209,12 +211,12 @@ class _HueStrip(QWidget):
         p.setPen(QPen(QColor(0, 0, 0, 90), 1))
         p.drawRoundedRect(r, _RADIUS, _RADIUS)
         y = self._hue / 359 * (self.height() - 1)
-        y = max(3, min(y, self.height() - 4))       # 夹住指示器: 0° 与 359° 时三条线都画得下
-        p.setPen(QPen(QColor(0, 0, 0, 120), 1))     # 上下各一条深线: 黄/青段的白线才有边界
-        p.drawLine(QPoint(1, round(y) - 2), QPoint(self.width() - 2, round(y) - 2))
-        p.drawLine(QPoint(1, round(y) + 2), QPoint(self.width() - 2, round(y) + 2))
-        p.setPen(QPen(QColor(255, 255, 255), 2))
-        p.drawLine(QPoint(1, round(y)), QPoint(self.width() - 2, round(y)))
+        y = max(6.5, min(y, self.height() - 7.5))   # 夹住整个手柄: 0° 与 359° 时白块也不压到圆角
+        # 手柄画成白色圆角块而不是横贯色条的直线: 横线会把色条看成被割成两段, 圆角块才像能抓的把手;
+        # 深描边兼作黄/青段的边界, 白块在浅色段上也不会糊掉
+        p.setPen(QPen(QColor(24, 24, 24, 110), 1))
+        p.setBrush(QColor(255, 255, 255, 240))
+        p.drawRoundedRect(QRectF(3.5, y - 4.5, self.width() - 7, 9), 3, 3)
 
 
 class _Swatch(QWidget):
