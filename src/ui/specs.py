@@ -79,7 +79,8 @@ PARAM_SPECS = [
          args=(0, 1000), step=10, hint=QT_TRANSLATE_NOOP("ParamRow", "0~1000 圆角，默认 0")),
     dict(tab="effects", card=QT_TRANSLATE_NOOP("Card", "背景模式"), key="corner_circle", label=QT_TRANSLATE_NOOP("ParamRow", "圆形（整图正圆）"), kind="bool"),
 
-    dict(tab="effects", card=QT_TRANSLATE_NOOP("Card", "水印文字"), key="text_color", label=QT_TRANSLATE_NOOP("ParamRow", "文字颜色"), kind="color"),
+    dict(tab="effects", card=QT_TRANSLATE_NOOP("Card", "水印文字"), key="text_color", label=QT_TRANSLATE_NOOP("ParamRow", "文字颜色"), kind="color",
+         label_action="invert", hint=QT_TRANSLATE_NOOP("ParamRow", "单击反色")),
     dict(tab="effects", card=QT_TRANSLATE_NOOP("Card", "水印文字"), key="scale_logo", label=QT_TRANSLATE_NOOP("ParamRow", "Logo 缩放"), kind="pct",
          args=(0.1, 2.0), step=10, hint=QT_TRANSLATE_NOOP("ParamRow", "10~200%，默认 70%")),
     dict(tab="effects", card=QT_TRANSLATE_NOOP("Card", "水印文字"), key="scale_model", label=QT_TRANSLATE_NOOP("ParamRow", "型号缩放"), kind="pct",

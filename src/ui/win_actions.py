@@ -1,6 +1,6 @@
 """菜单动作与弹窗入口: 关于、日志与数据目录、预设 / Logo / 取色 / 映射 / 字体。"""
 from PySide6.QtCore import QUrl
-from PySide6.QtGui import QDesktopServices
+from PySide6.QtGui import QColor, QDesktopServices
 from PySide6.QtWidgets import QApplication, QMessageBox
 from core.config import DATA_DIR, DEFAULT_LOGO_DIR, LOG_DIR
 from core.exif import prettify_model
@@ -122,6 +122,14 @@ class ActionMixin:
             self._params[row.key] = base
         row.set_value(c)
         self._on_param(row.key, c)
+
+    def _invert_color(self, row):
+        # 标题单击反色: 只翻明度(H、S 不变, L -> 255-L), 浅红变深红而不是变补色
+        c = QColor(row.value() or "#000000")
+        if not c.isValid():
+            return
+        h, s, l, _a = c.getHsl()
+        self._apply_color(row, QColor.fromHsl(h, s, 255 - l).name().upper())
 
     def _cancel_color(self, row):
         # 取消取色: 把预览与参数退回拖动前, 并丢掉基线(免得留给下一次正式落地)

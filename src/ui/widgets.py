@@ -139,6 +139,7 @@ class ParamRow(QWidget):
     colorClicked = Signal()          # 点「颜色管理」: 打开预设与收藏弹窗(取色弹窗由主窗提供, 需读取用户保存的颜色)
     pickColorClicked = Signal()    # 点色块: 弹出取色面板(自绘, 拖动即生效; 不经过「颜色管理」弹窗)
     resetClicked = Signal()          # 点行尾 ↺: 把本行参数恢复默认值(含镜像行)
+    labelClicked = Signal()          # 点可点的标题: 目前只有「文字颜色」的一键反色
 
     def __init__(self, spec, value, parent=None):
         super().__init__(parent)
@@ -163,12 +164,23 @@ class ParamRow(QWidget):
 # 标签为空(字体/水印开关网格的格位)时不加弹性空白: 那些格位靠 grid 的 AlignCenter 居中, 加 stretch 会把开关推偏
                 lay.addStretch(1)
         else:
-            lab = QLabel(self.tr(spec["label"]))
-            lab.setObjectName("fieldLabel")
-            lab.setFixedWidth(_LABEL_W)
-            lab.setWordWrap(True)
-            lay.addWidget(lab)
             hint = spec.get("hint")
+            if spec.get("label_action"):
+                # 标题做成链接式开关(手型 + 下划线): 单击执行该动作, 与行尾 ↺ 分工(一个改值, 一个复原)
+                lab = QPushButton(self.tr(spec["label"]))
+                lab.setObjectName("linklabel")
+                lab.setCursor(Qt.PointingHandCursor)
+                lab.setFixedWidth(_LABEL_W)
+                f = lab.font()
+                f.setUnderline(True)
+                lab.setFont(f)
+                lab.clicked.connect(self.labelClicked.emit)
+            else:
+                lab = QLabel(self.tr(spec["label"]))
+                lab.setObjectName("fieldLabel")
+                lab.setFixedWidth(_LABEL_W)
+                lab.setWordWrap(True)
+            lay.addWidget(lab)
             if hint:
                 lab.setToolTip(self.tr(hint))
 

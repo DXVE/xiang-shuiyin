@@ -257,6 +257,8 @@ class BuildMixin:
                 if s["kind"] == "color":
                     row.colorClicked.connect(lambda r=row: self._open_color_dialog(r))
                     row.pickColorClicked.connect(lambda r=row: self._pick_color(r))
+                if s.get("label_action") == "invert":
+                    row.labelClicked.connect(lambda r=row: self._invert_color(r))
                 self._rows[s["key"]] = row
                 row.resetClicked.connect(lambda r=row: self._reset_param_row(r))
                 card.body.addWidget(row)
@@ -414,6 +416,8 @@ class BuildMixin:
                 if s["kind"] == "color":
                     row.colorClicked.connect(lambda r=row: self._open_color_dialog(r))
                     row.pickColorClicked.connect(lambda r=row: self._pick_color(r))
+                if s.get("label_action") == "invert":
+                    row.labelClicked.connect(lambda r=row: self._invert_color(r))
                 self._rows[s["key"]] = row
                 row.resetClicked.connect(lambda r=row: self._reset_param_row(r))
                 card.body.addWidget(row)

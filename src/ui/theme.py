@@ -136,6 +136,14 @@ QFrame#divider {{
 }}
 QLabel#hint {{ color: {MUTED}; font-size: 11px; background: transparent; }}
 QLabel#fieldLabel {{ background: transparent; }}
+QPushButton#linklabel {{
+    background: transparent;
+    border: none;
+    padding: 0;
+    text-align: left;
+    color: {TEXT};
+}}
+QPushButton#linklabel:hover, QPushButton#linklabel:focus {{ color: {ACCENT}; }}
 QLabel#muted {{ color: {MUTED}; background: transparent; }}
 QLabel#aboutName {{ font-size: 22px; font-weight: 600; color: #2f4a38; background: transparent; }}
 QLabel#aboutSub {{ font-size: 13px; color: {MUTED}; background: transparent; }}
