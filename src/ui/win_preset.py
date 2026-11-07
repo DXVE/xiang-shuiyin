@@ -215,6 +215,7 @@ class PresetMixin:
             if row is not None:
                 row.set_value(val)
         self._sync_mirror_rows(changed)
+        self._sync_range_rows()
         self._sync_visibility()
         self._persist_model_map(map_before)
         self._update_effective_model()      # 「水印将显示：X」依赖映射表, 跟着刷一次

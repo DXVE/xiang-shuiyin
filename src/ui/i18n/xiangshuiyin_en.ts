@@ -124,7 +124,7 @@
         </message>
         <message>
             <location filename="../win_build.py" line="81" />
-            <location filename="../win_build.py" line="481" />
+            <location filename="../win_build.py" line="491" />
             <source>未选择图片</source>
             <translation>No image selected</translation>
         </message>
@@ -225,42 +225,42 @@
             <translation>Start</translation>
         </message>
         <message>
-            <location filename="../win_build.py" line="485" />
+            <location filename="../win_build.py" line="495" />
             <source>未选择目录</source>
             <translation>No folder selected</translation>
         </message>
         <message>
-            <location filename="../win_build.py" line="487" />
+            <location filename="../win_build.py" line="497" />
             <source>选择文件夹</source>
             <translation>Choose folder</translation>
         </message>
         <message>
-            <location filename="../win_build.py" line="490" />
+            <location filename="../win_build.py" line="500" />
             <source>包含子文件夹</source>
             <translation>Include subfolders</translation>
         </message>
         <message>
-            <location filename="../win_build.py" line="516" />
+            <location filename="../win_build.py" line="526" />
             <source>临时美化型号（仅本次有效）</source>
             <translation>Temporary pretty model (this run only)</translation>
         </message>
         <message>
-            <location filename="../win_build.py" line="517" />
+            <location filename="../win_build.py" line="527" />
             <source>留空则使用映射表；填写后强制使用该名称</source>
             <translation>Leave empty to use the mapping table; if filled, this name is forced for this run</translation>
         </message>
         <message>
-            <location filename="../win_build.py" line="519" />
+            <location filename="../win_build.py" line="529" />
             <source>管理所有型号映射</source>
             <translation>Manage model mappings</translation>
         </message>
         <message>
-            <location filename="../win_build.py" line="525" />
+            <location filename="../win_build.py" line="535" />
             <source>复制原始型号</source>
             <translation>Copy raw model</translation>
         </message>
         <message>
-            <location filename="../win_build.py" line="532" />
+            <location filename="../win_build.py" line="542" />
             <source>启用（启用后强制使用下列信息，忽略照片 EXIF）</source>
             <translation>Enable (force the values below, ignore the photo's EXIF)</translation>
         </message>
@@ -268,109 +268,109 @@
     <context>
         <name>Card</name>
         <message>
-            <location filename="../specs.py" line="48" />
-            <location filename="../specs.py" line="49" />
             <location filename="../specs.py" line="50" />
             <location filename="../specs.py" line="51" />
+            <location filename="../specs.py" line="52" />
+            <location filename="../specs.py" line="53" />
             <source>字体文件</source>
             <translation>Font files</translation>
         </message>
         <message>
-            <location filename="../specs.py" line="54" />
-            <source>最小字号设置</source>
-            <translation>Minimum font size</translation>
-        </message>
-        <message>
-            <location filename="../specs.py" line="57" />
+            <location filename="../specs.py" line="60" />
             <source>画布比例</source>
             <translation>Canvas ratio</translation>
         </message>
         <message>
-            <location filename="../specs.py" line="62" />
-            <location filename="../specs.py" line="66" />
+            <location filename="../specs.py" line="65" />
+            <location filename="../specs.py" line="69" />
             <source>水印位置布局</source>
             <translation>Watermark layout</translation>
         </message>
         <message>
-            <location filename="../specs.py" line="94" />
             <location filename="../specs.py" line="97" />
-            <location filename="../specs.py" line="101" />
-            <location filename="../specs.py" line="105" />
-            <location filename="../specs.py" line="109" />
-            <location filename="../specs.py" line="113" />
+            <location filename="../specs.py" line="100" />
+            <location filename="../specs.py" line="104" />
+            <location filename="../specs.py" line="108" />
+            <location filename="../specs.py" line="112" />
+            <location filename="../specs.py" line="116" />
             <source>边距</source>
             <translation>Spacing</translation>
         </message>
         <message>
-            <location filename="../specs.py" line="69" />
-            <location filename="../specs.py" line="71" />
-            <location filename="../specs.py" line="73" />
-            <location filename="../specs.py" line="75" />
+            <location filename="../specs.py" line="72" />
+            <location filename="../specs.py" line="74" />
+            <location filename="../specs.py" line="76" />
             <location filename="../specs.py" line="78" />
-            <location filename="../specs.py" line="80" />
+            <location filename="../specs.py" line="81" />
+            <location filename="../specs.py" line="83" />
             <source>背景模式</source>
             <translation>Background mode</translation>
         </message>
         <message>
-            <location filename="../specs.py" line="118" />
-            <location filename="../specs.py" line="120" />
-            <location filename="../specs.py" line="122" />
-            <location filename="../specs.py" line="124" />
-            <location filename="../specs.py" line="128" />
-            <location filename="../specs.py" line="130" />
-            <location filename="../specs.py" line="132" />
+            <location filename="../specs.py" line="56" />
+            <source>字号范围</source>
+            <translation>Font size range</translation>
+        </message>
+        <message>
+            <location filename="../specs.py" line="121" />
+            <location filename="../specs.py" line="123" />
+            <location filename="../specs.py" line="125" />
+            <location filename="../specs.py" line="127" />
+            <location filename="../specs.py" line="131" />
+            <location filename="../specs.py" line="133" />
             <location filename="../specs.py" line="135" />
             <location filename="../specs.py" line="138" />
             <location filename="../specs.py" line="141" />
-            <location filename="../specs.py" line="145" />
-            <location filename="../specs.py" line="147" />
-            <location filename="../specs.py" line="149" />
-            <location filename="../specs.py" line="153" />
-            <location filename="../specs.py" line="155" />
-            <location filename="../specs.py" line="157" />
+            <location filename="../specs.py" line="144" />
+            <location filename="../specs.py" line="148" />
+            <location filename="../specs.py" line="150" />
+            <location filename="../specs.py" line="152" />
+            <location filename="../specs.py" line="156" />
+            <location filename="../specs.py" line="158" />
             <location filename="../specs.py" line="160" />
             <location filename="../specs.py" line="163" />
             <location filename="../specs.py" line="166" />
-            <location filename="../win_build.py" line="397" />
+            <location filename="../specs.py" line="169" />
+            <location filename="../win_build.py" line="407" />
             <source>描边与投影</source>
             <translation>Stroke and shadow</translation>
         </message>
         <message>
-            <location filename="../specs.py" line="82" />
-            <location filename="../specs.py" line="84" />
-            <location filename="../specs.py" line="86" />
-            <location filename="../specs.py" line="88" />
+            <location filename="../specs.py" line="85" />
+            <location filename="../specs.py" line="87" />
+            <location filename="../specs.py" line="89" />
+            <location filename="../specs.py" line="91" />
             <source>水印文字</source>
             <translation>Watermark text</translation>
         </message>
         <message>
-            <location filename="../specs.py" line="92" />
-            <location filename="../win_build.py" line="357" />
+            <location filename="../specs.py" line="95" />
+            <location filename="../win_build.py" line="367" />
             <source>水印开关</source>
             <translation>Watermark switches</translation>
         </message>
         <message>
-            <location filename="../widgets.py" line="469" />
+            <location filename="../widgets.py" line="548" />
             <source>展开本组</source>
             <translation>Expand this group</translation>
         </message>
         <message>
-            <location filename="../widgets.py" line="469" />
+            <location filename="../widgets.py" line="548" />
             <source>收起本组</source>
             <translation>Collapse this group</translation>
         </message>
         <message>
-            <location filename="../win_build.py" line="462" />
+            <location filename="../win_build.py" line="472" />
             <source>处理模式</source>
             <translation>Mode</translation>
         </message>
         <message>
-            <location filename="../win_build.py" line="514" />
+            <location filename="../win_build.py" line="524" />
             <source>型号美化</source>
             <translation>Model naming</translation>
         </message>
         <message>
-            <location filename="../win_build.py" line="531" />
+            <location filename="../win_build.py" line="541" />
             <source>自定义水印信息</source>
             <translation>Custom watermark info</translation>
         </message>
@@ -744,41 +744,41 @@
             <translation>Watermark and effects</translation>
         </message>
         <message>
-            <location filename="../win_build.py" line="526" />
+            <location filename="../win_build.py" line="536" />
             <source>识别型号</source>
             <translation>Model</translation>
         </message>
         <message>
-            <location filename="../specs.py" line="120" />
-            <location filename="../specs.py" line="122" />
-            <location filename="../specs.py" line="124" />
+            <location filename="../specs.py" line="123" />
+            <location filename="../specs.py" line="125" />
+            <location filename="../specs.py" line="127" />
             <source>图片描边</source>
             <translation>Image stroke</translation>
         </message>
         <message>
-            <location filename="../specs.py" line="128" />
-            <location filename="../specs.py" line="130" />
-            <location filename="../specs.py" line="132" />
+            <location filename="../specs.py" line="131" />
+            <location filename="../specs.py" line="133" />
             <location filename="../specs.py" line="135" />
             <location filename="../specs.py" line="138" />
             <location filename="../specs.py" line="141" />
+            <location filename="../specs.py" line="144" />
             <source>图片投影</source>
             <translation>Image shadow</translation>
         </message>
         <message>
-            <location filename="../specs.py" line="145" />
-            <location filename="../specs.py" line="147" />
-            <location filename="../specs.py" line="149" />
+            <location filename="../specs.py" line="148" />
+            <location filename="../specs.py" line="150" />
+            <location filename="../specs.py" line="152" />
             <source>文字描边</source>
             <translation>Text stroke</translation>
         </message>
         <message>
-            <location filename="../specs.py" line="153" />
-            <location filename="../specs.py" line="155" />
-            <location filename="../specs.py" line="157" />
+            <location filename="../specs.py" line="156" />
+            <location filename="../specs.py" line="158" />
             <location filename="../specs.py" line="160" />
             <location filename="../specs.py" line="163" />
             <location filename="../specs.py" line="166" />
+            <location filename="../specs.py" line="169" />
             <source>文字投影</source>
             <translation>Text shadow</translation>
         </message>
@@ -788,98 +788,98 @@
             <translation>「ShuiYin · Watermark」 Watermark Tool</translation>
         </message>
         <message>
-            <location filename="../win_build.py" line="470" />
+            <location filename="../win_build.py" line="480" />
             <source>单张图片</source>
             <translation>Single image</translation>
         </message>
         <message>
-            <location filename="../win_build.py" line="471" />
+            <location filename="../win_build.py" line="481" />
             <source>批量目录</source>
             <translation>Batch folder</translation>
         </message>
         <message>
-            <location filename="../win_build.py" line="478" />
+            <location filename="../win_build.py" line="488" />
             <source>模式</source>
             <translation>Mode</translation>
         </message>
         <message>
-            <location filename="../win_build.py" line="482" />
+            <location filename="../win_build.py" line="492" />
             <source>输入图片</source>
             <translation>Input image</translation>
         </message>
         <message>
-            <location filename="../win_build.py" line="486" />
+            <location filename="../win_build.py" line="496" />
             <source>图片目录</source>
             <translation>Image folder</translation>
         </message>
         <message>
-            <location filename="../win_build.py" line="520" />
+            <location filename="../win_build.py" line="530" />
             <source>美化型号</source>
             <translation>Pretty model</translation>
         </message>
         <message>
-            <location filename="../win_build.py" line="539" />
+            <location filename="../win_build.py" line="549" />
             <source>品牌</source>
             <translation>Make</translation>
         </message>
         <message>
-            <location filename="../win_build.py" line="540" />
+            <location filename="../win_build.py" line="550" />
             <source>如 Canon</source>
             <translation>e.g. Canon</translation>
         </message>
         <message>
-            <location filename="../win_build.py" line="541" />
-            <location filename="../win_build.py" line="544" />
+            <location filename="../win_build.py" line="551" />
+            <location filename="../win_build.py" line="554" />
             <source>原样输出</source>
             <translation>Used as-is</translation>
         </message>
         <message>
-            <location filename="../win_build.py" line="542" />
+            <location filename="../win_build.py" line="552" />
             <source>型号</source>
             <translation>Model</translation>
         </message>
         <message>
-            <location filename="../win_build.py" line="543" />
+            <location filename="../win_build.py" line="553" />
             <source>如 EOS R5</source>
             <translation>e.g. EOS R5</translation>
         </message>
         <message>
-            <location filename="../win_build.py" line="545" />
+            <location filename="../win_build.py" line="555" />
             <source>快门</source>
             <translation>Shutter</translation>
         </message>
         <message>
-            <location filename="../win_build.py" line="546" />
+            <location filename="../win_build.py" line="556" />
             <source>如 1/125</source>
             <translation>e.g. 1/125</translation>
         </message>
         <message>
-            <location filename="../win_build.py" line="548" />
+            <location filename="../win_build.py" line="558" />
             <source>光圈</source>
             <translation>Aperture</translation>
         </message>
         <message>
-            <location filename="../win_build.py" line="549" />
+            <location filename="../win_build.py" line="559" />
             <source>如 2.8</source>
             <translation>e.g. 2.8</translation>
         </message>
         <message>
-            <location filename="../win_build.py" line="551" />
+            <location filename="../win_build.py" line="561" />
             <source>如 100</source>
             <translation>e.g. 100</translation>
         </message>
         <message>
-            <location filename="../win_build.py" line="547" />
+            <location filename="../win_build.py" line="557" />
             <source>自动补充 s 后缀</source>
             <translation>Adds the "s" suffix</translation>
         </message>
         <message>
-            <location filename="../win_build.py" line="550" />
+            <location filename="../win_build.py" line="560" />
             <source>自动补充 f/ 前缀</source>
             <translation>Adds the "f/" prefix</translation>
         </message>
         <message>
-            <location filename="../win_build.py" line="552" />
+            <location filename="../win_build.py" line="562" />
             <source>自动补充 ISO 前缀</source>
             <translation>Adds the "ISO" prefix</translation>
         </message>
@@ -994,376 +994,381 @@
     <context>
         <name>ParamRow</name>
         <message>
-            <location filename="../specs.py" line="48" />
+            <location filename="../specs.py" line="50" />
             <source>常规字体</source>
             <translation>Regular font</translation>
         </message>
         <message>
-            <location filename="../specs.py" line="49" />
+            <location filename="../specs.py" line="51" />
             <source>粗体字体</source>
             <translation>Bold font</translation>
         </message>
         <message>
-            <location filename="../specs.py" line="50" />
+            <location filename="../specs.py" line="52" />
             <source>斜体字体</source>
             <translation>Italic font</translation>
         </message>
         <message>
-            <location filename="../specs.py" line="51" />
+            <location filename="../specs.py" line="53" />
             <source>粗斜体字体</source>
             <translation>Bold italic font</translation>
         </message>
         <message>
-            <location filename="../specs.py" line="54" />
-            <source>最小字号</source>
-            <translation>Minimum font size</translation>
+            <location filename="../specs.py" line="58" />
+            <source>左侧最小字号、右侧最大字号；选「不限」表示不设限</source>
+            <translation>Left: min size; right: max size. Choose "No limit" to leave that side open</translation>
         </message>
         <message>
-            <location filename="../specs.py" line="55" />
-            <source>0~200px，默认 20</source>
-            <translation>0–200 px, default 20</translation>
-        </message>
-        <message>
-            <location filename="../specs.py" line="57" />
+            <location filename="../specs.py" line="60" />
             <source>画布比例</source>
             <translation>Canvas ratio</translation>
         </message>
         <message>
-            <location filename="../specs.py" line="58" />
+            <location filename="../specs.py" line="61" />
             <source>跟随原图</source>
             <translation>Follow source</translation>
         </message>
         <message>
-            <location filename="../specs.py" line="58" />
+            <location filename="../specs.py" line="61" />
             <source>3:2（横）</source>
             <translation>3:2 (landscape)</translation>
         </message>
         <message>
-            <location filename="../specs.py" line="58" />
+            <location filename="../specs.py" line="61" />
             <source>2:3（竖）</source>
             <translation>2:3 (portrait)</translation>
         </message>
         <message>
-            <location filename="../specs.py" line="59" />
+            <location filename="../specs.py" line="62" />
             <source>4:3（横）</source>
             <translation>4:3 (landscape)</translation>
         </message>
         <message>
-            <location filename="../specs.py" line="59" />
+            <location filename="../specs.py" line="62" />
             <source>3:4（竖）</source>
             <translation>3:4 (portrait)</translation>
         </message>
         <message>
-            <location filename="../specs.py" line="59" />
+            <location filename="../specs.py" line="62" />
             <source>16:9（横）</source>
             <translation>16:9 (landscape)</translation>
         </message>
         <message>
-            <location filename="../specs.py" line="60" />
+            <location filename="../specs.py" line="63" />
             <source>9:16（竖）</source>
             <translation>9:16 (portrait)</translation>
         </message>
         <message>
-            <location filename="../specs.py" line="60" />
+            <location filename="../specs.py" line="63" />
             <source>21:9（超宽）</source>
             <translation>21:9 (ultrawide)</translation>
         </message>
         <message>
-            <location filename="../specs.py" line="60" />
+            <location filename="../specs.py" line="63" />
             <source>9:21（超长）</source>
             <translation>9:21 (extra tall)</translation>
         </message>
         <message>
-            <location filename="../specs.py" line="62" />
+            <location filename="../specs.py" line="65" />
             <source>布局</source>
             <translation>Layout</translation>
         </message>
         <message>
-            <location filename="../specs.py" line="63" />
+            <location filename="../specs.py" line="66" />
             <source>统一下方</source>
             <translation>Unified, below image</translation>
         </message>
         <message>
-            <location filename="../specs.py" line="63" />
+            <location filename="../specs.py" line="66" />
             <source>上下分离</source>
             <translation>Split top/bottom</translation>
         </message>
         <message>
-            <location filename="../specs.py" line="64" />
+            <location filename="../specs.py" line="67" />
             <source>下方左右分离</source>
             <translation>Split left/right below</translation>
         </message>
         <message>
-            <location filename="../specs.py" line="66" />
+            <location filename="../specs.py" line="69" />
             <source>对比模式</source>
             <translation>Compare mode</translation>
         </message>
         <message>
-            <location filename="../specs.py" line="67" />
+            <location filename="../specs.py" line="70" />
             <source>开启后按三种布局各出一张，其余参数不变（布局选择不参与）</source>
             <translation>Writes one image per layout (three in total) with all other parameters unchanged; the layout choice does not apply.</translation>
         </message>
         <message>
-            <location filename="../specs.py" line="94" />
+            <location filename="../specs.py" line="97" />
             <source>图片与边框间距</source>
             <translation>Image margin</translation>
         </message>
         <message>
-            <location filename="../specs.py" line="97" />
+            <location filename="../specs.py" line="100" />
             <source>内侧间距（水印与图片间距）</source>
             <translation>Inner spacing (watermark ↔ image)</translation>
         </message>
         <message>
-            <location filename="../specs.py" line="101" />
+            <location filename="../specs.py" line="104" />
             <source>外侧间距（水印与画布边距）</source>
             <translation>Outer spacing (watermark ↔ canvas edge)</translation>
         </message>
         <message>
-            <location filename="../specs.py" line="105" />
+            <location filename="../specs.py" line="108" />
             <source>水印与图片间距</source>
             <translation>Spacing to image</translation>
         </message>
         <message>
-            <location filename="../specs.py" line="109" />
+            <location filename="../specs.py" line="112" />
             <source>水印与底部间距</source>
             <translation>Spacing to bottom</translation>
         </message>
         <message>
-            <location filename="../specs.py" line="113" />
+            <location filename="../specs.py" line="116" />
             <source>水印行间距</source>
             <translation>Line spacing</translation>
         </message>
         <message>
-            <location filename="../specs.py" line="69" />
+            <location filename="../specs.py" line="72" />
             <source>背景模式</source>
             <translation>Background mode</translation>
         </message>
         <message>
-            <location filename="../specs.py" line="70" />
+            <location filename="../specs.py" line="57" />
+            <source>字号范围</source>
+            <translation>Font size range</translation>
+        </message>
+        <message>
+            <location filename="../specs.py" line="73" />
             <source>模糊图片</source>
             <translation>Blur the image</translation>
         </message>
         <message>
-            <location filename="../specs.py" line="70" />
+            <location filename="../specs.py" line="73" />
             <source>纯色</source>
             <translation>Solid color</translation>
         </message>
         <message>
-            <location filename="../specs.py" line="71" />
+            <location filename="../specs.py" line="74" />
             <source>背景色</source>
             <translation>Background color</translation>
         </message>
         <message>
-            <location filename="../specs.py" line="73" />
+            <location filename="../specs.py" line="76" />
             <source>模糊半径</source>
             <translation>Blur radius</translation>
         </message>
         <message>
-            <location filename="../specs.py" line="74" />
+            <location filename="../specs.py" line="77" />
             <source>1~1000，默认 150</source>
             <translation>1–1000, default 150</translation>
         </message>
         <message>
-            <location filename="../specs.py" line="75" />
+            <location filename="../specs.py" line="78" />
             <source>背景暗化</source>
             <translation>Background darkening</translation>
         </message>
         <message>
-            <location filename="../specs.py" line="76" />
+            <location filename="../specs.py" line="79" />
             <source>0~100%，默认 0；100=全黑（仅模糊模式）</source>
             <translation>0–100%, default 0; 100 = fully black (blur mode only)</translation>
         </message>
         <message>
-            <location filename="../specs.py" line="78" />
+            <location filename="../specs.py" line="81" />
             <source>图片圆角</source>
             <translation>Image corner radius</translation>
         </message>
         <message>
-            <location filename="../specs.py" line="79" />
+            <location filename="../specs.py" line="82" />
             <source>0~1000 圆角，默认 0</source>
             <translation>0–1000 px radius, default 0</translation>
         </message>
         <message>
-            <location filename="../specs.py" line="80" />
+            <location filename="../specs.py" line="83" />
             <source>圆形（整图正圆）</source>
             <translation>Circle (full round)</translation>
         </message>
         <message>
-            <location filename="../specs.py" line="83" />
+            <location filename="../specs.py" line="86" />
             <source>单击反色</source>
             <translation>Click to invert</translation>
         </message>
         <message>
-            <location filename="../specs.py" line="121" />
-            <location filename="../specs.py" line="129" />
-            <location filename="../specs.py" line="146" />
-            <location filename="../specs.py" line="154" />
+            <location filename="../specs.py" line="124" />
+            <location filename="../specs.py" line="132" />
+            <location filename="../specs.py" line="149" />
+            <location filename="../specs.py" line="157" />
             <source>开启</source>
             <translation>On</translation>
         </message>
         <message>
-            <location filename="../specs.py" line="123" />
-            <location filename="../specs.py" line="131" />
-            <location filename="../specs.py" line="148" />
-            <location filename="../specs.py" line="156" />
+            <location filename="../specs.py" line="126" />
+            <location filename="../specs.py" line="134" />
+            <location filename="../specs.py" line="151" />
+            <location filename="../specs.py" line="159" />
             <source>颜色</source>
             <translation>Color</translation>
         </message>
         <message>
-            <location filename="../specs.py" line="125" />
-            <location filename="../specs.py" line="150" />
+            <location filename="../specs.py" line="128" />
+            <location filename="../specs.py" line="153" />
             <source>宽度</source>
             <translation>Width</translation>
         </message>
         <message>
-            <location filename="../specs.py" line="126" />
+            <location filename="../specs.py" line="129" />
             <source>1~50px，默认 5</source>
             <translation>1–50 px, default 5</translation>
         </message>
         <message>
-            <location filename="../specs.py" line="133" />
-            <location filename="../specs.py" line="158" />
+            <location filename="../specs.py" line="136" />
+            <location filename="../specs.py" line="161" />
             <source>方向</source>
             <translation>Angle</translation>
         </message>
         <message>
-            <location filename="../specs.py" line="134" />
-            <location filename="../specs.py" line="159" />
+            <location filename="../specs.py" line="137" />
+            <location filename="../specs.py" line="162" />
             <source>0~360°，默认 135</source>
             <translation>0–360°, default 135</translation>
         </message>
         <message>
-            <location filename="../specs.py" line="136" />
-            <location filename="../specs.py" line="161" />
+            <location filename="../specs.py" line="139" />
+            <location filename="../specs.py" line="164" />
             <source>偏移</source>
             <translation>Offset</translation>
         </message>
         <message>
-            <location filename="../specs.py" line="137" />
+            <location filename="../specs.py" line="140" />
             <source>0~100px，默认 25</source>
             <translation>0–100 px, default 25</translation>
         </message>
         <message>
-            <location filename="../specs.py" line="139" />
-            <location filename="../specs.py" line="164" />
+            <location filename="../specs.py" line="142" />
+            <location filename="../specs.py" line="167" />
             <source>浓度</source>
             <translation>Opacity</translation>
         </message>
         <message>
-            <location filename="../specs.py" line="140" />
+            <location filename="../specs.py" line="143" />
             <source>5~100%，默认 35</source>
             <translation>5–100%, default 35</translation>
         </message>
         <message>
-            <location filename="../specs.py" line="142" />
-            <location filename="../specs.py" line="167" />
+            <location filename="../specs.py" line="145" />
+            <location filename="../specs.py" line="170" />
             <source>晕开范围</source>
             <translation>Spread</translation>
         </message>
         <message>
-            <location filename="../specs.py" line="143" />
+            <location filename="../specs.py" line="146" />
             <source>0~80px，默认 30</source>
             <translation>0–80 px, default 30</translation>
         </message>
         <message>
-            <location filename="../specs.py" line="82" />
+            <location filename="../specs.py" line="85" />
             <source>文字颜色</source>
             <translation>Text color</translation>
         </message>
         <message>
-            <location filename="../specs.py" line="96" />
+            <location filename="../specs.py" line="99" />
             <source>0.5~5%，默认 1.5%；可输 1 位小数，按钮按 0.5% 步进</source>
             <translation>0.5~5%, default 1.5%; one decimal place allowed, buttons step by 0.5%</translation>
         </message>
         <message>
-            <location filename="../specs.py" line="99" />
-            <location filename="../specs.py" line="103" />
+            <location filename="../specs.py" line="102" />
+            <location filename="../specs.py" line="106" />
             <source>0.1~20%，上下镜像同步（默认 4%，仅上下分离）；可输 1 位小数</source>
             <translation>0.1~20%, mirrored top/bottom (default 4%, split layout only); one decimal place allowed</translation>
         </message>
         <message>
-            <location filename="../specs.py" line="107" />
-            <location filename="../specs.py" line="111" />
+            <location filename="../specs.py" line="110" />
+            <location filename="../specs.py" line="114" />
             <source>0.1~20%，默认 4%；可输 1 位小数，按钮按 0.5% 步进</source>
             <translation>0.1~20%, default 4%; one decimal place allowed, buttons step by 0.5%</translation>
         </message>
         <message>
-            <location filename="../specs.py" line="115" />
+            <location filename="../specs.py" line="118" />
             <source>0~10%，默认 2%；可输 1 位小数，按钮按 0.5% 步进</source>
             <translation>0~10%, default 2%; one decimal place allowed, buttons step by 0.5%</translation>
         </message>
         <message>
-            <location filename="../specs.py" line="84" />
+            <location filename="../specs.py" line="87" />
             <source>Logo 缩放</source>
             <translation>Logo scale</translation>
         </message>
         <message>
-            <location filename="../specs.py" line="85" />
+            <location filename="../specs.py" line="88" />
             <source>10~200%，默认 70%</source>
             <translation>10–200%, default 70%</translation>
         </message>
         <message>
-            <location filename="../specs.py" line="86" />
+            <location filename="../specs.py" line="89" />
             <source>型号缩放</source>
             <translation>Model scale</translation>
         </message>
         <message>
-            <location filename="../specs.py" line="87" />
+            <location filename="../specs.py" line="90" />
             <source>10~200%，默认 50%</source>
             <translation>10–200%, default 50%</translation>
         </message>
         <message>
-            <location filename="../specs.py" line="88" />
+            <location filename="../specs.py" line="91" />
             <source>参数缩放</source>
             <translation>Params scale</translation>
         </message>
         <message>
-            <location filename="../specs.py" line="89" />
+            <location filename="../specs.py" line="92" />
             <source>10~200%，默认 30%</source>
             <translation>10–200%, default 30%</translation>
         </message>
         <message>
-            <location filename="../specs.py" line="151" />
+            <location filename="../specs.py" line="154" />
             <source>1~50px，默认 1</source>
             <translation>1–50 px, default 1</translation>
         </message>
         <message>
-            <location filename="../specs.py" line="162" />
+            <location filename="../specs.py" line="165" />
             <source>0~40px，默认 3</source>
             <translation>0–40 px, default 3</translation>
         </message>
         <message>
-            <location filename="../specs.py" line="165" />
+            <location filename="../specs.py" line="168" />
             <source>5~100%，默认 20</source>
             <translation>5–100%, default 20</translation>
         </message>
         <message>
-            <location filename="../specs.py" line="168" />
+            <location filename="../specs.py" line="171" />
             <source>0~30px，默认 5</source>
             <translation>0–30 px, default 5</translation>
         </message>
         <message>
-            <location filename="../widgets.py" line="199" />
+            <location filename="../widgets.py" line="228" />
             <source>点击选择颜色</source>
             <translation>Click to pick a color</translation>
         </message>
         <message>
-            <location filename="../widgets.py" line="202" />
+            <location filename="../widgets.py" line="231" />
             <source>颜色管理</source>
             <translation>Color library</translation>
         </message>
         <message>
-            <location filename="../widgets.py" line="214" />
+            <location filename="../widgets.py" line="262" />
             <source>选择字体</source>
             <translation>Choose font</translation>
         </message>
         <message>
-            <location filename="../widgets.py" line="363" />
+            <location filename="../widgets.py" line="240" />
+            <source>不限</source>
+            <translation>No limit</translation>
+        </message>
+        <message>
+            <location filename="../widgets.py" line="442" />
             <source>选择字体文件</source>
             <translation>Choose a font file</translation>
         </message>
         <message>
-            <location filename="../widgets.py" line="827" />
+            <location filename="../widgets.py" line="906" />
             <source>恢复默认值</source>
             <translation>Reset to default</translation>
         </message>
@@ -1591,27 +1596,27 @@
             <translation>Deleted slot {slot}: {name}</translation>
         </message>
         <message>
-            <location filename="../win_preset.py" line="233" />
+            <location filename="../win_preset.py" line="234" />
             <source>映射表没能写回文件：{err}</source>
             <translation>Could not write the mapping table back to the file: {err}</translation>
         </message>
         <message>
-            <location filename="../win_preset.py" line="252" />
+            <location filename="../win_preset.py" line="253" />
             <source>自动保存失败：{err}</source>
             <translation>Auto-save failed: {err}</translation>
         </message>
         <message>
-            <location filename="../win_preset.py" line="262" />
+            <location filename="../win_preset.py" line="263" />
             <source>恢复默认设置</source>
             <translation>Reset to defaults</translation>
         </message>
         <message>
-            <location filename="../win_preset.py" line="263" />
+            <location filename="../win_preset.py" line="264" />
             <source>将把当前所有参数恢复为出厂默认，现有调整会丢失。继续？</source>
             <translation>All current parameters will be restored to factory defaults and your adjustments will be lost. Continue?</translation>
         </message>
         <message>
-            <location filename="../win_preset.py" line="275" />
+            <location filename="../win_preset.py" line="276" />
             <source>已恢复默认设置</source>
             <translation>Restored to defaults</translation>
         </message>
@@ -1619,7 +1624,7 @@
     <context>
         <name>PreviewBox</name>
         <message>
-            <location filename="../widgets.py" line="543" />
+            <location filename="../widgets.py" line="622" />
             <source>请拖入图片，或点击「打开图片」</source>
             <translation>Drop an image, or click "Open image"</translation>
         </message>

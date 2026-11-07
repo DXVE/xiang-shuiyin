@@ -69,6 +69,7 @@ def default_params():
         "bold_params": False,
         "italic_params": True,
         "min_font_size": 20,
+        "max_font_size": 0,          # 字号上限, 0 = 不限
         "enable_image_stroke": False,
         "image_stroke_color": "#ffffff",
         "image_stroke_width": 5,

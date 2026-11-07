@@ -1,7 +1,7 @@
 """通用控件: 参数行、卡片、预览框、色块与胶囊开关等。"""
 from PIL import Image
-from PySide6.QtCore import (QCoreApplication, QPointF, QRectF, QSize, QT_TRANSLATE_NOOP, QTimer,
-                              QUrl, Qt, Signal)
+from PySide6.QtCore import (QCoreApplication, QEvent, QPointF, QRectF, QSize, QT_TRANSLATE_NOOP,
+                              QTimer, QUrl, Qt, Signal)
 from PySide6.QtGui import (QColor, QDesktopServices, QIcon, QImage, QPainter, QPainterPath, QPen,
                            QPixmap)
 from PySide6.QtWidgets import (QAbstractSpinBox, QCheckBox, QComboBox, QDoubleSpinBox, QFrame,
@@ -15,6 +15,7 @@ from .winconst import _PV_FADE_MS
 import logging
 import math
 import os
+import re
 import time
 
 
@@ -132,6 +133,55 @@ class NoWheelComboBox(QComboBox):
         e.ignore()
 
 
+class _FontSizeCombo(NoWheelComboBox):
+    # 字号取值下拉: 「不限」(存 0) 加 1 / 10 / 20 … 的台阶; 可编辑, 任意整数直接输
+    # 不加 QValidator: 输入法提交会绕过它, 挡不干净反而时灵时不灵; 取值统一在提交时解析归一
+    committed = Signal()          # 回车或失焦: 交给参数行解析、夹取与归一化
+
+    def __init__(self, un_text, lim, parent=None):
+        super().__init__(parent)
+        self._lim = int(lim)
+        self._un = un_text
+        self.setEditable(True)
+        self.setInsertPolicy(QComboBox.InsertPolicy.NoInsert)
+        # 聚焦时全选: 「不限」「35px」这类展示文本直接续写会拼成脏值
+        self.lineEdit().installEventFilter(self)
+        self.lineEdit().returnPressed.connect(self.committed)
+        self.addItem(un_text, 0)
+        for v in (1, *range(10, self._lim + 1, 10)):
+            self.addItem(f"{v}px", v)
+        self.setFixedWidth(96)
+
+    def eventFilter(self, obj, ev):       # noqa: N802 - Qt 命名
+        if obj is self.lineEdit():
+            if ev.type() == QEvent.Type.FocusIn:
+                # 聚焦后补一次全选: 鼠标按下还会把光标定位到点击处, 所以延到该轮事件之后再选
+                QTimer.singleShot(0, obj.selectAll)
+            elif ev.type() == QEvent.Type.FocusOut:
+                # 失焦必提交: 程序写入或输入法上屏的文本不会置编辑标记, editingFinished 可能不触发
+                QTimer.singleShot(0, self.committed.emit)
+        return super().eventFilter(obj, ev)
+
+    def num(self):
+        # 文本 -> 取值: 只认开头的整数, 小数截断(2.656 -> 2); 其余(字母/符号/空)按 0=不限 处理
+        t = self.currentText().strip()
+        if t == self._un:
+            return 0
+        m = re.match(r"-?\d+", t)
+        return max(0, min(self._lim, int(m.group()))) if m else 0
+
+    def set_num(self, v):
+        # 回填: 0 落到「不限」; 台阶内选对应项, 台阶外的值(手输过)直接显示成本值
+        v = max(0, min(self._lim, int(v or 0)))
+        i = self.findData(v)
+        self.blockSignals(True)
+        if i >= 0:
+            self.setCurrentIndex(i)
+        else:
+            self.setEditText(f"{v}px")
+        self.blockSignals(False)
+
+
 class ParamRow(QWidget):
     # 一行参数控件。按 kind 组装, 对外统一的 changed(key, value) / set_value() / value()。
 
@@ -148,6 +198,8 @@ class ParamRow(QWidget):
         self._spec = spec
         self._value = value
         self._updating = False
+        self.key2 = None                 # 一行两键时(字号范围)的第二个键
+        self._range_val = [0, 0]
 
         lay = QHBoxLayout(self)
         lay.setContentsMargins(0, 2, 0, 2)
@@ -204,6 +256,25 @@ class ParamRow(QWidget):
                 self.color_btn.setCursor(Qt.PointingHandCursor)
                 self.color_btn.clicked.connect(self.colorClicked.emit)
                 lay.addWidget(self.color_btn)
+
+            elif self.kind == "range":
+                # 一行两键: 左侧下拉写主键(下限), 右侧写 key2(上限); 两端「不限」都存 0
+                self.key2 = spec["key2"]
+                un, lim = self.tr("不限"), spec["args"][1]
+                self.cmb_lo = _FontSizeCombo(un, lim)
+                self.cmb_hi = _FontSizeCombo(un, lim)
+                for c, which in ((self.cmb_lo, "lo"), (self.cmb_hi, "hi")):
+                    c.setAccessibleName(self.tr(spec["label"]))
+                    c.activated.connect(lambda _i, w=which: self._from_combo(w))
+                    c.committed.connect(lambda w=which: self._from_combo(w))
+                    lay.addWidget(c)
+                    if which == "lo":
+                        dash = QLabel("–")
+                        dash.setObjectName("fieldLabel")
+                        lay.addWidget(dash)
+                lay.addStretch(1)
+                pair = value if isinstance(value, (tuple, list)) else (value, 0)
+                self._set_pair(*pair)
 
             elif self.kind == "path":
                 self.edit = QLineEdit()
@@ -292,6 +363,11 @@ class ParamRow(QWidget):
         elif self.kind == "path":
             self.edit.setText(str(v or ""))
             self.edit.setToolTip(str(v or ""))
+        elif self.kind == "range":
+            if isinstance(v, (tuple, list)):
+                self._set_pair(v[0], v[1])
+            else:
+                self._set_pair(v, self._range_val[1])
         else:
             lo, hi = self._spec["args"]
             v = max(lo, min(hi, float(v)))
@@ -301,7 +377,33 @@ class ParamRow(QWidget):
         self._updating = False
 
     def value(self):
-        return self._value
+        return self._range_val[0] if self.kind == "range" else self._value
+
+    def _from_combo(self, which):
+        # 下拉选中与手输共用: 归一化显示、夹住两端关系, 只发被改的那个键(撤销按单键记一步)
+        lo, hi = self._range_val
+        v = (self.cmb_lo if which == "lo" else self.cmb_hi).num()
+        if which == "lo":
+            lo = min(v, hi) if hi > 0 else v
+        else:
+            hi = max(v, lo) if v > 0 else 0
+        changed = [lo, hi] != self._range_val
+        self._set_pair(lo, hi)
+        if changed:
+            self.changed.emit(self.key if which == "lo" else self.key2, lo if which == "lo" else hi)
+
+    def _set_pair(self, lo, hi):
+        # 回填两个下拉: 0 显示「不限」; 两者都取数值时保证下限不大于上限
+        lo, hi = max(0, int(lo or 0)), max(0, int(hi or 0))
+        if hi > 0 and lo > hi:
+            lo = hi
+        self._range_val = [lo, hi]
+        self.cmb_lo.set_num(lo)
+        self.cmb_hi.set_num(hi)
+
+    def set_pair(self, lo, hi):
+        # 双键行专用: 主窗回填/重置/撤销恢复时成对刷新(通用回填只认单键)
+        self._set_pair(lo, hi)
 
     # pct 类内部是 0~1 的小数, 差一个 ×100(小数档再 ×10, 见 _PCT_SCALE); int 类两者相同。
     def _disp_to_value(self, disp):

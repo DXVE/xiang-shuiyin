@@ -26,6 +26,8 @@ def migrate_preset(p):
         except (TypeError, ValueError):
             num = 0.0
         out["canvas_ratio_mode"] = "original" if num <= 0 else _RATIO_MODES.get(num, "original")
+    # 字号上限是后加的键: 旧预设没有它, 补 0(不限), 免得沿用上一次方案的残余上限
+    out.setdefault("max_font_size", 0)
     return out
 
 
@@ -51,8 +53,9 @@ PARAM_SPECS = [
     dict(tab=None, dialog="fonts", card=QT_TRANSLATE_NOOP("Card", "字体文件"), key="font_bold_italic_path", label=QT_TRANSLATE_NOOP("ParamRow", "粗斜体字体"), kind="path"),
 
 
-    dict(tab="font", card=QT_TRANSLATE_NOOP("Card", "最小字号设置"), key="min_font_size", label=QT_TRANSLATE_NOOP("ParamRow", "最小字号"), kind="int",
-         args=(0, 200), hint=QT_TRANSLATE_NOOP("ParamRow", "0~200px，默认 20")),
+    dict(tab="font", card=QT_TRANSLATE_NOOP("Card", "字号范围"), key="min_font_size", key2="max_font_size",
+         label=QT_TRANSLATE_NOOP("ParamRow", "字号范围"), kind="range", args=(0, 200),
+         hint=QT_TRANSLATE_NOOP("ParamRow", "左侧最小字号、右侧最大字号；选「不限」表示不设限")),
 
     dict(tab="font", card=QT_TRANSLATE_NOOP("Card", "画布比例"), key="canvas_ratio_mode", label=QT_TRANSLATE_NOOP("ParamRow", "画布比例"), kind="choice",
          args=[("original", QT_TRANSLATE_NOOP("ParamRow", "跟随原图")), ("1:1", "1:1"), ("3:2", QT_TRANSLATE_NOOP("ParamRow", "3:2（横）")), ("2:3", QT_TRANSLATE_NOOP("ParamRow", "2:3（竖）")),

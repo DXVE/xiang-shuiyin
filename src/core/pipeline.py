@@ -84,7 +84,7 @@ def process_single(input_path, output_path, logo_dir,
                    canvas_ratio, image_margin, model_map,
                    corner_circle=False,
                    show_brand=True, show_model=True, show_params=True,
-                   min_font_size=20,
+                   min_font_size=20, max_font_size=0,   # 字号下限 / 上限(0 = 不限)
                    low_res_enhance=True,   # 内部参数: 低清增强(2 倍超采样)
                    enable_image_stroke=False,
                    image_stroke_color="#ffffff",
@@ -136,7 +136,7 @@ def process_single(input_path, output_path, logo_dir,
                else f"画布{canvas_w}x{canvas_h} {layout_mode} 比例原图") + (
                f" bg={bg_mode}/r{blur_radius}/d{bg_darken_strength} 圆角{corner_radius}{'圆' if corner_circle else ''}"
                f" 边距{image_margin} 间距{gap_image_top}/{gap_image_bottom}/{gap_top}/{gap_bottom}/{line_gap}"
-               f" 字{min_font_size_in} 缩{scale_logo}/{scale_model}/{scale_params}"
+               f" 字{min_font_size_in}-{max_font_size_in or '不限'} 缩{scale_logo}/{scale_model}/{scale_params}"
                f" 描边{int(enable_image_stroke)} 影{int(enable_image_shadow)}o{image_shadow_offset}"
                f"b{image_shadow_blur}a{image_shadow_alpha} 字描{int(enable_text_stroke)} 字影{int(enable_text_shadow)}")
         total_ms = (time.monotonic() - _t0) * 1000
@@ -150,6 +150,7 @@ def process_single(input_path, output_path, logo_dir,
 
     # 低清增强会放大该值, 参数指纹记录的是用户输入的原值
     min_font_size_in = min_font_size
+    max_font_size_in = max_font_size
     # 显式关闭原图句柄, 避免批量处理时句柄与内存堆积(convert()/resize() 生成新对象, 不受 close() 影响)
     # src_key: 本次输入图的内容标识, 分层缓存键均以它开头
     # 预览档下 input_path 为 psrc 缩略图(文件名含原图路径哈希 + mtime + size), 可直接作为原图标识
@@ -173,6 +174,8 @@ def process_single(input_path, output_path, logo_dir,
         if low_res_enhance and img_h < LOW_RES_THRESHOLD:
             render_scale = 2
             min_font_size = int(min_font_size * render_scale)
+            if max_font_size > 0:
+                max_font_size = int(max_font_size * render_scale)
             img_w *= render_scale
             img_h *= render_scale
             original_large = original.resize((img_w, img_h), Image.Resampling.LANCZOS)
@@ -197,9 +200,16 @@ def process_single(input_path, output_path, logo_dir,
     temp_base = img_h * 0.2
     base_model_size = int(temp_base / 5.5)
     base_param_size = int(temp_base / 5.5)
-    font_size_brand = max(min_font_size, int(base_param_size * scale_logo))
-    font_size_model = max(min_font_size, int(base_model_size * scale_model))
-    font_size_params = max(min_font_size, int(base_param_size * scale_params))
+    # 字号夹进 [下限, 上限]: 上限 0 表示不限; 上限低于下限时按两者重合处理
+    hi_font = max(max_font_size, min_font_size) if max_font_size > 0 else 0
+
+    def _fit_font(size):
+        size = max(min_font_size, size)
+        return min(hi_font, size) if hi_font > 0 else size
+
+    font_size_brand = _fit_font(int(base_param_size * scale_logo))
+    font_size_model = _fit_font(int(base_model_size * scale_model))
+    font_size_params = _fit_font(int(base_param_size * scale_params))
 
     font_brand = _load_font(font_size_brand, bold_logo, italic_logo,
                             font_path, font_bold_path, font_italic_path, font_bold_italic_path)

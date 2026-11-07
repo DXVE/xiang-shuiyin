@@ -606,11 +606,14 @@ class AppState:
             src, src_h = self._preview_src_for(input_path, src_image, max_side)
             input_path = src
             # 预览相对成品的渲染宽度比: 所有绝对像素参数按此等比缩放, 使预览观感与成品一致
-            # (圆角/模糊半径/字号下限/描边宽都是像素绝对值, 不缩放则预览小图上显得更大更粗)。
+            # (圆角/模糊半径/字号上下限/描边宽都是像素绝对值, 不缩放则预览小图上显得更大更粗)。
             # scale2 = 成品那一侧的 2x 系数(成品恒为开), 按 EXIF 转正后的高度判定(见 _oriented_height)。
             scale2 = 2 if src_h < LOW_RES_THRESHOLD else 1
             ratio = preview_scale / scale2
             params["min_font_size"] = max(8, int(params.get("min_font_size", 20) * ratio))
+            # 上限 0 表示不限; 跟着缩放会把 0 变成具体值, 这里单独判
+            mv = int(params.get("max_font_size", 0) or 0)
+            params["max_font_size"] = max(1, int(mv * ratio)) if mv > 0 else 0
             params["corner_radius"] = max(0, int(params.get("corner_radius", 0) * ratio))
             params["image_stroke_width"] = max(0, int(params.get("image_stroke_width", 5) * ratio))
             params["text_stroke_width"] = max(0, int(params.get("text_stroke_width", 1) * ratio))

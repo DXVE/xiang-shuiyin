@@ -147,9 +147,12 @@ class UndoVisibilityMixin:
                 row.set_value(self._params.get(m[0]))
 
     def _reset_param_row(self, row):
-        # 参数行行尾的 ↺: 镜像行没有自己的参数, 回的是它代理的那一对底层键
+        # 参数行行尾的 ↺: 镜像行回它代理的那一对底层键, 双键行(字号范围)两个键一起回
         spec = self._spec_by_key.get(row.key) or {}
-        self._reset_params(row.spec_label() or row.key, tuple(spec.get("mirror") or (row.key,)))
+        keys = tuple(spec.get("mirror") or ())
+        if not keys:
+            keys = (row.key, spec["key2"]) if spec.get("key2") else (row.key,)
+        self._reset_params(row.spec_label() or row.key, keys)
 
     def _reset_params(self, label, keys):
         # 把一组参数恢复为出厂默认值(参数行的 ↺ 给单个键, 水印开关一行的 ↺ 给该行三个键), 整批算撤销一步
@@ -167,6 +170,7 @@ class UndoVisibilityMixin:
                     self._rows[key].set_value(defaults[key])
                 changed.add(key)
             self._sync_mirror_rows(changed)
+            self._sync_range_rows()
             self._sync_visibility()
             self._touch()
 

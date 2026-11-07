@@ -249,9 +249,12 @@ class BuildMixin:
             for s in specs:
                 if s["card"] != name:
                     continue
-                init = self._params.get(s["key"])
-                if init is None and s.get("mirror"):
-                    init = self._params.get(s["mirror"][0])
+                if s.get("key2"):
+                    init = (self._params.get(s["key"]), self._params.get(s["key2"]))
+                else:
+                    init = self._params.get(s["key"])
+                    if init is None and s.get("mirror"):
+                        init = self._params.get(s["mirror"][0])
                 row = ParamRow(s, init)
                 row.changed.connect(self._on_param)
                 if s["kind"] == "color":
@@ -321,6 +324,13 @@ class BuildMixin:
             # 色块行的「颜色管理」入口占的正是数值行步进器组那一段: 与它同宽, 色块右缘才与滑块列右缘对齐
             if getattr(r, "kind", "") == "color" and hasattr(r, "color_btn"):
                 r.color_btn.setFixedWidth(grp)
+
+    def _sync_range_rows(self):
+        # 双键行(字号范围)的成对回填: 通用回填只认单键, 重置/撤销/加载预设后在这里补一次
+        for s in PARAM_SPECS:
+            row = self._rows.get(s.get("key"))
+            if s.get("key2") and row is not None:
+                row.set_value((self._params.get(s["key"]), self._params.get(s["key2"])))
 
     def _build_segbar(self):
         # 页签实现为分段控件: 外层一张卡片, 内含三个胶囊

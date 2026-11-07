@@ -30,7 +30,7 @@ GRID = {k for _name, keys in FONT_STYLE_GROUPS for k in keys}
 # 特殊卡的头行(不是参数行)
 HEAD_ROWS = {"水印开关", "描边与投影"}
 
-KINDS = {"choice", "pct", "int", "bool", "color", "path"}
+KINDS = {"choice", "pct", "int", "bool", "color", "path", "range"}
 fails = []
 
 
@@ -50,7 +50,7 @@ def ok(title, note=""):
 kernel = list(inspect.signature(process_single).parameters)
 defaults = default_params()
 rows = [s for s in PARAM_SPECS]
-keys = [s.get("key") for s in rows if s.get("key")]
+keys = [s.get("key") for s in rows if s.get("key")] + [s.get("key2") for s in rows if s.get("key2")]
 table = set(keys)
 
 # 1. 行结构: 每行有 card; 无 key 的行只能是特殊卡的头行
@@ -77,7 +77,7 @@ for s in rows:
         if not isinstance(args, (list, tuple)) or not args or any(
                 not isinstance(a, (list, tuple)) or len(a) != 2 for a in args):
             bad_args.append(f"{k}: choice 需要 [(值, 标签), …]")
-    elif kind in ("pct", "int"):
+    elif kind in ("pct", "int", "range"):
         if not isinstance(args, (list, tuple)) or len(args) != 2 or args[0] > args[1]:
             bad_args.append(f"{k}: {kind} 需要 (下限, 上限)")
 fail("args 与 kind 匹配", bad_args) if bad_args else ok("args 与 kind 匹配")
@@ -123,16 +123,17 @@ fail("显隐条件指向的键存在", bad_ref) if bad_ref else ok("显隐条件
 # 8. 默认值类型与 kind 相容(避免控件按错的类型读写)
 bad_type = []
 for s in rows:
-    k, kind = s.get("key"), s.get("kind")
-    if not k or k not in defaults or k in MIRROR_ONLY:
-        continue
-    v = defaults[k]
-    fine = ((kind == "bool" and isinstance(v, bool))
-            or (kind == "int" and isinstance(v, int) and not isinstance(v, bool))
-            or (kind == "pct" and isinstance(v, (int, float)) and not isinstance(v, bool))
-            or (kind in ("color", "path", "choice") and isinstance(v, str)))
-    if not fine:
-        bad_type.append(f"{k}: kind={kind} 但默认值是 {type(v).__name__}")
+    kind = s.get("kind")
+    for k in (s.get("key"), s.get("key2")):
+        if not k or k not in defaults or k in MIRROR_ONLY:
+            continue
+        v = defaults[k]
+        fine = ((kind == "bool" and isinstance(v, bool))
+                or (kind in ("int", "range") and isinstance(v, int) and not isinstance(v, bool))
+                or (kind == "pct" and isinstance(v, (int, float)) and not isinstance(v, bool))
+                or (kind in ("color", "path", "choice") and isinstance(v, str)))
+        if not fine:
+            bad_type.append(f"{k}: kind={kind} 但默认值是 {type(v).__name__}")
 fail("默认值类型与控件类型相容", bad_type) if bad_type else ok("默认值类型与控件类型相容")
 
 # 9. backend_params() 的输出必须干净: 只有内核形参, 不含界面专有键
