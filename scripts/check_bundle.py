@@ -47,7 +47,7 @@ def main():
            and (dist / "THIRD_PARTY_LICENSES.md").is_file()
            and lic_dir.is_dir() and any(lic_dir.iterdir()))
 
-    # 版本: 源码是唯一真源, 打包生成的 version.iss 必须与它一致; 发布时还要与 tag 一致
+    # 版本: 源码是唯一来源, 打包生成的 version.iss 必须与它一致; 发布时还要与 tag 一致
     m = re.search(r'__version__\s*=\s*"([^"]+)"', (ROOT / "src" / "core" / "__init__.py").read_text(encoding="utf-8"))
     ver = m.group(1) if m else None
     report("能从源码读到版本号", bool(ver), ver or "")

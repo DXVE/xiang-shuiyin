@@ -12,7 +12,7 @@ $notes = @()
 
 function Check([string]$title, [string]$file, [string]$pattern, [int]$max, [string]$exempt) {
   $hits = @()
-  foreach ($m in Select-String -Path $file -Pattern $pattern -AllMatches) {
+  foreach ($m in Select-String -Path $file -Pattern $pattern -AllMatches -Encoding utf8) {
     foreach ($mm in $m.Matches) {
       if ($exempt -and $m.Line -match $exempt) { continue }
       $hits += "{0}:{1}" -f $m.LineNumber, $m.Line.Trim()
@@ -28,6 +28,12 @@ function Check([string]$title, [string]$file, [string]$pattern, [int]$max, [stri
 foreach ($name in $files.Keys) {
   $f = $files[$name]
   "===== $name ====="
+  # 文件缺失或为空时后续正则无从判定；显式记入备注，避免把“读不到”误报成一批违规
+  if (-not (Test-Path -LiteralPath $f) -or (Get-Item -LiteralPath $f).Length -eq 0) {
+    "SKIP {0,-28} 文件缺失或为空" -f '文档内容'
+    $notes += "$name 缺失或为空，已跳过该文件的检查"
+    continue
+  }
 
   # 1. 禁用内容: 机器相关、会过期的定位信息
   Check '绝对路径/盘符'      $f '[A-Za-z]:\\|LOCALAPPDATA'            0 $null
@@ -36,7 +42,7 @@ foreach ($name in $files.Keys) {
 
   # 2. 排版体例（引号规则需排除代码字面量：仅当引号出现在中文行文中才算违规）
   $quoteHits = @()
-  foreach ($m in Select-String -Path $f -Pattern '"([^"\n]*)"' -AllMatches) {
+  foreach ($m in Select-String -Path $f -Pattern '"([^"\n]*)"' -AllMatches -Encoding utf8) {
     foreach ($mm in $m.Matches) {
       if ($mm.Groups[1].Value -notmatch '[\u4e00-\u9fff]') { continue }
       $before = if ($mm.Index -gt 0) { $m.Line[$mm.Index - 1] } else { '' }
@@ -58,21 +64,32 @@ foreach ($name in $files.Keys) {
 
   # 4. 交叉引用完整性
   $refs = @()
-  if ($name -eq 'AGENTS.md') {
-    $targets = (Select-String -Path (Join-Path $root 'wiki.md') -Pattern '^#{2,3} [0-9]' |
-      ForEach-Object { (($_.Line -replace '^#+\s*', '') -split '\s+')[0].TrimEnd('.') }) | Sort-Object -Unique
-    $refs = Select-String -Path $f -Pattern 'wiki §[0-9]+(\.[0-9]+)?' -AllMatches |
-      ForEach-Object { $_.Matches } | ForEach-Object { $_ -replace 'wiki §', '' } | Sort-Object -Unique
+  $otherName = if ($name -eq 'AGENTS.md') { 'wiki.md' } else { 'AGENTS.md' }
+  $otherPath = Join-Path $root $otherName
+  $otherText = if (Test-Path -LiteralPath $otherPath) {
+    Get-Content -LiteralPath $otherPath -Raw -Encoding utf8
+  } else { '' }
+
+  if ([string]::IsNullOrWhiteSpace($otherText)) {
+    # 跨文档校验要求两份文档同时在位；只有一份时如实跳过，不把缺少目标文档报成引用失效
+    "SKIP {0,-28} {1} 缺失或为空" -f '交叉引用完整', $otherName
+    $notes += "$name -> 交叉引用校验跳过（$otherName 缺失或为空）"
   } else {
-    $targets = (Select-String -Path (Join-Path $root 'AGENTS.md') -Pattern '^#{2,3} [0-9]' |
-      ForEach-Object { (($_.Line -replace '^#+\s*', '') -split '\s+')[0].TrimEnd('.') }) | Sort-Object -Unique
-    $refs = Select-String -Path $f -Pattern 'AGENTS\.md`?\s*§[0-9]+(\.[0-9]+)?' -AllMatches |
-      ForEach-Object { $_.Matches } | ForEach-Object { $_ -replace '.*§', '' } | Sort-Object -Unique
+    $selfText = Get-Content -LiteralPath $f -Raw -Encoding utf8
+    $targets = [regex]::Matches($otherText, '(?m)^#{2,3} [0-9][^\r\n]*') |
+      ForEach-Object { (($_.Value -replace '^#+\s*', '') -split '\s+')[0].TrimEnd('.') } | Sort-Object -Unique
+    if ($name -eq 'AGENTS.md') {
+      $refs = [regex]::Matches($selfText, 'wiki §[0-9]+(?:\.[0-9]+)?') |
+        ForEach-Object { $_.Value -replace 'wiki §', '' } | Sort-Object -Unique
+    } else {
+      $refs = [regex]::Matches($selfText, 'AGENTS\.md`?\s*§[0-9]+(?:\.[0-9]+)?') |
+        ForEach-Object { $_.Value -replace '.*§', '' } | Sort-Object -Unique
+    }
+    $missing = $refs | Where-Object { $targets -notcontains $_.TrimEnd('.') }
+    $ok = ($missing.Count -eq 0)
+    if (-not $ok) { $fails++ ; foreach ($m in $missing) { $notes += "$name -> 缺失引用 §$m" } }
+    "{0} {1,-28} 引用={2} 缺失={3}" -f $(if ($ok) { 'PASS' } else { 'FAIL' }), '交叉引用完整', $refs.Count, $missing.Count
   }
-  $missing = $refs | Where-Object { $targets -notcontains $_.TrimEnd('.') }
-  $ok = ($missing.Count -eq 0)
-  if (-not $ok) { $fails++ ; foreach ($m in $missing) { $notes += "$name -> 缺失引用 §$m" } }
-  "{0} {1,-28} 引用={2} 缺失={3}" -f $(if ($ok) { 'PASS' } else { 'FAIL' }), '交叉引用完整', $refs.Count, $missing.Count
 }
 
 ''

@@ -79,9 +79,9 @@
 - 也可以选择自行构建（构建机需装 Inno Setup，它只作构建工具、不随产物分发）：
 
 ```bat
-.venv\Scripts\pip install -e ".[build]"
+uv sync
 :: 1) 目录形态载荷（同时生成版本头文件）
-set XSY_ONEDIR=1 && .venv\Scripts\python.exe -m PyInstaller packaging\xiangshuiyin-qt.spec
+set XSY_ONEDIR=1 && uv run pyinstaller packaging\xiangshuiyin-qt.spec
 :: 2) 编译安装器
 ISCC.exe packaging\xiangshuiyin-qt.iss
 ```
@@ -99,22 +99,21 @@ ISCC.exe packaging\xiangshuiyin-qt.iss
 #### 环境要求
 
 - Python 3.10+
+- [uv](https://docs.astral.sh/uv/)：按 `.python-version` 准备解释器，依赖锁定在 `uv.lock`
 - 运行平台：**Windows** 为当前主要验证平台，打包配置也面向 Windows；界面与内核基于跨平台 Qt 与 Pillow，macOS / Linux 上可运行，但未做打包与完整验证。各平台的功能点差异、成因与影响见 [`docs/跨平台功能点差异.md`](docs/跨平台功能点差异.md)。
 
 #### 安装依赖
 
 ```bash
-python -m venv .venv
-.venv\Scripts\pip install -e .
-
-# 或者只装运行依赖：
-# .venv\Scripts\pip install "PySide6-Essentials>=6.11" "Pillow>=10.0" "exifread>=3.0"
+uv sync
 ```
+
+> `uv sync` 按 `pyproject.toml` 与 `uv.lock` 创建仓库内 `.venv` 并装好运行依赖；PyInstaller 在 dev 组，默认一并安装，用于本地打包。
 
 #### 运行
 
 ```bat
-.venv\Scripts\python.exe main.py
+uv run python main.py
 ```
 
 > 启动后即打开应用窗口。**首次运行会在用户数据目录里创建配置目录与内置字体的持久副本。**

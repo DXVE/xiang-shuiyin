@@ -18,6 +18,8 @@
 .gitignore     text eol=lf
 LICENSE        text eol=lf
 .gitattributes text eol=lf
+.python-version text eol=lf
+uv.lock        text eol=lf
 
 # 二进制素材(git 的自动探测本来就认得, 这里显式声明防呆):
 # 不做行尾转换、也不参与 diff

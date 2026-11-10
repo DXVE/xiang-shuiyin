@@ -22,22 +22,21 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - name: 设置 Python
-        uses: actions/setup-python@v7
+      - name: 安装 uv
+        uses: astral-sh/setup-uv@v10.3.0
         with:
-          # 需满足 pyproject 的 requires-python>=3.10
-          python-version: '3.14'
+          # 与本地开发一致的 uv 版本, 避免 lock 解析差异
+          version: "0.13.1"
+          enable-cache: true
+
+      - name: 同步依赖
+        # 解释器与依赖由 uv 按 pyproject.toml 与 uv.lock 安装, dev 组含 PyInstaller
+        run: uv sync --locked
 
       - name: 版本核对（tag 与源码版本一致）
-        # 版本号唯一真源是 src/core/__init__.py; tag 只是发布用的标签, 与它不一致时在编译前直接失败
+        # 版本号唯一来源是 src/core/__init__.py; tag 只是发布用的标签, 与它不一致时在编译前直接失败
         shell: pwsh
-        run: python scripts/check_version.py --tag $env:BUILD_TAG
-
-      - name: 安装构建依赖
-        # 用 -e 与仓库文档中的本地流程保持一致
-        run: |
-          python -m pip install --upgrade pip
-          pip install -e ".[build]"
+        run: uv run python scripts/check_version.py --tag $env:BUILD_TAG
 
       - name: 安装 Inno Setup
         # 用官方发行包而非包管理器: 安装路径可控, 版本固定(升级即替换下面的版本号)
@@ -59,30 +58,28 @@ jobs:
         run: pwsh -File scripts/check_docs_style.ps1
 
       - name: 发布门禁 - 代码检查
-        run: python scripts/check_code_style.py
+        run: uv run python scripts/check_code_style.py
 
       - name: 发布门禁 - 静态分析
-        run: |
-          python -m pip install --quiet ruff
-          python -m ruff check --select F821 src main.py
+        run: uv run --with ruff python -m ruff check --select F821 src main.py
 
       - name: 发布门禁 - 翻译完整性
-        run: python scripts/check_i18n.py
+        run: uv run python scripts/check_i18n.py
 
       - name: 发布门禁 - 参数契约
-        run: python scripts/check_params.py
+        run: uv run python scripts/check_params.py
 
       - name: 发布门禁 - 导入冒烟
-        run: python -c "import sys; sys.path.insert(0, 'src'); import ui.window, cli.render, main"
+        run: uv run python -c "import sys; sys.path.insert(0, 'src'); import ui.window, cli.render, main"
 
       - name: 发布门禁 - 渲染冒烟
-        run: python scripts/check_cli.py
+        run: uv run python scripts/check_cli.py
 
       - name: PyInstaller 打包（目录形态）
-        run: python -m PyInstaller --noconfirm packaging\xiangshuiyin-qt.spec
+        run: uv run pyinstaller --noconfirm packaging\xiangshuiyin-qt.spec
 
       - name: 产物自检（资源 / 翻译 / 许可 / 版本号）
-        run: python scripts/check_bundle.py --dist dist/xiangshuiyin-qt --expect-version ${{ github.ref_name }}
+        run: uv run python scripts/check_bundle.py --dist dist/xiangshuiyin-qt --expect-version ${{ github.ref_name }}
 
       - name: 编译安装器
         shell: pwsh

@@ -4,7 +4,8 @@ build-backend = "hatchling.build"
 
 [project]
 name = "xiang-shuiyin-qt"
-dynamic = ["version"]
+# 版本以源码 __version__ 与 git tag 为准，本字段仅满足 PEP 621 必填要求
+version = "0.0.0"
 description = "「镶 · 水印」 水印处理工具（Qt6 桌面版）"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -15,8 +16,9 @@ dependencies = [
     "PySide6-Essentials>=6.11",
 ]
 
-[project.optional-dependencies]
-build = [
+[dependency-groups]
+# 仅构建期使用，uv sync 默认安装
+dev = [
     "pyinstaller>=6.0",
 ]
 
@@ -25,10 +27,6 @@ packages = ["src/core", "src/ui", "src/cli"]
 
 [tool.hatch.build.targets.wheel.force-include]
 "src/assets" = "assets"
-
-[tool.hatch.version]
-path = "src/core/__init__.py"
-pattern = '__version__\s*=\s*"(?P<version>[^"]+)"'
 
 [tool.ruff]
 line-length = 100

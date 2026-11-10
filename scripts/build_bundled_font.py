@@ -4,13 +4,13 @@
 **这个脚本入库**(与其它发布门禁同放 scripts/), 它承担内置字体的重建; README 里记了等价的
 命令行步骤, 换 Sarasa 版本时照着重跑即可。产物提交进仓库(`src/assets/fonts/`)。
 
-依赖(开发期, 不进运行时): `pip install fonttools`
+依赖(开发期, 不进运行时): `fonttools`, 用 `uv run --with fonttools python ...` 临时安装
 
 **默认是"演练"(dry-run)**: 产物写进临时目录并自检, **不碰仓库里的字体**(字体不入 git, 覆盖了
 没有回退); 看过报告没问题再加 `--write` 才真写进 `src/assets/fonts/`:
 
-    .venv\\Scripts\\python.exe scripts/build_bundled_font.py <Sarasa-TTF 解包目录>            :: 演练
-    .venv\\Scripts\\python.exe scripts/build_bundled_font.py <Sarasa-TTF 解包目录> --write    :: 真写
+    uv run --with fonttools python scripts/build_bundled_font.py <Sarasa-TTF 解包目录>            :: 演练
+    uv run --with fonttools python scripts/build_bundled_font.py <Sarasa-TTF 解包目录> --write    :: 真写
 
 为什么要子集化: 单个 SC 面原文件 22.8~23.7 MB, 四档 93 MB —— 对"随程序分发"太重。
 裁到「简体(GB2312 一二级 6763) + 繁体常用(Big5 一级 5401) + 拉丁/希腊/西里尔 + 常用符号 +

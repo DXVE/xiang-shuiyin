@@ -1,4 +1,4 @@
-"""版本号核对: 源码 __version__ 是唯一真源, 发布 tag 必须与它一致。
+"""版本号核对: 源码 __version__ 是唯一来源, 发布 tag 必须与它一致。
 
 用法:
     python scripts/check_version.py              # 只校验源码版本号格式

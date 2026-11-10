@@ -42,7 +42,7 @@
 - `manual_exif` 的键固定为 `make` / `model` / `exposure` / `fnumber` / `iso`（字符串），由 `_format_manual_exif()` 归一；`None` = 不启用；**有意不持久化**。
 - `low_res_enhance` 是**常驻入参**、成品恒为开：界面没有控件，`backend_params()` 也不产出该键，成品只走 `process_single()` 的形参默认值 `True`；只有预览显式传 `False`（见 §1.4）。改动这里要同时确认预览与成品两条取值路径都仍成立。
 - 单张与批量两条生成路径**都必须**透传 `manual_exif`（历史上批量漏传，表现为“预览按自定义信息渲染、成品却不是”）。
-- `compare_layouts` 是**界面专有键**（对比模式），只改出图数量、不改渲染：它**不进** `backend_params()`（预览不认它，进了就是 `TypeError`），由 `start_generate` 单独透传给 `RenderWorker`；三种布局的成品后缀只在 `RenderWorker.COMPARE_SUFFIX` 一处定义。该键进设置文件、**不进预设**（与 `mode` 同类），并在 `scripts/check_params.py` 的 `UI_ONLY` 里登记。
+- `compare_layouts` 是**界面专有键**（对比模式），只改出图数量、不改渲染：它**不进** `backend_params()`（预览不认它，进入会触发 `TypeError`），由 `start_generate` 单独透传给 `RenderWorker`；三种布局的成品后缀只在 `RenderWorker.COMPARE_SUFFIX` 一处定义。该键进设置文件、**不进预设**（与 `mode` 同类），并在 `scripts/check_params.py` 的 `UI_ONLY` 里登记。
 
 ### 1.3 间距与布局
 
@@ -271,12 +271,12 @@
 ### 3.3 字体路径与持久副本
 
 - 启动**必须**把内置字体复制到数据目录的持久目录（按文件大小判断是否更新），并只在字体路径确实缺失时才写回设置文件。
-- 预设加载遇到失效字体路径**只在内存里回退**：**不得**回写用户的预设文件（那等于程序悄悄改用户文件，会导致分发出去的预设被改写）。
+- 预设加载遇到失效字体路径**只在内存里回退**：**不得**回写用户的预设文件（那等同于程序在用户不知情时改写其文件，会导致分发出去的预设被改写）。
 - 字体解析顺序固定为“持久副本 → 打包资源 → 系统字体目录”（原理见 wiki §7.5）。
 
 ### 3.4 退出序列
 
-关窗时按固定顺序收尾：停止悬停心跳 → 将在途保存写入磁盘 → 写会话汇总日志 → 停预览线程并等待 → 停事件线程并等待 → 清空预览目录。**不得**将这些收尾动作交由析构或垃圾回收触发；**不得**扩大清空范围（只清 `PREVIEW_DIR`）。会话汇总**按行写**（每行都带 `[统计]` 前缀）：它是一份多行报告，**不得**再改回“一行塞满所有指标”的形式（那一行已经长到没人愿意读）。
+关窗时按固定顺序收尾：停止悬停心跳 → 将在途保存写入磁盘 → 写会话汇总日志 → 停预览线程并等待 → 停事件线程并等待 → 清空预览目录。**不得**将这些收尾动作交由析构或垃圾回收触发；**不得**扩大清空范围（只清 `PREVIEW_DIR`）。会话汇总**按行写**（每行都带 `[统计]` 前缀）：它是一份多行报告，**不得**再改回“一行塞满所有指标”的形式（该形式过长，难以阅读）。
 
 ## 4. 资源、打包与许可
 
@@ -292,15 +292,15 @@
 
 - spec 的 `datas` 有两条**必须**成立的映射：`src/assets` → 包根的 `assets/`（与内核的 `_MEIPASS/assets` 定位规则对应）、`src/ui/i18n` → `ui/i18n`（打包器只收 `.py` 模块，缺了它打包版切英文会静默回退中文）。位置错误不会报错，仅表现为字体回落、图标缺失与翻译失效。
 - 运行期只允许 `PySide6-Essentials` 范围内的模块（`QtCore` / `QtGui` / `QtWidgets` / `QtNetwork`）：**不得**引入 QtWebEngine、QtQuick 等 Addons。
-- PyInstaller 只能留在可选依赖 `build` 里：**不得**进运行时依赖。
-- **版本号只定义一处**：`core.__version__`（`src/core/__init__.py`）。`pyproject.toml` 由 `[tool.hatch.version]` 读它，安装器脚本由打包时生成的 `build/version.iss` 读它；**不得**在打包脚本、安装器脚本、文档或其它代码里另写版本字面量（升版本只改那一行）。
+- PyInstaller 只能留在 dev 组（仅构建期）：**不得**进运行时依赖。
+- **版本号只在一处维护**：`core.__version__`（`src/core/__init__.py`）。打包时 spec 由它生成 `build/version.iss`，安装器脚本由该头文件读版本；`pyproject.toml` 的 `version` 只是满足 PEP 621 的占位值（`0.0.0`），不作为版本来源。**不得**在打包脚本、安装器脚本、文档或其它代码里另写版本字面量（升版本只改那一行）。
 - 分发形态 = **目录形态产物 + 安装器**：先以 `XSY_ONEDIR=1` 打包（产出载荷与 `build/version.iss`），再编译 `packaging/xiangshuiyin-qt.iss`。脚本按 `dist/xiangshuiyin-qt/` 与 `build/version.iss` 定位，**不得**改用自定义输出目录，也**不得**把分发退回单文件（目录形态同时是「Qt 库可替换」的前提，见 §4.4）。
 - 安装器脚本的语言文件用仓库内副本（`packaging/i18n/`）：官方安装包不捆绑简体中文，**不得**改回 `compiler:Languages\...`（干净环境会直接编译失败）。
 - 安装器**必须**创建桌面与开始菜单快捷方式（`DefaultGroupName` + `DisableProgramGroupPage=no`）。
 - 安装器覆盖安装**必须**先清空 `{app}`（`[InstallDelete]` 的 `filesandordirs`），以清掉旧版删除的模块残留；`{app}` 恒为数据根目录下的 `app` 子目录，清空不波及同级 `watermark_data` 与 `logs`。
 - 「选择目标位置」页的路径输入栏**必须**只读，且离开该页前把路径补回 `app` 子目录（`[Code]`），禁止手输或粘贴绕过子目录。
 - 发布由 `.github/workflows/release.yml` 在打 tag 时执行：它只做打包与上传，**不得**依赖 tag 注入版本号（版本号只来自内核）；`scripts/check_version.py` 在打包前核对 tag 与 `__version__`，不一致即失败、不打包，tag 只用于该核对与资产命名。
-- **验收**：`dist/` 产物能启动、资源在位、无 Addons 依赖；安装器装完可运行、桌面与开始菜单快捷方式齐备、注册表无新增、删除程序目录与快捷方式即卸载干净；版本字面量只出现在 `src/core/__init__.py`（打包项与因果见 wiki §3.2、§3.6）。
+- **验收**：`dist/` 产物能启动、资源在位、无 Addons 依赖；安装器装完可运行、桌面与开始菜单快捷方式齐备、注册表无新增、删除程序目录与快捷方式即卸载干净；发布版本字面量只出现在 `src/core/__init__.py`（`pyproject.toml` 的 `0.0.0` 为占位，打包项与因果见 wiki §3.2、§3.6）。
 
 ### 4.3 字体与许可
 
@@ -400,7 +400,7 @@
 | 多语言 | 见 §6.6 |
 | 界面字体 / 图标素材 | 界面无缺字方框；步进按钮、弹窗关闭按钮、色块勾号仍正常；常规宽度下左对齐线不变 |
 | 资源与打包 | 冻结后字体 / 界面图标 / 关于框 logo 都在；spec 的 `datas` 与内核定位规则一致；打包版切英文生效 |
-| 分发形态 | 目录形态产物能启动；安装器装完可运行、桌面与开始菜单快捷方式齐备、注册表无新增、删程序目录即卸载干净；版本字面量只在 `src/core/__init__.py` 出现 |
+| 分发形态 | 目录形态产物能启动；安装器装完可运行、桌面与开始菜单快捷方式齐备、注册表无新增、删程序目录即卸载干净；发布版本字面量只在 `src/core/__init__.py` 出现（`pyproject.toml` 的 `0.0.0` 为占位） |
 | 内置字体 | 见 §6.5 |
 
 ## 7. 自检、工具与排障入口
@@ -416,12 +416,12 @@
 
 ### 7.2 命令
 
-- 运行：仓库内 `.venv` 的 Python 执行 `main.py`（Windows 布局为 `.venv\Scripts\python.exe`）。
+- 运行：`uv sync` 后 `uv run python main.py`（uv 按 `pyproject.toml` 与 `uv.lock` 创建仓库内 `.venv`）。
 - 界面截图：`tools/shot.py`（真实平台插件 + `WA_DontShowOnScreen`，产物默认写 `shots/`）。**禁止**用 `QT_QPA_PLATFORM=offscreen` 截图（字体库为空，中文渲染为方块，会将布局问题误判为字体问题）。
-- 打包：装可选依赖 `.[build]`。两步：`XSY_ONEDIR=1` 时 `python -m PyInstaller packaging/xiangshuiyin-qt.spec` 出目录形态载荷并生成 `build/version.iss`；再 `ISCC.exe packaging/xiangshuiyin-qt.iss` 出安装器（构建机需装 Inno Setup 6.3 或更高版本；它只作构建工具，不随产物分发）。核实方式是读产物归档表确认资源与 `ui/i18n/*.qm` 在位，并把数据目录指向沙箱、写入英文设置后启动产物，读日志里的 `[i18n]` 行；安装器另按 §4.2 的验收项核对。
+- 打包：`uv sync`（dev 组含 PyInstaller）。两步：`XSY_ONEDIR=1` 时 `uv run pyinstaller packaging/xiangshuiyin-qt.spec` 出目录形态载荷并生成 `build/version.iss`；再 `ISCC.exe packaging/xiangshuiyin-qt.iss` 出安装器（构建机需装 Inno Setup 6.3 或更高版本；它只作构建工具，不随产物分发）。核实方式是读产物归档表确认资源与 `ui/i18n/*.qm` 在位，并把数据目录指向沙箱、写入英文设置后启动产物，读日志里的 `[i18n]` 行；安装器另按 §4.2 的验收项核对。
 - 多语言：`scripts/build_i18n.py`（演练）/ `--write`，校验 `scripts/check_i18n.py`（§5）。
-- 命令行出图：`python src/cli/render.py <图片或目录>…`（内核默认值 + 可选预设或方案文件 + 参数覆盖，可输出 `--json`；`--compare` 一次按三种布局出图，`--info` 只读文件信息与 EXIF；`cd src` 后也可 `python -m cli`）。
-- 发布门禁：`scripts/check_docs_style.ps1`（文档：机器相关定位信息 / 排版体例 / 术语 / 交叉引用）、`scripts/check_code_style.py`（代码：本机路径写死 / 凭据 / 过期定位信息 / 注释体例）、`scripts/check_params.py`（参数表 / 内核签名 / 默认值契约）、`scripts/check_version.py`（发布 tag 与源码版本号一致）、`scripts/check_cli.py`（命令行无头出图）、`scripts/check_bundle.py`（产物自检）；语义级检查用 `python -m ruff check --select F821`（未定义名）。新增或修改发布门禁**必须**同时接进 `.github/workflows/ci.yml` 与 `release.yml` 的发布门禁；两处跑同一套脚本，发布时不过不打包。
+- 命令行出图：`uv run python src/cli/render.py <图片或目录>…`（内核默认值 + 可选预设或方案文件 + 参数覆盖，可输出 `--json`；`--compare` 一次按三种布局出图，`--info` 只读文件信息与 EXIF；`cd src` 后也可 `uv run python -m cli`）。
+- 发布门禁：`scripts/check_docs_style.ps1`（文档：机器相关定位信息 / 排版体例 / 术语 / 交叉引用）、`scripts/check_code_style.py`（代码：本机路径写死 / 凭据 / 过期定位信息 / 注释体例）、`scripts/check_params.py`（参数表 / 内核签名 / 默认值契约）、`scripts/check_version.py`（发布 tag 与源码版本号一致）、`scripts/check_cli.py`（命令行无头出图）、`scripts/check_bundle.py`（产物自检）；语义级检查用 `uv run --with ruff python -m ruff check --select F821`（未定义名）。新增或修改发布门禁**必须**同时接进 `.github/workflows/ci.yml` 与 `release.yml` 的发布门禁；两处跑同一套脚本，发布时不过不打包。
 - 发布门禁只收**能客观判定**的项（路径 / 行号 / 引号 / 交叉引用 / 契约）。靠语感的风格判断（口语词表一类）**不得**进 CI：穷举不可能完整，还会把个人用词偏好变成硬失败；注释体例、未使用导入（ruff `F401`）这类现存命中较多的项只**报告**，不计失败。
 
 ### 7.3 脚本纪律（`scripts/` 入库、`tools/` 不入库）
